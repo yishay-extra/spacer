@@ -184,3 +184,17 @@ TEST_CASE("Offline render: a project without output channels is an error") {
     Project p = makeProject({makeSpeaker(1, -30.0f, 2.0f, -1), makeSpeaker(2, 30.0f, 2.0f, -1)});
     CHECK_FALSE(OfflineRenderer::render(p, {}, 0.1).hasValue());
 }
+
+TEST_CASE("Offline render: DBAP sources render through the Dbap spatializer") {
+    Project p = makeProject({makeSpeaker(1, -90.0f, 2.0f, 0), makeSpeaker(2, 90.0f, 2.0f, 1)},
+                            {makeSource(1, {-90.0f, 0.0f, 2.0f}, SpatializerKind::Dbap)});
+    auto r = OfflineRenderer::render(p, {{1, sine(kSr, 440.0, 0.25f, 48000)}}, 1.0);
+    REQUIRE(r.hasValue());
+    const float left = rms(r->audio.getReadPointer(0, 4800), 38400);
+    const float right = rms(r->audio.getReadPointer(1, 4800), 38400);
+    // DBAP never fully silences the far speaker, but the near one dominates
+    // and power is preserved (Σg² = 1).
+    CHECK(left > right * 2.0f);
+    CHECK(right > 0.0f);
+    CHECK(left * left + right * right == Approx(0.25f * 0.25f / 2.0f).epsilon(0.01));
+}
