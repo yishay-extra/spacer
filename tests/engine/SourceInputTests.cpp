@@ -41,8 +41,9 @@ TEST_CASE("Generator: sine has the given frequency, unit peak and starts at phas
         x.insert(x.end(), blk.begin(), blk.end());
     }
     for (std::size_t i = 0; i < x.size(); i += 37)
-        REQUIRE(x[i] ==
-                Approx(std::sin(2.0 * juce::MathConstants<double>::pi * 1000.0 * i / kSr)).margin(1e-5));
+        REQUIRE(x[i] == Approx(std::sin(2.0 * juce::MathConstants<double>::pi * 1000.0 *
+                                        static_cast<double>(i) / kSr))
+                            .margin(1e-5));
     CHECK(peakAbs(x.data(), static_cast<int>(x.size())) == Approx(1.0f).margin(1e-4));
 }
 
