@@ -431,3 +431,21 @@ TEST_CASE("Engine: motion, modulators, generators and files process without allo
     }
     dir.deleteRecursively();
 }
+
+TEST_CASE("Source motion: restartMotion (scene recall restartMotionPhase) resets motion and LFO phase") {
+    Project p = quad();
+    SourceSpec s = orbitSource(Period::seconds(1.0));
+    ModulatorSpec m;
+    m.source = LfoSource{LfoShape::Saw, Period::seconds(1.0)};
+    m.target = "motion.radius";
+    s.modulators = {m};
+    p.sources = {s};
+    Rig rig(p);
+    Rig reference(p);
+    reference.run();
+    rig.run(37);
+    rig.source().restartMotion();
+    rig.run();
+    CHECK(rig.pos().azimuth == Approx(reference.pos().azimuth).margin(1e-3));
+    CHECK(rig.pos().distance == Approx(reference.pos().distance).margin(1e-4));
+}
