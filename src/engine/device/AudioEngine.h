@@ -13,6 +13,7 @@
 #include "engine/Command.h"
 #include "engine/EngineProcessor.h"
 #include "engine/Feedback.h"
+#include "engine/GraphBuilder.h"
 
 namespace spacer {
 
@@ -55,6 +56,10 @@ public:
     /// swaps it in (SPEC §5.2). Also used before the device is open.
     void setProject(const Project& project);
 
+    /// Source inputs for graphs built from now on (null = silence). Until
+    /// WP4/WP5 provide live inputs this is how tools feed test signals.
+    void setInputFactory(GraphBuilder::InputFactory factory) { inputFactory_ = std::move(factory); }
+
     /// Parameter change, queued for the audio thread. False if dropped.
     bool send(const Command& command) { return processor_.push(command); }
 
@@ -78,6 +83,7 @@ private:
     juce::AudioDeviceManager deviceManager_;
     EngineProcessor processor_;
     std::optional<Project> project_;
+    GraphBuilder::InputFactory inputFactory_;
 
     // Written in audioDeviceAboutToStart (callback not running), read by the callback.
     juce::AudioIODevice* device_{nullptr};

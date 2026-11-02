@@ -124,6 +124,34 @@ if(SPACER_WITH_APP)
             juce::juce_recommended_config_flags
             juce::juce_recommended_lto_flags
             juce::juce_recommended_warning_flags)
+
+    # spacer-engine-check: CLI that drives the real AudioEngine on a real
+    # device (manual validation, docs/mac-validation/WP3.md).
+    file(GLOB SPACER_ENGINE_DEVICE_SOURCES CONFIGURE_DEPENDS
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/device/*.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/device/*.h)
+    juce_add_console_app(spacer_engine_check PRODUCT_NAME "spacer-engine-check")
+    target_sources(spacer_engine_check PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/tools/EngineCheck.cpp
+        ${SPACER_ENGINE_SOURCES}
+        ${SPACER_ENGINE_DEVICE_SOURCES})
+    target_include_directories(spacer_engine_check PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_compile_definitions(spacer_engine_check PRIVATE
+        ${SPACER_ENGINE_JUCE_DEFINITIONS}
+        JUCE_MODAL_LOOPS_PERMITTED=1
+        SPACER_ALLOCATION_GUARD=1)
+    target_link_libraries(spacer_engine_check
+        PRIVATE
+            spacer_core
+            juce::juce_audio_devices
+            juce::juce_audio_formats
+            juce::juce_dsp
+            juce::juce_events
+            "-framework CoreAudio"
+            "-framework CoreFoundation"
+        PUBLIC
+            juce::juce_recommended_config_flags
+            juce::juce_recommended_warning_flags)
 elseif(SPACER_BUILD_APP)
     message(STATUS "Spacer app is macOS-only; building spacer_core and tests only.")
 endif()

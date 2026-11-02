@@ -45,6 +45,7 @@ std::unique_ptr<Graph> AudioEngine::buildGraph(double sampleRate, int blockSize,
     if (!project_ || sampleRate <= 0.0 || blockSize <= 0) return nullptr;
     GraphBuilder builder(*project_);
     // Live source inputs (hardware, file, generator, virtual device) are WP4 / WP5.
+    if (inputFactory_) builder.setInputFactory(inputFactory_);
     builder.setNumOutputChannels(numOutputs);
     return builder.build(sampleRate, blockSize);
 }

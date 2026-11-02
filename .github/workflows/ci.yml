@@ -43,3 +43,9 @@ jobs:
           name: Spacer-macOS
           path: build/Spacer_artefacts/Release/Spacer.app
           if-no-files-found: error
+      - name: Upload engine check tool
+        uses: actions/upload-artifact@v4
+        with:
+          name: spacer-engine-check-macOS
+          path: build/spacer_engine_check_artefacts/Release/spacer-engine-check
+          if-no-files-found: error
