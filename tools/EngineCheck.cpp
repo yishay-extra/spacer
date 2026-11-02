@@ -1,10 +1,14 @@
 // spacer-engine-check: manual validation tool for WP3 on a real Mac (see
-// docs/mac-validation/WP3.md). Runs the real AudioEngine on a real device.
+// docs/mac-validation/WP3.md, WP4.md). Runs the real AudioEngine on a real device.
 //
 //   spacer-engine-check devices
 //   spacer-engine-check tone  [--device NAME] [--seconds S] [--az DEG] [--rate HZ] [--buffer N]
 //   spacer-engine-check pan   [--device NAME] [--seconds S]
 //   spacer-engine-check delay [--device NAME] [--seconds S]
+//   spacer-engine-check file PATH [--loop] [--seek-at S] [--device NAME] [--seconds S]     (WP4)
+//   spacer-engine-check generator sine|pink|white|impulse [--az DEG] [--device NAME] [--seconds S]
+//   spacer-engine-check input --channel N [--az DEG] [--device NAME] [--seconds S]
+//   spacer-engine-check orbit [--period S] [--device NAME] [--seconds S]
 //   spacer-engine-check aggregate-create NAME UID SUB_UID [SUB_UID...]
 //   spacer-engine-check aggregate-destroy UID
 
@@ -16,6 +20,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <variant>
 #include <vector>
 
 #include "core/Project.h"
@@ -34,6 +39,10 @@ struct Args {
     float az{-90.0f};
     double rate{0.0};
     int buffer{0};
+    bool loop{false};
+    double seekAt{-1.0};
+    int channel{0};
+    double period{4.0};
 };
 
 Args parse(int argc, char** argv) {
@@ -51,6 +60,14 @@ Args parse(int argc, char** argv) {
             a.rate = std::stod(argv[++i]);
         else if (s == "--buffer" && hasValue)
             a.buffer = std::stoi(argv[++i]);
+        else if (s == "--loop")
+            a.loop = true;
+        else if (s == "--seek-at" && hasValue)
+            a.seekAt = std::stod(argv[++i]);
+        else if (s == "--channel" && hasValue)
+            a.channel = std::stoi(argv[++i]);
+        else if (s == "--period" && hasValue)
+            a.period = std::stod(argv[++i]);
         else
             a.positional.push_back(s);
     }
@@ -156,6 +173,94 @@ int playTone(const Args& a, const std::string& mode) {
     return 0;
 }
 
+/// WP4: the engine's own live inputs (no input override): file player with
+/// the disk thread, generators, hardware input, and an Orbit motion.
+int playLive(const Args& a, const std::string& mode) {
+    AudioEngine engine;
+    Project p = tonePlan(a.az, false);
+    SourceSpec& s = p.sources.front();
+    int inputs = 0;
+    if (mode == "file") {
+        if (a.positional.size() < 2) {
+            std::fprintf(stderr, "usage: file PATH [--loop] [--seek-at S]\n");
+            return 2;
+        }
+        FileInputSpec f;
+        f.path = juce::File::getCurrentWorkingDirectory()
+                     .getChildFile(a.positional[1])
+                     .getFullPathName()
+                     .toStdString();
+        f.loop = a.loop;
+        s.input.value = f;
+        s.stereo = true;
+        s.width = 180.0f;  // file L / R on speakers L / R
+        s.motion.value = ManualMotion{{0.0f, 0.0f, 2.0f}, 20.0f};
+    } else if (mode == "generator") {
+        const std::string kind = a.positional.size() > 1 ? a.positional[1] : "sine";
+        GeneratorSpec g;
+        g.type = kind == "pink"      ? GeneratorKind::Pink
+                 : kind == "white"   ? GeneratorKind::White
+                 : kind == "impulse" ? GeneratorKind::Impulse
+                                     : GeneratorKind::Sine;
+        g.periodSeconds = 0.5f;
+        s.input.value = g;
+    } else if (mode == "input") {
+        HardwareInputSpec in;
+        in.left = a.channel;
+        s.input.value = in;
+        s.gainDb = 0.0f;
+        inputs = a.channel + 1;
+    } else {  // orbit
+        GeneratorSpec g;
+        g.type = GeneratorKind::Pink;
+        s.input.value = g;
+        OrbitMotion o;
+        o.centre = {0.0f, 0.0f, 0.0f};
+        o.radius = 2.0f;
+        o.period = Period::seconds(a.period);
+        s.motion.value = o;
+    }
+    if (mode != "input") s.gainDb = -20.0f;
+
+    DeviceMapping devices;
+    devices.outputDeviceName = a.device;
+    devices.sampleRate = a.rate;
+    devices.bufferSize = a.buffer;
+    const auto error = engine.openDevice(devices, inputs);
+    if (error.isNotEmpty()) {
+        std::fprintf(stderr, "cannot open device: %s\n", error.toRawUTF8());
+        return 1;
+    }
+    double position = 0.0;
+    unsigned underruns = 0;
+    engine.onFeedback = [&](const Feedback& f) {
+        if (const auto* t = std::get_if<fb::FileTransport>(&f)) {
+            position = t->positionSeconds;
+            underruns = t->underruns;
+        }
+    };
+    engine.setProject(p);
+    for (const auto& w : engine.buildWarnings()) std::fprintf(stderr, "warning: %s\n", w.c_str());
+    if (mode == "file") engine.send(cmd::FilePlay{1});
+
+    std::printf("mode=%s\n", mode.c_str());
+    bool seeked = false;
+    double nextPrint = 0.0;
+    runFor(a.seconds, engine, [&](double t) {
+        if (mode != "file") return;
+        if (a.seekAt >= 0.0 && !seeked && t >= a.seekAt) {
+            seeked = true;
+            engine.send(cmd::FileSeek{1, 0.0});
+            std::printf("t=%5.1fs  seek to 0\n", t);
+        }
+        if (t >= nextPrint) {
+            std::printf("t=%5.1fs  file position %.3f s  underruns %u\n", t, position, underruns);
+            nextPrint += 1.0;
+        }
+    });
+    return 0;
+}
+
 int listDevices() {
     for (const auto& d : AggregateDevice::listDevices())
         std::printf("%5u  in=%-3d out=%-3d  %-40s  uid=%s\n", d.id, d.numInputs, d.numOutputs, d.name.c_str(),
@@ -201,11 +306,15 @@ int main(int argc, char** argv) {
     const std::string command = a.positional.empty() ? "" : a.positional.front();
     if (command == "devices") return listDevices();
     if (command == "tone" || command == "pan" || command == "delay") return playTone(a, command);
+    if (command == "file" || command == "generator" || command == "input" || command == "orbit")
+        return playLive(a, command);
     if (command == "aggregate-create") return createAggregate(a);
     if (command == "aggregate-destroy") return destroyAggregate(a);
     std::fprintf(
         stderr,
-        "usage: spacer-engine-check devices | tone | pan | delay | aggregate-create | aggregate-destroy\n"
-        "       options: --device NAME --seconds S --az DEG --rate HZ --buffer N\n");
+        "usage: spacer-engine-check devices | tone | pan | delay | file | generator | input | orbit |\n"
+        "                           aggregate-create | aggregate-destroy\n"
+        "       options: --device NAME --seconds S --az DEG --rate HZ --buffer N --loop --seek-at S\n"
+        "                --channel N --period S\n");
     return 2;
 }

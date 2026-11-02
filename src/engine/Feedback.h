@@ -33,6 +33,14 @@ struct SourcePosition {
     int channel{0};
     Position position;
 };
+/// File source transport: playback position (file time) and state.
+struct FileTransport {
+    int sourceId{0};
+    double positionSeconds{0.0};
+    bool playing{false};
+    /// Blocks in which the disk side had not delivered enough audio (monotonic).
+    std::uint32_t underruns{0};
+};
 struct Clock {
     ClockState state;
 };
@@ -53,8 +61,8 @@ struct CueFired {
 
 }  // namespace fb
 
-using Feedback = std::variant<fb::SourceMeter, fb::SpeakerMeter, fb::SourcePosition, fb::Clock, fb::Xrun,
-                              fb::CommandDropped, fb::CueFired>;
+using Feedback = std::variant<fb::SourceMeter, fb::SpeakerMeter, fb::SourcePosition, fb::FileTransport,
+                              fb::Clock, fb::Xrun, fb::CommandDropped, fb::CueFired>;
 
 static_assert(std::is_trivially_copyable_v<Feedback>);
 
