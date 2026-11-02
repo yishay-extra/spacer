@@ -12,7 +12,8 @@
       "trimDb": 0,
       "userDelayMs": 0,
       "polarityInverted": false,
-      "outputChannel": 0
+      "outputChannel": 0,
+      "lfe": false
     },
     {
       "id": 2,
@@ -25,7 +26,8 @@
       "trimDb": 0,
       "userDelayMs": 0,
       "polarityInverted": false,
-      "outputChannel": 1
+      "outputChannel": 1,
+      "lfe": false
     },
     {
       "id": 3,
@@ -38,7 +40,8 @@
       "trimDb": 0,
       "userDelayMs": 0,
       "polarityInverted": false,
-      "outputChannel": 2
+      "outputChannel": 2,
+      "lfe": false
     },
     {
       "id": 4,
@@ -51,7 +54,8 @@
       "trimDb": 0,
       "userDelayMs": 0,
       "polarityInverted": false,
-      "outputChannel": 3
+      "outputChannel": 3,
+      "lfe": false
     },
     {
       "id": 5,
@@ -64,7 +68,8 @@
       "trimDb": 0,
       "userDelayMs": 0,
       "polarityInverted": false,
-      "outputChannel": 4
+      "outputChannel": 4,
+      "lfe": false
     },
     {
       "id": 6,
@@ -77,7 +82,8 @@
       "trimDb": 0,
       "userDelayMs": 0,
       "polarityInverted": false,
-      "outputChannel": 5
+      "outputChannel": 5,
+      "lfe": false
     },
     {
       "id": 7,
@@ -90,7 +96,8 @@
       "trimDb": 0,
       "userDelayMs": 0,
       "polarityInverted": false,
-      "outputChannel": 6
+      "outputChannel": 6,
+      "lfe": false
     },
     {
       "id": 8,
@@ -103,7 +110,8 @@
       "trimDb": 0,
       "userDelayMs": 0,
       "polarityInverted": false,
-      "outputChannel": 7
+      "outputChannel": 7,
+      "lfe": false
     }
   ]
 }

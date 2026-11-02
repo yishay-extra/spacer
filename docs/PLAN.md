@@ -291,7 +291,7 @@ Decisions made where SPEC was silent (all additive; nothing in the spec was chan
 
 Spec issues for the owner (not changed):
 
-1. §7 presets: 5.1 / 7.1 / 7.1.4 include an LFE speaker. It is in the same direction as C, which degenerates VBAP. Layouts probably need a way to mark non-panned speakers (e.g. `role: "lfe"`) — WP2a/WP2b must decide. `validate()` currently *warns* on coincident directions.
+1. **Resolved** (SPEC §7: `Speaker::lfe`, excluded from panning, Direct-only). §7 presets: 5.1 / 7.1 / 7.1.4 include an LFE speaker. It is in the same direction as C, which degenerates VBAP. Layouts probably need a way to mark non-panned speakers (e.g. `role: "lfe"`) — WP2a/WP2b must decide. `validate()` currently *warns* on coincident directions.
 2. §7 "standard angles" is undefined for Dome 22 and the octagon; chosen: octagon at 0°,45°…; dome22 = 8 @0°, 8 @30° (offset 22.5°), 5 @60°, zenith.
 3. §15 example has `"..."` placeholders inside `scenes`; not valid JSON as written.
 4. §11 `Midi{note | cc}` and "program change selects scenes" (§12.2): program-change→scene mapping has no home in `MidiConfig`; not modelled.

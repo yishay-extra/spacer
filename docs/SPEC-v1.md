@@ -78,7 +78,7 @@ signatures.
 ```cpp
 struct Position { float azimuth, elevation, distance; /* + conversions */ };
 struct Speaker  { int id; std::string name; Position position; float trimDb;
-                  float userDelayMs; bool polarityInverted; int outputChannel; };
+                  float userDelayMs; bool polarityInverted; int outputChannel; bool lfe; };
 struct Layout   { std::string name; std::vector<Speaker> speakers; };
 std::vector<SpeakerCompensation> computeCompensation(const Layout&, float c = 343.f);
 
@@ -258,6 +258,12 @@ default 0 (off). Parameters are per source.
   attenuated). `c` = 343 m/s, user-adjustable in settings.
 - Effective speaker delay = compensation + `userDelayMs`; effective gain =
   compensation + `trimDb`.
+- **LFE speakers** (`lfe: true`, JSON key optional, default false) are
+  excluded from panning: VBAP, DBAP and the Ambisonic decoder ignore them
+  (they are not part of the hull, the DBAP sum or the AllRAD target layout).
+  They receive signal only via `Direct` routing (§6.4). They still get
+  distance compensation and a speaker chain. Bass management is out of
+  scope for v1. Direction-coincidence checks skip LFE speakers.
 - Validation: 2 ≤ speakers ≤ 32, unique ids, unique output channels (or −1),
   distance > 0.
 - Layout presets (JSON files in `resources/layouts/`): stereo, quad, 5.1,
@@ -421,7 +427,8 @@ ignored on load (forward compatibility) but a warning is logged.
     "name": "Dome 22",
     "speakers": [
       {"id": 1, "name": "1", "position": {"az": 0, "el": 0, "dist": 4.2},
-       "trimDb": 0, "userDelayMs": 0, "polarityInverted": false, "outputChannel": 0}
+       "trimDb": 0, "userDelayMs": 0, "polarityInverted": false, "outputChannel": 0,
+       "lfe": false}
     ]
   },
   "devices": {"outputDeviceName": "Spacer Aggregate", "sampleRate": 48000, "bufferSize": 128,

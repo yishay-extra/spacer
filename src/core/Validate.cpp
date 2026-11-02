@@ -265,6 +265,7 @@ Issues validate(const Layout& layout) {
     }
     for (std::size_t i = 0; i < n; ++i)
         for (std::size_t k = i + 1; k < n; ++k) {
+            if (layout.speakers[i].lfe || layout.speakers[k].lfe) continue;  // LFE is not panned
             const auto& a = layout.speakers[i].position;
             const auto& b = layout.speakers[k].position;
             if (finite(a) && finite(b) && angleBetween(a, b) < 0.5f)
