@@ -82,8 +82,11 @@ TEST_CASE("Allocation guard: detects an allocation inside the audio scope only")
     CHECK(allocguard::violations() == 0);
     {
         allocguard::ScopedAudioThread guard;
-        auto inside = std::make_unique<int>(2);  // new + delete
-        CHECK(*inside == 2);
+        // Call the allocation functions directly: optimisers may elide a
+        // paired new-expression / delete-expression (e.g. make_unique<int>),
+        // but not explicit calls to ::operator new / ::operator delete.
+        void* volatile p = ::operator new(16);
+        ::operator delete(p);
     }
     CHECK(allocguard::violations() == 2);
     allocguard::resetViolations();

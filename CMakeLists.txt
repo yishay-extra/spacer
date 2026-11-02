@@ -73,8 +73,7 @@ file(GLOB SPACER_ENGINE_SOURCES CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/*.h)
 set(SPACER_ENGINE_JUCE_DEFINITIONS
     JUCE_WEB_BROWSER=0
-    JUCE_USE_CURL=0
-    JUCE_DISPLAY_SPLASH_SCREEN=0)
+    JUCE_USE_CURL=0)
 
 # ---------------------------------------------------------------------------
 # Spacer app: JUCE. macOS only for phase 1.
