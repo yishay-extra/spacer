@@ -181,7 +181,9 @@ master: mute/panic ramp applied to all outputs
   (default **10 ms**; cue transitions use the cue's time).
 - Positions: motion output is evaluated once per block; the spatializer
   interpolates gains per sample from the block's start to end position. Manual
-  positions additionally pass through a one-pole smoother (default 20 ms).
+  positions additionally pass through a one-pole smoother whose time constant
+  is the Manual motion's `smoothMs` (default 20 ms); this is the only Manual
+  smoothing (no additional glide).
 - Delay changes (layout edits) crossfade between old and new delay over 50 ms.
 
 ### 5.5 Output limiter (per speaker)
@@ -318,6 +320,15 @@ default 0 (off). Parameters are per source.
   `linkedPoints` instead gives each channel its own position/motion.
 - File formats: WAV, AIFF, FLAC, OGG (JUCE), MP3/AAC/ALAC (CoreAudio). Files
   are resampled to the engine rate on the disk thread.
+- File transport: a file source starts **stopped** at `startSeconds`, already
+  buffered. `loop` repeats `[startSeconds, end)`; `play` at the end of a
+  non-looping file restarts from `startSeconds`. The offline renderer plays
+  files from t = 0.
+- Generators are mono at full scale (level via `gainDb`): sine peak 1 from
+  phase 0; white uniform ±1; pink (Voss–McCartney) peak ≤ 1; impulse one
+  sample of 1.0 per period; fixed seed (deterministic renders).
+- Live edits of a motion **period** are structural (rebuilt via `SwapGraph`)
+  and re-anchor the phase so the position is continuous at the switch.
 
 ## 9. Clock
 
@@ -533,8 +544,9 @@ Single window, dark theme, resizable, minimum 1100×700. Panels:
 - Core: Catch2 unit tests for every spatializer (known-gain cases), compensation,
   every motion (determinism + known values), scene recall ramps, JSON round
   trips, migrations.
-- Engine: offline-render golden tests (`tests/golden/*.wav`, tolerance
-  −80 dBFS RMS difference), latency reporting tests.
+- Engine: offline-render tests against analytic references (preferred) or
+  golden files (`tests/golden/*.wav`), tolerance −80 dBFS RMS difference;
+  latency reporting tests.
 - RT safety: debug-build allocation guard (`operator new` hook active during
   the callback asserts), plus a CI benchmark: 64 sources, 32 speakers,
   5th-order ambisonics + VBAP mix, 128 frames at 48 kHz must process in
