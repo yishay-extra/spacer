@@ -4,6 +4,8 @@ on:
   push:
     branches: ["main", "claude/**"]
   pull_request:
+    types: [opened, synchronize, reopened, labeled]
+  workflow_dispatch:
 
 jobs:
   core-tests:
@@ -20,6 +22,12 @@ jobs:
 
   macos-app:
     name: App + tests (macOS)
+    # macOS runners are expensive: run only on main, on manual dispatch,
+    # or on a PR labelled "macos" (use it for macOS-only WPs before merging).
+    if: >-
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'macos'))
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
