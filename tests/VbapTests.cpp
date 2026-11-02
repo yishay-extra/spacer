@@ -1,42 +1,13 @@
-#include <atomic>
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
 #include <cmath>
-#include <cstdlib>
-#include <new>
 #include <numeric>
 #include <vector>
 
+#include "AllocationCounter.h"
 #include "core/LayoutPresets.h"
 #include "core/spatial/Vbap.h"
-
-// --- allocation counter hook (active only while `g_countAllocs` is set) -----
-namespace {
-std::atomic<bool> g_countAllocs{false};
-std::atomic<long> g_allocs{0};
-}  // namespace
-
-void* operator new(std::size_t n) {
-    if (g_countAllocs.load(std::memory_order_relaxed)) g_allocs.fetch_add(1, std::memory_order_relaxed);
-    if (void* p = std::malloc(n ? n : 1)) return p;
-    throw std::bad_alloc();
-}
-void* operator new[](std::size_t n) {
-    return operator new(n);
-}
-void operator delete(void* p) noexcept {
-    std::free(p);
-}
-void operator delete[](void* p) noexcept {
-    std::free(p);
-}
-void operator delete(void* p, std::size_t) noexcept {
-    std::free(p);
-}
-void operator delete[](void* p, std::size_t) noexcept {
-    std::free(p);
-}
 
 using Catch::Approx;
 using namespace spacer;
@@ -259,12 +230,14 @@ TEST_CASE("VBAP: render does not allocate") {
     bus.numSamples = n;
     std::vector<float> in(n, 1.0f);
 
-    g_allocs = 0;
-    g_countAllocs = true;
-    for (int i = 0; i < 100; ++i)
-        v.render(in.data(), n, {static_cast<float>(i), static_cast<float>(i % 90), 2.0f},
-                 {static_cast<float>(i + 7), static_cast<float>((i * 7) % 181 - 90), 2.0f},
-                 i % 2 ? 0.5f : 0.0f, bus);
-    g_countAllocs = false;
-    CHECK(g_allocs.load() == 0);
+    long allocs = 0;
+    {
+        test::AllocationCounter counter;
+        for (int i = 0; i < 100; ++i)
+            v.render(in.data(), n, {static_cast<float>(i), static_cast<float>(i % 90), 2.0f},
+                     {static_cast<float>(i + 7), static_cast<float>((i * 7) % 181 - 90), 2.0f},
+                     i % 2 ? 0.5f : 0.0f, bus);
+        allocs = counter.count();
+    }
+    CHECK(allocs == 0);
 }
