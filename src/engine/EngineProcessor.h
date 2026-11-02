@@ -10,6 +10,7 @@
 #include "engine/Feedback.h"
 #include "engine/GainRamp.h"
 #include "engine/Graph.h"
+#include "engine/RecallPlan.h"
 #include "engine/SpscQueue.h"
 
 namespace spacer {
@@ -31,6 +32,10 @@ public:
     static constexpr int kMaxIoChannels = 256;
     static constexpr int kMaxChunk = 2048;  // SPEC §1 max block size
     static constexpr double kFeedbackRateHz = 60.0;
+    static constexpr int kRetirePlanCapacity = 256;
+    static constexpr int kMaxActiveRamps = 2048;
+    /// Crossfade for discrete switches during a recall (SPEC §11).
+    static constexpr float kRecallCrossfadeMs = 50.0f;
 
     EngineProcessor();
     ~EngineProcessor();
@@ -44,7 +49,8 @@ public:
     /// deleted and false returned.
     bool swapGraph(std::unique_ptr<Graph> graph);
     bool popFeedback(Feedback& out) noexcept { return feedback_.pop(out); }
-    /// Deletes graphs the audio thread has finished with. Call regularly.
+    /// Deletes graphs and recall plans the audio thread has finished with.
+    /// Call regularly.
     int collectGarbage();
     /// Only while process() cannot run (device stopped / before start).
     void setGraphWhileStopped(std::unique_ptr<Graph> graph);
@@ -67,6 +73,21 @@ public:
     ClockState clockState() const noexcept { return clock_.current(); }
 
 private:
+    struct ActiveRamp {
+        Ramp ramp;
+        float from{0.0f};
+        Position fromPosition;
+        int total{0};
+        int elapsed{0};
+    };
+
+    void applyRecall(RecallPlan* plan) noexcept;
+    void startRamp(const Ramp& ramp, int totalSamples, float rampMs) noexcept;
+    void applyRampValue(const Ramp& ramp, float value, const Position& position) noexcept;
+    void stepRamps(int numSamples) noexcept;
+    void retirePlan(RecallPlan* plan) noexcept;
+    void scheduleRecall(RecallPlan* plan) noexcept;
+    int scheduledRecallOffset(const ClockState& clock, int numSamples) const noexcept;
     void applyCommands() noexcept;
     void apply(const Command& c) noexcept;
     bool applyPendingSwap() noexcept;
@@ -76,10 +97,14 @@ private:
     SpscQueue<Command, kCommandCapacity> commands_;
     SpscQueue<Feedback, kFeedbackCapacity> feedback_;
     SpscQueue<Graph*, kRetireCapacity> retired_;
+    SpscQueue<RecallPlan*, kRetirePlanCapacity> retiredPlans_;
 
     // Audio-thread state.
     Graph* graph_{nullptr};
     Graph* pending_{nullptr};
+    RecallPlan* scheduled_{nullptr};  // AtBeat recall waiting for its beat
+    std::array<ActiveRamp, kMaxActiveRamps> ramps_{};
+    int numRamps_{0};
     bool fadingOut_{false};
     InternalClock clock_;
     double sampleRate_{0.0};
