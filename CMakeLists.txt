@@ -131,8 +131,7 @@ if(SPACER_WITH_APP)
 
     target_link_libraries(Spacer
         PRIVATE
-            spacer_core
-            spacer_ui_logic
+            spacer_ui_logic  # brings spacer_core (listing both makes Apple ld warn)
             juce::juce_audio_utils
             juce::juce_audio_processors
             juce::juce_audio_formats
