@@ -161,6 +161,10 @@ resampling, transport, loop; generators. Hook into `GraphBuilder`.
 Acceptance: offline render with a file source matches the file (after
 resample) within −80 dB; seek/loop are sample-accurate; stopping the disk
 thread never blocks the audio thread (test with a stalled reader).
+Also (carried over from WP3): wire WP7's `MotionFactory` / `ModulatorBank`
+into the engine's `SourceNode` (motion evaluated per block from the clock,
+modulators applied, `SetMotionParam` and modulator commands, motion phase
+carried across `SwapGraph`), with an offline-render test of an Orbit source.
 
 ---
 
@@ -204,6 +208,8 @@ scheduled to sample via command timestamps), `OscSender` (30 Hz feedback),
 → `Command` translation. Acceptance: every §12.1 address has a test sending
 a message and observing the resulting command; malformed messages are
 counted, never crash; MIDI learn captures the first moved control.
+OSC/MIDI callbacks must not push to the audio command queue directly (SPEC
+§5.2 single producer).
 Also: add `MidiConfig::programChangeChannel` (model, JSON, round-trip test; SPEC §12.2).
 
 ---
