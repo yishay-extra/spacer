@@ -3,6 +3,8 @@
 #include <cmath>
 #include <set>
 
+#include "core/motion/ParameterPath.h"
+
 namespace spacer {
 
 namespace {
@@ -138,7 +140,10 @@ void checkModulators(Sink& s, const std::string& path, const std::vector<Modulat
         s.error(path, "at most " + std::to_string(kMaxModulators) + " modulators allowed");
     for (std::size_t i = 0; i < mods.size(); ++i) {
         const std::string p = idx(path, i);
-        if (mods[i].target.empty()) s.error(p + ".target", "target parameter path must not be empty");
+        if (mods[i].target.empty())
+            s.error(p + ".target", "target parameter path must not be empty");
+        else if (!ParameterPath::parse(mods[i].target))
+            s.error(p + ".target", "unknown parameter path '" + mods[i].target + "'");
         if (!finite(mods[i].depth) || !finite(mods[i].offset)) s.error(p, "depth and offset must be finite");
         if (const auto* lfo = std::get_if<LfoSource>(&mods[i].source))
             checkPeriod(s, p + ".source.period", lfo->period);
