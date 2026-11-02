@@ -5,6 +5,7 @@
 #include <utility>
 #include <variant>
 
+#include "core/SpecEquality.h"
 #include "core/motion/MotionFactory.h"
 #include "core/motion/MotionParamValue.h"
 #include "core/motion/ParameterPath.h"
@@ -172,7 +173,7 @@ void SourceNode::takeStateFrom(SourceNode& old, bool sameLayout) noexcept {
         if (!motion_[k] || !old.motion_[ok]) continue;
         if (motionSpec_[k].value.index() != old.motionSpec_[ok].value.index()) continue;  // new kind: phase 0
         const bool unchanged =
-            motionSpec_[k] == old.motionSpec_[ok] && (sameLayout || !usesLayout(motionSpec_[k]));
+            specEqual(motionSpec_[k], old.motionSpec_[ok]) && (sameLayout || !usesLayout(motionSpec_[k]));
         if (unchanged && samePoints) {
             // Keep the running motion with all its state; the fresh one goes
             // back with the old graph.
@@ -182,7 +183,7 @@ void SourceNode::takeStateFrom(SourceNode& old, bool sameLayout) noexcept {
             motion_[k]->continueTimelineFrom(*old.motion_[ok]);
         }
     }
-    if (modulatorSpecs_ == old.modulatorSpecs_)
+    if (specEqual(modulatorSpecs_, old.modulatorSpecs_))
         modulators_ = old.modulators_;
     else
         modulators_.continueTimelineFrom(old.modulators_);

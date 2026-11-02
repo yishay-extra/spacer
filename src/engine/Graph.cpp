@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <utility>
 
+#include "core/SpecEquality.h"
+
 namespace spacer {
 
 Graph::Graph(const Layout& layout, double sampleRate, int maxBlockSize, int numOutputChannels,
@@ -91,7 +93,7 @@ void Graph::process(const InputContext& ctx, const ClockState& clock, float* con
 }
 
 void Graph::takeStateFrom(Graph& old) noexcept {
-    const bool sameLayout = layout_ == old.layout_;
+    const bool sameLayout = specEqual(layout_, old.layout_);
     for (auto& s : sources_)
         if (SourceNode* o = old.findSource(s->id())) s->takeStateFrom(*o, sameLayout);
 

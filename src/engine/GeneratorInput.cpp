@@ -4,6 +4,8 @@
 #include <bit>
 #include <cmath>
 
+#include "core/SpecEquality.h"
+
 namespace spacer {
 
 GeneratorInput::GeneratorInput(const GeneratorSpec& spec) : spec_(spec) {}
@@ -67,7 +69,7 @@ void GeneratorInput::read(const InputContext& /*ctx*/, float* const* dest, int n
 
 void GeneratorInput::takeStateFrom(SourceInput& old) noexcept {
     auto* o = dynamic_cast<GeneratorInput*>(&old);
-    if (o == nullptr || !(o->spec_ == spec_)) return;
+    if (o == nullptr || !specEqual(o->spec_, spec_)) return;
     phase_ = o->phase_;
     random_ = o->random_;
     pinkRows_ = o->pinkRows_;
