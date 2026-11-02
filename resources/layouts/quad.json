@@ -1,0 +1,57 @@
+{
+  "name": "Quad",
+  "speakers": [
+    {
+      "id": 1,
+      "name": "FL",
+      "position": {
+        "az": -45,
+        "el": 0,
+        "dist": 2.0
+      },
+      "trimDb": 0,
+      "userDelayMs": 0,
+      "polarityInverted": false,
+      "outputChannel": 0
+    },
+    {
+      "id": 2,
+      "name": "FR",
+      "position": {
+        "az": 45,
+        "el": 0,
+        "dist": 2.0
+      },
+      "trimDb": 0,
+      "userDelayMs": 0,
+      "polarityInverted": false,
+      "outputChannel": 1
+    },
+    {
+      "id": 3,
+      "name": "RR",
+      "position": {
+        "az": 135,
+        "el": 0,
+        "dist": 2.0
+      },
+      "trimDb": 0,
+      "userDelayMs": 0,
+      "polarityInverted": false,
+      "outputChannel": 2
+    },
+    {
+      "id": 4,
+      "name": "RL",
+      "position": {
+        "az": -135,
+        "el": 0,
+        "dist": 2.0
+      },
+      "trimDb": 0,
+      "userDelayMs": 0,
+      "polarityInverted": false,
+      "outputChannel": 3
+    }
+  ]
+}

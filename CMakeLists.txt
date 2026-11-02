@@ -34,6 +34,8 @@ file(GLOB_RECURSE SPACER_CORE_SOURCES CONFIGURE_DEPENDS
 add_library(spacer_core STATIC ${SPACER_CORE_SOURCES})
 target_include_directories(spacer_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(spacer_core PUBLIC nlohmann_json::nlohmann_json)
+include(cmake/EmbedLayoutPresets.cmake)
+spacer_embed_layout_presets(spacer_core ${CMAKE_CURRENT_SOURCE_DIR}/resources/layouts)
 target_compile_options(spacer_core PRIVATE
     $<$<CXX_COMPILER_ID:GNU,Clang,AppleClang>:-Wall -Wextra -Wpedantic -Wshadow -Wconversion -Wno-sign-conversion>)
 

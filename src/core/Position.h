@@ -27,6 +27,7 @@ struct Cartesian {
     constexpr Cartesian operator+(const Cartesian& o) const { return {x + o.x, y + o.y, z + o.z}; }
     constexpr Cartesian operator-(const Cartesian& o) const { return {x - o.x, y - o.y, z - o.z}; }
     constexpr Cartesian operator*(float s) const { return {x * s, y * s, z * s}; }
+    bool operator==(const Cartesian&) const = default;
     float length() const { return std::sqrt(x * x + y * y + z * z); }
     float dot(const Cartesian& o) const { return x * o.x + y * o.y + z * o.z; }
     constexpr Cartesian cross(const Cartesian& o) const {
@@ -42,6 +43,8 @@ struct Position {
     float azimuth{0.0f};    // degrees, (-180, 180]
     float elevation{0.0f};  // degrees, [-90, 90]
     float distance{1.0f};   // metres, >= 0
+
+    bool operator==(const Position&) const = default;
 
     /// Wrap any angle in degrees into (-180, 180].
     static float wrapAzimuth(float deg) {

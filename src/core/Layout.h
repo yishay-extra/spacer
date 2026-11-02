@@ -19,11 +19,15 @@ struct Speaker {
     float userDelayMs{0.0f};        // user delay, added to compensation delay
     bool polarityInverted{false};
     int outputChannel{-1};          // 0-based device channel; -1 = unassigned
+
+    bool operator==(const Speaker&) const = default;
 };
 
 struct Layout {
     std::string name{"Untitled"};
     std::vector<Speaker> speakers;  // size in [2, kMaxSpeakers]
+
+    bool operator==(const Layout&) const = default;
 
     const Speaker* findSpeaker(int id) const {
         for (const auto& s : speakers)
