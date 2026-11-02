@@ -208,6 +208,12 @@ TEST_CASE("Source field rules") {
         REQUIRE(hasIssue(issues, "target"));
         REQUIRE(hasIssue(issues, "address"));
     }
+    SECTION("unknown modulator parameter path") {
+        s.modulators = {ModulatorSpec{LfoSource{}, "motion.nonsense", 1.0f, 0.0f}};
+        REQUIRE(hasIssue(validate(s, layout), "target"));
+        s.modulators = {ModulatorSpec{LfoSource{}, "motion.radius", 1.0f, 0.0f}};
+        REQUIRE_FALSE(hasIssue(validate(s, layout), "target"));
+    }
 }
 
 TEST_CASE("Motion rules") {

@@ -274,6 +274,14 @@ mode relaunch, CI release job on tags, `docs/INSTALL.md`.
 | WP1 | done | Model, JSON, `projectfile::{parse,load,save,serialize}`, `validate()`, layout presets (embedded via `cmake/EmbedLayoutPresets.cmake`). Spec gaps filled and open questions: see "WP1 notes" below |
 | WP2a | done | `spatial/Vbap` (2D, MDAP spread, LFE ignored) and `spatial/DistanceModel` (`distanceGain`, `distanceCutoffHz`, `DistanceProcessor`). Notes below |
 | WP6 | done | `InternalClock` (tempo, play/resume/stop, setBeat, tap tempo, quantised start). Decisions and open points: see "WP6 notes" below |
+| WP2c | done | `spacer::Dbap` (`src/core/spatial/Dbap.h/.cpp`): §6.2 gains, Σg²=1 over panned speakers, `r_s = 0.2 + 3·spread`, LFE speakers excluded from gains, normalisation and render (§7). Tests in `tests/DbapTests.cpp`. Open spec issue: see "WP2c notes" below |
+
+### WP2c notes
+
+- Built on the WP1 branch (`wp2c-dbap` already contained the WP1 model). Nothing in the spec was changed.
+- `Dbap(rolloffDb = 6)`. Gains are computed relative to the nearest panned speaker, `(d_min/d_i)^(a/2)`, then normalised. This is mathematically the same as `d_i^(-a/2)` after normalisation and cannot overflow for large rolloffs.
+- `render()` adds into the bus. Gains are linearly ramped from start to end over the block, reaching the end gain on the last sample. Steady-state render is allocation-free; buffers are sized in `prepare()`.
+- **Resolved** (SPEC §6.2 now `α = a / (20·log10 2)`; code and tests updated). Spec issue: §6.2 described `a` as "dB per doubling of distance (default 6)", but the formula `g = d^(-a/2)` gives about 18 dB of amplitude drop per doubling at a = 6, not 6 dB. The implementation follows the formula literally, so the tests encode `(0.2/2.2)^3`. If the intended exponent is `a/6.02` (≈ 1 at the default), change `Dbap::computeGains` and the hand-computed test together. This needs a decision from the owner.
 
 ### WP1 notes
 
@@ -310,9 +318,9 @@ Spec issues for the owner (not changed):
 
 Spec issues for the owner (not changed):
 
-1. §6.1 2D mode does not say what happens in a ≥180° coverage gap (stereo, or a front-only array); the cross-fade above is my choice.
-2. §6.1 MDAP ring in 2D is ambiguous (a ring of angular radius around a horizontal direction); see projection above.
-3. §6.1 "sum gains and normalise" — amplitude sum was assumed (not power sum).
+1. **Resolved** (now in SPEC §6.1). §6.1 2D mode does not say what happens in a ≥180° coverage gap (stereo, or a front-only array); the cross-fade above is my choice.
+2. **Resolved** (now in SPEC §6.1). §6.1 MDAP ring in 2D is ambiguous (a ring of angular radius around a horizontal direction); see projection above.
+3. **Resolved** (now in SPEC §6.1). §6.1 "sum gains and normalise" — amplitude sum was assumed (not power sum).
 4. §6.5 with `q > 0` and distance ≤ 1 m the cutoff is 20 kHz, which still low-passes noticeably at 48 kHz with a one-pole; fine, but not transparent.
 
 ### WP6 notes

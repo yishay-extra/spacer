@@ -1,41 +1,13 @@
-#include <atomic>
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 #include <cmath>
-#include <cstdlib>
-#include <new>
 #include <numeric>
 #include <vector>
 
+#include "AllocationCounter.h"
 #include "core/LayoutPresets.h"
 #include "core/spatial/Vbap.h"
-
-// --- allocation counter hook (active only while `g_countAllocs` is set) -----
-namespace {
-std::atomic<bool> g_countAllocs{false};
-std::atomic<long> g_allocs{0};
-}  // namespace
-
-void* operator new(std::size_t n) {
-    if (g_countAllocs.load(std::memory_order_relaxed)) g_allocs.fetch_add(1, std::memory_order_relaxed);
-    if (void* p = std::malloc(n ? n : 1)) return p;
-    throw std::bad_alloc();
-}
-void* operator new[](std::size_t n) {
-    return operator new(n);
-}
-void operator delete(void* p) noexcept {
-    std::free(p);
-}
-void operator delete[](void* p) noexcept {
-    std::free(p);
-}
-void operator delete(void* p, std::size_t) noexcept {
-    std::free(p);
-}
-void operator delete[](void* p, std::size_t) noexcept {
-    std::free(p);
-}
 
 using Catch::Approx;
 using namespace spacer;
@@ -191,9 +163,21 @@ TEST_CASE("VBAP: LFE speakers are ignored (5.1 preset)") {
     for (float s : out[lfe]) CHECK(s == 0.0f);
 }
 
-TEST_CASE("VBAP: 3D layouts are flagged") {
+TEST_CASE("VBAP: 3D mode is chosen when any panned speaker has |el| >= 5 deg") {
     Vbap v;
     v.prepare(preset("7.1.4"), 48000.0, 256);
+    CHECK_FALSE(v.is2D());
+    CHECK(v.numTriangles() > 0);
+    v.prepare(preset("octagon"), 48000.0, 256);
+    CHECK(v.is2D());
+    CHECK(v.numTriangles() == 0);
+
+    Layout nearlyFlat = preset("quad");
+    nearlyFlat.speakers[0].position.elevation = 4.9f;
+    v.prepare(nearlyFlat, 48000.0, 256);
+    CHECK(v.is2D());
+    nearlyFlat.speakers[0].position.elevation = 5.0f;
+    v.prepare(nearlyFlat, 48000.0, 256);
     CHECK_FALSE(v.is2D());
 }
 
@@ -232,7 +216,8 @@ TEST_CASE("VBAP: render of a constant signal matches gainsFor") {
 }
 
 TEST_CASE("VBAP: render does not allocate") {
-    const Layout l = preset("5.1");
+    const char* id = GENERATE("5.1", "7.1.4", "dome22");
+    const Layout l = preset(id);
     Vbap v;
     v.prepare(l, 48000.0, 256);
     const int n = 256;
@@ -245,11 +230,14 @@ TEST_CASE("VBAP: render does not allocate") {
     bus.numSamples = n;
     std::vector<float> in(n, 1.0f);
 
-    g_allocs = 0;
-    g_countAllocs = true;
-    for (int i = 0; i < 100; ++i)
-        v.render(in.data(), n, {static_cast<float>(i), 0.0f, 2.0f}, {static_cast<float>(i + 7), 0.0f, 2.0f},
-                 i % 2 ? 0.5f : 0.0f, bus);
-    g_countAllocs = false;
-    CHECK(g_allocs.load() == 0);
+    long allocs = 0;
+    {
+        test::AllocationCounter counter;
+        for (int i = 0; i < 100; ++i)
+            v.render(in.data(), n, {static_cast<float>(i), static_cast<float>(i % 90), 2.0f},
+                     {static_cast<float>(i + 7), static_cast<float>((i * 7) % 181 - 90), 2.0f},
+                     i % 2 ? 0.5f : 0.0f, bus);
+        allocs = counter.count();
+    }
+    CHECK(allocs == 0);
 }
