@@ -55,8 +55,9 @@ Fixed; implemented in `src/core/Position.h`.
 ```
 src/core      pure C++20 — Position, Layout, Project model + JSON, Spatializer
               implementations, Motion implementations, Clock interface +
-              InternalClock, Scene/Cue model, parameter ramps, utility DSP.
-              No JUCE, no OS APIs. Unit-tested on Linux and macOS.
+              InternalClock, Scene/Cue model. No JUCE, no OS APIs, no generic
+              DSP (that is engine's job, on juce::dsp). Unit-tested on Linux
+              and macOS.
 src/engine    JUCE — AudioEngine (device callback), SourceGraph, SpeakerChain,
               command/feedback queues, file players, OfflineRenderer.
 src/control   JUCE — OscServer/Client, MidiMapper, CueEngine, ClockManager

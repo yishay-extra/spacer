@@ -26,6 +26,12 @@ tests/         Catch2 tests for src/core (and offline-render tests later).
 Dependency rule: `core` depends on nothing in-repo. `engine`/`control`/`ui`
 depend on `core`. `core` must never include JUCE headers.
 
+DSP rule: `core` holds only the spatial/motion/model maths (VBAP, DBAP,
+ambisonics, trajectories, distance model, gain interpolation). Generic DSP
+primitives — delay lines, filters/EQ, limiter, resampling, parameter
+smoothing — live in `engine` and use `juce::dsp` (`DelayLine`, `IIR`,
+`SmoothedValue`, `Oversampling`, …). Never hand-roll these.
+
 ## Build and test
 
 ```

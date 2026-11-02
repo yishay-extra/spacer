@@ -74,8 +74,10 @@ Spec: §6, §6.1 (2D), §6.5.
 - `src/core/spatial/Vbap.h/.cpp` implementing `Spatializer` for layouts with
   all |el| < 5°: sort speakers by azimuth, pairwise gains, constant-power
   normalisation, MDAP spread, per-sample interpolation in `render`.
-- `src/core/spatial/DistanceModel.h/.cpp`: gain + optional low-pass (§6.5).
-- `src/core/dsp/`: `Ramp.h` (linear gain ramp), `OnePole.h`.
+- `src/core/spatial/DistanceModel.h/.cpp`: gain + optional one-pole low-pass
+  (§6.5). Keep DSP in core to this and the per-sample gain interpolation;
+  all other DSP primitives (delays, EQ, limiter, smoothing) belong in
+  `src/engine` built on `juce::dsp` — do not hand-roll them in core.
 
 Acceptance: a source exactly at a speaker gives gain 1 there and 0 elsewhere;
 midway between two adjacent speakers gives 1/√2 each; Σg²=1 everywhere (test
