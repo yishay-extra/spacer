@@ -173,6 +173,7 @@ inline Project makeFullProject() {
                     MidiCurve::Log},
         MidiMapping{MidiMessageType::PitchBend, 3, 0, "spread", 0.0f, 1.0f, MidiCurve::Linear},
         MidiMapping{MidiMessageType::Cc14, 0, 12, "distance.k", 0.0f, 2.0f, MidiCurve::Linear}};
+    p.midi.programChangeChannel = 5;
     p.clock = {ClockKind::Midi, 133.5, 3, true};
     return p;
 }
