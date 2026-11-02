@@ -133,7 +133,12 @@ struct Project { int schemaVersion; Layout layout; DeviceMapping devices;
 - **Control → audio**: a lock-free SPSC FIFO of `Command` (fixed-size POD
   variants: `SetGain{sourceId, dB}`, `SetPosition{sourceId, Position, smoothMs}`,
   `SetMotionParam{...}`, `RecallScene{snapshotIndex, rampSeconds}`,
-  `SwapGraph{newGraphPtr}` …). Capacity 4096; overflow is dropped and counted.
+  `SwapGraph{newGraphPtr}` …). Capacity 4096; overflow is dropped and counted
+  on the producer side (the count is reported to the UI as `CommandDropped`).
+  **Single producer:** only the message thread pushes commands. OSC, MIDI and
+  other control callbacks that run on their own threads hand events to the
+  message thread first (or through their own SPSC queue drained there); they
+  never push to the audio queue directly.
 - **Audio → control**: a lock-free FIFO/ring for `Feedback` (`Meter{...}`,
   `Position{...}`, `ClockState`, `Xrun`, `CommandDropped`), polled at 30 Hz
   by the message thread.
@@ -260,10 +265,10 @@ Source goes to the speaker(s) selected in the source spec with unit gain
 each; `spread` and position are ignored for rendering (position still shown in
 UI).
 
-### 6.5 Distance model (all spatializers)
+### 6.5 Distance model (all panning spatializers)
 
 Applied as a gain (and optional filter) to the source signal before
-rendering: `g = (r_ref / max(d, r_min))^k`, with `r_ref` = 1 m, `r_min`
+rendering, for every spatializer except `Direct` (which ignores position): `g = (r_ref / max(d, r_min))^k`, with `r_ref` = 1 m, `r_min`
 default 0.5 m, `k` default 1.0 (0 disables). Optional one-pole low-pass whose
 cutoff falls with distance: `fc = 20 kHz · (r_ref / max(d, r_ref))^q`, `q`
 default 0 (off). Parameters are per source.
@@ -274,7 +279,10 @@ default 0 (off). Parameters are per source.
   (so the farthest speaker is 0 dB / 0 ms, nearer ones are delayed and
   attenuated). `c` = 343 m/s, user-adjustable in settings.
 - Effective speaker delay = compensation + `userDelayMs`; effective gain =
-  compensation + `trimDb`.
+  compensation + `trimDb`. `Speaker` (layout) holds the calibration defaults;
+  if a `SpeakerChainSpec` exists for that speaker (live state or recalled
+  scene), its `trimDb`, `userDelayMs` and polarity override the layout's.
+  Mute and EQ exist only on the chain.
 - **LFE speakers** (`lfe: true`, JSON key optional, default false) are
   excluded from panning: VBAP, DBAP and the Ambisonic decoder ignore them
   (they are not part of the hull, the DBAP sum or the AllRAD target layout).
