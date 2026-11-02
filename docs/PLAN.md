@@ -294,6 +294,10 @@ Collects cross-WP follow-ups reported in PRs:
   needed by WP11b), `motionRight.*` modulation paths for linked stereo.
 - File sources across a node-replacing scene recall: true crossfade instead
   of hand-over + 50 ms fade-in (WP4 note).
+- `ControlHub` must accept a `ControlDispatcher::Config` (selected source,
+  motion-param and file-transport hooks) from `AppContext` (WP11a note).
+- An OSC/MIDI scene recall that does not move the cue index must notify the
+  UI/model observers (WP11a note).
 - Any other "follow-up" items listed in merged PR descriptions.
 Acceptance: each item has a test; no open follow-ups left in the status log.
 
