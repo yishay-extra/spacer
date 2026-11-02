@@ -54,10 +54,12 @@ void AppContext::start() {
             project_ = loaded->project;
             projectPath_ = installation_.lastProjectPath;
             history_.clear();
+            engine_.setProjectDirectory(juce::File(juce::String(projectPath_.parent_path().string())));
             engine_.setProject(project_);
         }
     }
-    deviceError_ = engine_.openDevice(project_.devices).toStdString();
+    deviceError_ =
+        engine_.openDevice(project_.devices, GraphBuilder::requiredInputChannels(project_)).toStdString();
     resetCueEngine();  // now with the device's rate and block size
     if (installation_.enabled) {
         installation::startShow(*cues_, installation_, cueTick());
@@ -167,6 +169,8 @@ void AppContext::newProject(Project project) {
 std::string AppContext::openProject(const std::filesystem::path& path) {
     auto loaded = projectfile::load(path);
     if (!loaded) return loaded.error().message;
+    // Project-relative file sources resolve against the project's folder (SPEC §15).
+    engine_.setProjectDirectory(juce::File(juce::String(path.parent_path().string())));
     newProject(std::move(loaded->project));
     projectPath_ = path;
     rememberProjectPath();
