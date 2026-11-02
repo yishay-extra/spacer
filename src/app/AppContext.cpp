@@ -39,6 +39,7 @@ AppContext::AppContext() : project_(defaultProject()) {
 
 AppContext::~AppContext() {
     stopTimer();
+    midiIn_.reset();  // no MIDI callbacks into a dying hub
     engine_.onFeedback = nullptr;
 }
 
@@ -77,7 +78,20 @@ void AppContext::resetCueEngine() {
     config.maxBlockSize =
         std::max(status.bufferSize > 0 ? status.bufferSize : project_.devices.bufferSize, 512);
     if (status.outputChannels > 0) config.numOutputChannels = status.outputChannels;
+    if (midiIn_) midiIn_->close();
+    control_.reset();
     cues_ = std::make_unique<CueEngine>(engine_.processor(), project_, std::move(config));
+    resetControl();
+}
+
+void AppContext::resetControl() {
+    control_ = std::make_unique<ControlHub>(project_, engine_.processor(), cues_.get());
+    control_->applyProject();  // OSC port bind failure is visible in control().osc().stats()
+    if (!midiIn_)
+        midiIn_ = std::make_unique<MidiInputService>([this](const juce::MidiMessage& m) {
+            control_->submitMidi(m);  // MIDI thread: hand over only
+        });
+    midiIn_->openAll();
 }
 
 // ---- model --------------------------------------------------------------------
@@ -210,6 +224,7 @@ void AppContext::stopSpeakerTest() {
 
 void AppContext::onFeedback(const Feedback& f) {
     feedback_.apply(f);
+    control_->onFeedback(f);
     if (const auto* fired = std::get_if<fb::CueFired>(&f)) {
         if (cues_->onEngineCueFired(fired->token, cueTick())) modelChanged(Change::SceneRecalled);
     }
@@ -265,6 +280,11 @@ void AppContext::timerCallback() {
     lastTick_ = now;
 
     if (rebuildPending_ && now - lastRebuild_ >= kGestureRebuildSeconds) rebuildGraph();
+
+    // OSC / MIDI. A cue fired from there changes the live model (SPEC §11).
+    const int cueBefore = cues_->sequencer().current();
+    control_->pump();
+    if (cues_->sequencer().current() != cueBefore) modelChanged(Change::SceneRecalled);
 
     // Automatic cue triggers are held while a speaker test runs: a recall
     // rebuilds the engine from the model and would end the test half-way.

@@ -8,8 +8,10 @@
 #include <string>
 #include <vector>
 
+#include "control/ControlHub.h"
 #include "control/CueEngine.h"
 #include "control/InstallationMode.h"
+#include "control/device/MidiInputService.h"
 #include "core/Project.h"
 #include "engine/device/AudioEngine.h"
 #include "ui/logic/FeedbackState.h"
@@ -24,6 +26,7 @@ namespace spacer {
 ///   - the live Project (single source of truth) and its ProjectHistory (undo),
 ///   - the AudioEngine (WP3) and the FeedbackState the UI draws from,
 ///   - the CueEngine (WP9) driving the engine's command queue,
+///   - the ControlHub (WP8: OSC in/out, MIDI mapping) and MidiInputService,
 ///   - installation-mode settings and the Autosaver (WP9, SPEC §11),
 ///   - the speaker-test overlay (SPEC §16).
 ///
@@ -33,9 +36,15 @@ namespace spacer {
 ///       parameters: commands on the engine queue (send())
 ///   engine feedback (30 Hz, AudioEngine's poll) -> FeedbackState
 ///       -> fb::CueFired forwarded to CueEngine::onEngineCueFired
-///   own 30 Hz tick -> meter decay, CueEngine::tick, autosave, Listener::feedbackUpdated
+///       -> ControlHub::onFeedback (OSC feedback out)
+///   own 30 Hz tick -> ControlHub::pump (OSC / MIDI -> engine commands, cues),
+///       meter decay, CueEngine::tick, autosave, Listener::feedbackUpdated
 ///
-/// How other subsystems plug in (WP8 OSC/MIDI, WP11b-e):
+/// The ControlHub and the CueEngine are rebuilt together when a project is
+/// loaded or the device opens (the hub holds a CueEngine pointer); MIDI input
+/// is closed meanwhile, so the MIDI thread never sees a stale hub.
+///
+/// How other subsystems plug in (WP11b-e):
 ///   - Parameter changes that are *not* model edits (live OSC/MIDI control):
 ///     send(Command). Single producer (SPEC §5.2): call it on the message
 ///     thread only — OSC/MIDI callbacks hand events over first.
@@ -115,6 +124,9 @@ public:
 
     // ---- cues ---------------------------------------------------------------
     CueEngine& cues() noexcept { return *cues_; }
+    /// OSC / MIDI (WP8). Rebuilt with the CueEngine; do not keep the reference
+    /// across a project load.
+    ControlHub& control() noexcept { return *control_; }
     /// "Now" for CueEngine calls: monotonic seconds, last engine clock, wall clock.
     CueTick cueTick() const;
     /// Go / Back on the armed cue list (arms the first list if none is armed).
@@ -133,6 +145,7 @@ private:
     void syncEngine(const EngineEffect& effect);
     void rebuildGraph();
     void resetCueEngine();
+    void resetControl();
     void modelChanged(Change change);
     void loadInstallationSettings();
     void rememberProjectPath();
@@ -141,6 +154,8 @@ private:
     ProjectHistory history_;
     AudioEngine engine_;
     std::unique_ptr<CueEngine> cues_;
+    std::unique_ptr<ControlHub> control_;  // after cues_: holds a pointer to it
+    std::unique_ptr<MidiInputService> midiIn_;
     FeedbackState feedback_;
 
     InstallationSettings installation_;
