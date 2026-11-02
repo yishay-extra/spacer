@@ -5,6 +5,7 @@
 #include <memory>
 #include <vector>
 
+#include "core/Clock.h"
 #include "core/Layout.h"
 #include "engine/SourceInput.h"
 #include "engine/SourceNode.h"
@@ -50,8 +51,10 @@ public:
 
     // ---- RT ----
     /// Render one block (numSamples <= maxBlockSize) and ADD each speaker's
-    /// output into `outputs[outputChannel]`.
-    void process(const InputContext& ctx, float* const* outputs, int numOutputs, int numSamples) noexcept;
+    /// output into `outputs[outputChannel]`. `clock` is the clock state at
+    /// the start of the block (drives the sources' motions).
+    void process(const InputContext& ctx, const ClockState& clock, float* const* outputs, int numOutputs,
+                 int numSamples) noexcept;
 
     /// Swap with state carry-over (SPEC §5.2). Sources present in both
     /// graphs continue from `old`'s state; speaker chains present in both

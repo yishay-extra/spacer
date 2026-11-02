@@ -6,6 +6,7 @@
 #include <map>
 #include <optional>
 #include <string>
+#include <vector>
 
 #include "core/Expected.h"
 #include "core/Project.h"
@@ -17,18 +18,23 @@ namespace spacer {
 /// the device's (speaker i → channel `outputChannel`; unassigned speakers are
 /// not rendered). Used for golden tests and, later, "bounce layout test".
 ///
-/// Inputs are per source id; sources without an input render silence (live
-/// input kinds are WP4/WP5). Input audio must already be at the render rate.
-/// The clock is configured from the project and running.
+/// `inputs` override sources by id (audio already at the render rate); every
+/// other source uses its own input: generators and files render (files are
+/// started at t = 0 and streamed through the same FilePlayer / disk path as
+/// live, serviced synchronously before every block so the result does not
+/// depend on disk timing); hardware and virtual inputs are silent. The clock
+/// is configured from the project and running.
 struct OfflineRenderOptions {
-    double sampleRate{0.0};  // 0 = project.devices.sampleRate
-    int blockSize{0};        // 0 = project.devices.bufferSize
+    double sampleRate{0.0};        // 0 = project.devices.sampleRate
+    int blockSize{0};              // 0 = project.devices.bufferSize
+    std::string projectDirectory;  // base for project-relative file paths
 };
 
 struct OfflineRenderResult {
     juce::AudioBuffer<float> audio;
     double sampleRate{0.0};
-    int latencySamples{0};  // graph latency (limiter look-ahead) included in `audio`
+    int latencySamples{0};              // graph latency (limiter look-ahead) included in `audio`
+    std::vector<std::string> warnings;  // e.g. unreadable files (rendered silent)
 };
 
 class OfflineRenderer {
@@ -40,8 +46,9 @@ public:
     static Expected<Result, std::string> render(const Project& project, const Inputs& inputs, double seconds,
                                                 const Options& options = Options{});
 
-    /// Inputs read from audio files (any format JUCE reads); each file's rate
-    /// must match the render rate.
+    /// Sources fed from audio files (any format the engine reads), played
+    /// from the start through the file player (resampled to the render rate).
+    /// An unreadable file is an error here.
     static Expected<Result, std::string> renderFiles(const Project& project,
                                                      const std::map<int, juce::File>& files, double seconds,
                                                      const Options& options = Options{});

@@ -126,6 +126,22 @@ void EngineProcessor::apply(const Command& command) noexcept {
                     if (auto* s = graph_->findSource(c.sourceId)) s->setWidth(c.widthDeg);
                 } else if constexpr (std::is_same_v<C, cmd::SetSourceDistance>) {
                     if (auto* s = graph_->findSource(c.sourceId)) s->setDistanceModel(c.model);
+                } else if constexpr (std::is_same_v<C, cmd::SetMotionParam>) {
+                    if (auto* s = graph_->findSource(c.sourceId))
+                        s->setMotionParam(c.channel, c.param, c.value);
+                } else if constexpr (std::is_same_v<C, cmd::ResetMotion>) {
+                    if (auto* s = graph_->findSource(c.sourceId)) s->resetMotion();
+                } else if constexpr (std::is_same_v<C, cmd::SetModulatorValue>) {
+                    if (auto* s = graph_->findSource(c.sourceId)) s->setModulatorValue(c.index, c.value);
+                } else if constexpr (std::is_same_v<C, cmd::FilePlay>) {
+                    if (auto* s = graph_->findSource(c.sourceId))
+                        if (auto* in = s->input()) in->play();
+                } else if constexpr (std::is_same_v<C, cmd::FileStop>) {
+                    if (auto* s = graph_->findSource(c.sourceId))
+                        if (auto* in = s->input()) in->stop();
+                } else if constexpr (std::is_same_v<C, cmd::FileSeek>) {
+                    if (auto* s = graph_->findSource(c.sourceId))
+                        if (auto* in = s->input()) in->seek(c.seconds);
                 } else if constexpr (std::is_same_v<C, cmd::SetSpeakerTrim>) {
                     if (auto* s = graph_->findSpeaker(c.speakerId)) s->setTrimDb(c.trimDb, c.rampMs);
                 } else if constexpr (std::is_same_v<C, cmd::SetSpeakerMute>) {
@@ -187,8 +203,8 @@ void EngineProcessor::process(const float* const* inputs, int numInputs, float* 
         }
     }
 
-    clock_.advance(numSamples);
-    // Motions (WP7) evaluate here with a MotionContext built from the clock.
+    // Clock first (SPEC §9); each chunk's motions see the clock at its start.
+    const ClockState blockClock = clock_.advance(numSamples);
 
     if (graph_ != nullptr) {
         const int chunkMax = std::min(graph_->maxBlockSize(), kMaxChunk);
@@ -199,7 +215,13 @@ void EngineProcessor::process(const float* const* inputs, int numInputs, float* 
             for (int c = 0; c < numOutputs; ++c)
                 outputChunk_[static_cast<std::size_t>(c)] = outputs[c] ? outputs[c] + offset : nullptr;
             const InputContext ctx{inputChunk_.data(), numInputs};
-            graph_->process(ctx, outputChunk_.data(), numOutputs, n);
+            ClockState chunkClock = blockClock;
+            if (offset > 0 && sampleRate_ > 0.0) {
+                const double dt = offset / sampleRate_;
+                chunkClock.timeSeconds += dt;
+                if (chunkClock.playing) chunkClock.beat += dt * chunkClock.bpm / 60.0;
+            }
+            graph_->process(ctx, chunkClock, outputChunk_.data(), numOutputs, n);
 
             // Master gain / panic ramp, identical on every output (SPEC §5.3).
             if (master_.isRamping()) {
@@ -242,6 +264,9 @@ void EngineProcessor::publishFeedback() noexcept {
         feedback_.push(meter);
         for (int c = 0; c < s.numChannels(); ++c)
             feedback_.push(fb::SourcePosition{s.id(), c, s.renderedPosition(c)});
+        TransportState t;
+        if (const SourceInput* in = s.input(); in && in->transportState(t))
+            feedback_.push(fb::FileTransport{s.id(), t.positionSeconds, t.playing, t.underruns});
     }
     for (int i = 0; i < graph_->numSpeakers(); ++i) {
         SpeakerChain& sp = graph_->speaker(i);
