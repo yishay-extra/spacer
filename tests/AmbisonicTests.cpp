@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-#include "AllocCounter.h"
+#include "AllocationCounter.h"
 #include "core/LayoutPresets.h"
 #include "core/spatial/AmbisonicDecoder.h"
 #include "core/spatial/AmbisonicEncoder.h"
@@ -18,8 +18,6 @@
 
 using Catch::Approx;
 using namespace spacer;
-using spacer::testing::g_allocs;
-using spacer::testing::g_countAllocs;
 
 namespace {
 
@@ -650,16 +648,18 @@ TEST_CASE("Ambisonic encoder + decoder: render and decode do not allocate") {
     bus.numSamples = n;
     std::vector<float> in(n, 1.0f);
 
-    g_allocs = 0;
-    g_countAllocs = true;
-    for (int i = 0; i < 100; ++i) {
-        enc.render(in.data(), n, {static_cast<float>(i), static_cast<float>(i % 90), 2.0f},
-                   {static_cast<float>(i + 7), static_cast<float>((i * 7) % 181 - 90), 2.0f},
-                   i % 2 ? 0.5f : 0.0f, bus);
-        dec.decode(bus);
+    long allocs = 0;
+    {
+        test::AllocationCounter counter;
+        for (int i = 0; i < 100; ++i) {
+            enc.render(in.data(), n, {static_cast<float>(i), static_cast<float>(i % 90), 2.0f},
+                       {static_cast<float>(i + 7), static_cast<float>((i * 7) % 181 - 90), 2.0f},
+                       i % 2 ? 0.5f : 0.0f, bus);
+            dec.decode(bus);
+        }
+        allocs = counter.count();
     }
-    g_countAllocs = false;
-    CHECK(g_allocs.load() == 0);
+    CHECK(allocs == 0);
 }
 
 TEST_CASE("Ambisonic decoder: degenerate layouts give finite gains") {

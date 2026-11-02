@@ -5,14 +5,12 @@
 #include <numeric>
 #include <vector>
 
-#include "AllocCounter.h"
+#include "AllocationCounter.h"
 #include "core/LayoutPresets.h"
 #include "core/spatial/Vbap.h"
 
 using Catch::Approx;
 using namespace spacer;
-using spacer::testing::g_allocs;
-using spacer::testing::g_countAllocs;
 
 namespace {
 
@@ -232,12 +230,14 @@ TEST_CASE("VBAP: render does not allocate") {
     bus.numSamples = n;
     std::vector<float> in(n, 1.0f);
 
-    g_allocs = 0;
-    g_countAllocs = true;
-    for (int i = 0; i < 100; ++i)
-        v.render(in.data(), n, {static_cast<float>(i), static_cast<float>(i % 90), 2.0f},
-                 {static_cast<float>(i + 7), static_cast<float>((i * 7) % 181 - 90), 2.0f},
-                 i % 2 ? 0.5f : 0.0f, bus);
-    g_countAllocs = false;
-    CHECK(g_allocs.load() == 0);
+    long allocs = 0;
+    {
+        test::AllocationCounter counter;
+        for (int i = 0; i < 100; ++i)
+            v.render(in.data(), n, {static_cast<float>(i), static_cast<float>(i % 90), 2.0f},
+                     {static_cast<float>(i + 7), static_cast<float>((i * 7) % 181 - 90), 2.0f},
+                     i % 2 ? 0.5f : 0.0f, bus);
+        allocs = counter.count();
+    }
+    CHECK(allocs == 0);
 }

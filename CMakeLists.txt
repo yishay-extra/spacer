@@ -9,6 +9,7 @@ set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0" CACHE STRING "Minimum macOS version")
 
 option(SPACER_BUILD_APP   "Build the JUCE desktop application (macOS only)" ON)
 option(SPACER_BUILD_TESTS "Build unit tests" ON)
+option(SPACER_BUILD_ENGINE_TESTS "Build the JUCE engine tests (fetches JUCE on every platform)" ON)
 
 include(FetchContent)
 set(FETCHCONTENT_QUIET OFF)
@@ -40,15 +41,49 @@ target_compile_options(spacer_core PRIVATE
     $<$<CXX_COMPILER_ID:GNU,Clang,AppleClang>:-Wall -Wextra -Wpedantic -Wshadow -Wconversion -Wno-sign-conversion>)
 
 # ---------------------------------------------------------------------------
-# Spacer app: JUCE. macOS only for phase 1.
+# JUCE: needed by the app (macOS) and by the engine tests (any platform). Off
+# macOS only the modules are configured (no juceaide, so no GUI deps needed).
 # ---------------------------------------------------------------------------
+set(SPACER_WITH_APP OFF)
 if(SPACER_BUILD_APP AND APPLE)
+    set(SPACER_WITH_APP ON)
+endif()
+set(SPACER_WITH_ENGINE_TESTS OFF)
+if(SPACER_BUILD_TESTS AND SPACER_BUILD_ENGINE_TESTS)
+    set(SPACER_WITH_ENGINE_TESTS ON)
+endif()
+
+if(SPACER_WITH_APP OR SPACER_WITH_ENGINE_TESTS)
+    if(NOT SPACER_WITH_APP)
+        set(JUCE_MODULES_ONLY ON CACHE BOOL "Only configure the JUCE modules" FORCE)
+    endif()
     FetchContent_Declare(JUCE
         GIT_REPOSITORY https://github.com/juce-framework/JUCE.git
         GIT_TAG        8.0.15
-        GIT_SHALLOW    TRUE)
+        GIT_SHALLOW    TRUE
+        SYSTEM)
     FetchContent_MakeAvailable(JUCE)
+endif()
 
+# Engine sources. src/engine/*.cpp is portable JUCE code (no device I/O) and
+# is also built into the engine tests; src/engine/device/ needs
+# juce_audio_devices / CoreAudio and is built into the app only.
+file(GLOB SPACER_ENGINE_SOURCES CONFIGURE_DEPENDS
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/*.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/*.h)
+# Portable control code (cue engine, installation mode): no JUCE types, built
+# into the engine tests too. The app globs src/control itself.
+file(GLOB SPACER_CONTROL_SOURCES CONFIGURE_DEPENDS
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/control/*.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/control/*.h)
+set(SPACER_ENGINE_JUCE_DEFINITIONS
+    JUCE_WEB_BROWSER=0
+    JUCE_USE_CURL=0)
+
+# ---------------------------------------------------------------------------
+# Spacer app: JUCE. macOS only for phase 1.
+# ---------------------------------------------------------------------------
+if(SPACER_WITH_APP)
     juce_add_gui_app(Spacer
         PRODUCT_NAME        "Spacer"
         COMPANY_NAME        "Spacer"
@@ -71,11 +106,10 @@ if(SPACER_BUILD_APP AND APPLE)
     target_sources(Spacer PRIVATE ${SPACER_APP_SOURCES})
 
     target_compile_definitions(Spacer PRIVATE
-        JUCE_WEB_BROWSER=0
-        JUCE_USE_CURL=0
+        ${SPACER_ENGINE_JUCE_DEFINITIONS}
+        $<$<CONFIG:Debug>:SPACER_ALLOCATION_GUARD=1>
         JUCE_PLUGINHOST_AU=1
         JUCE_PLUGINHOST_VST3=0
-        JUCE_DISPLAY_SPLASH_SCREEN=0
         JUCE_APPLICATION_NAME_STRING="$<TARGET_PROPERTY:Spacer,JUCE_PRODUCT_NAME>"
         JUCE_APPLICATION_VERSION_STRING="$<TARGET_PROPERTY:Spacer,JUCE_VERSION>")
 
@@ -88,9 +122,39 @@ if(SPACER_BUILD_APP AND APPLE)
             juce::juce_dsp
             juce::juce_osc
             juce::juce_gui_extra
+            "-framework CoreAudio"
+            "-framework CoreFoundation"
         PUBLIC
             juce::juce_recommended_config_flags
             juce::juce_recommended_lto_flags
+            juce::juce_recommended_warning_flags)
+
+    # spacer-engine-check: CLI that drives the real AudioEngine on a real
+    # device (manual validation, docs/mac-validation/WP3.md).
+    file(GLOB SPACER_ENGINE_DEVICE_SOURCES CONFIGURE_DEPENDS
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/device/*.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/device/*.h)
+    juce_add_console_app(spacer_engine_check PRODUCT_NAME "spacer-engine-check")
+    target_sources(spacer_engine_check PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/tools/EngineCheck.cpp
+        ${SPACER_ENGINE_SOURCES}
+        ${SPACER_ENGINE_DEVICE_SOURCES})
+    target_include_directories(spacer_engine_check PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_compile_definitions(spacer_engine_check PRIVATE
+        ${SPACER_ENGINE_JUCE_DEFINITIONS}
+        JUCE_MODAL_LOOPS_PERMITTED=1
+        SPACER_ALLOCATION_GUARD=1)
+    target_link_libraries(spacer_engine_check
+        PRIVATE
+            spacer_core
+            juce::juce_audio_devices
+            juce::juce_audio_formats
+            juce::juce_dsp
+            juce::juce_events
+            "-framework CoreAudio"
+            "-framework CoreFoundation"
+        PUBLIC
+            juce::juce_recommended_config_flags
             juce::juce_recommended_warning_flags)
 elseif(SPACER_BUILD_APP)
     message(STATUS "Spacer app is macOS-only; building spacer_core and tests only.")

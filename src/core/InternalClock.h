@@ -20,6 +20,9 @@ namespace spacer {
 ///    stays frozen at the position it was at when play() was called.
 ///  - A bar boundary exactly at the current beat counts as "next", so the
 ///    quantised start happens immediately.
+///  - `ClockState::startOffset` / `startBeat` (SPEC §9) report where in the
+///    block the transport starts: sample 0 for `play()` (unquantised) and
+///    `resume()`, the bar boundary's sample for a quantised start.
 ///  - `tap(t)` takes tap times in engine seconds (the same timeline as
 ///    ClockState::timeSeconds).
 ///
@@ -75,6 +78,7 @@ private:
     ClockState last_;
     bool quantisedStart_{false};
     bool armed_{false};
+    bool startNow_{false};  // play()/resume() started the transport; reported at sample 0 of the next block
     double pendingBeat_{0.0};     // bar boundary the quantised start aims for
     double armedBeatsToGo_{0.0};  // beats left until pendingBeat_, counted down per block
 

@@ -82,7 +82,8 @@ struct Speaker  { int id; std::string name; Position position; float trimDb;
 struct Layout   { std::string name; std::vector<Speaker> speakers; };
 std::vector<SpeakerCompensation> computeCompensation(const Layout&, float c = 343.f);
 
-struct ClockState { double bpm, beat; bool playing; double sampleRate, timeSeconds; int beatsPerBar; };
+struct ClockState { double bpm, beat; bool playing; double sampleRate, timeSeconds; int beatsPerBar;
+                    int startOffset; /* §9 */ };
 class ClockSource { ClockState advance(int numSamples); ClockState current() const; };
 
 struct SpeakerBus { float* const* speakers; int numSpeakers;
@@ -107,7 +108,7 @@ struct SourceSpec { int id; std::string name; SourceKind kind; /* kind-specific 
                     std::vector<PluginSlot> inserts; };
 struct SpeakerChainSpec { int speakerId; float trimDb; float userDelayMs; bool polarity;
                           Eq3 eq; std::vector<PluginSlot> inserts; };
-struct Scene { std::string name; /* full snapshot: sources, speaker chains, master */ };
+struct Scene { std::string name; /* full snapshot: sources, speaker chains, master {gainDb} */ };
 struct Cue   { std::string name; std::string sceneName; float transitionSeconds;
                Trigger trigger; bool restartMotionPhase; };
 struct CueList { std::string name; std::vector<Cue> cues; bool loop; };
@@ -132,7 +133,12 @@ struct Project { int schemaVersion; Layout layout; DeviceMapping devices;
 - **Control → audio**: a lock-free SPSC FIFO of `Command` (fixed-size POD
   variants: `SetGain{sourceId, dB}`, `SetPosition{sourceId, Position, smoothMs}`,
   `SetMotionParam{...}`, `RecallScene{snapshotIndex, rampSeconds}`,
-  `SwapGraph{newGraphPtr}` …). Capacity 4096; overflow is dropped and counted.
+  `SwapGraph{newGraphPtr}` …). Capacity 4096; overflow is dropped and counted
+  on the producer side (the count is reported to the UI as `CommandDropped`).
+  **Single producer:** only the message thread pushes commands. OSC, MIDI and
+  other control callbacks that run on their own threads hand events to the
+  message thread first (or through their own SPSC queue drained there); they
+  never push to the audio queue directly.
 - **Audio → control**: a lock-free FIFO/ring for `Feedback` (`Meter{...}`,
   `Position{...}`, `ClockState`, `Xrun`, `CommandDropped`), polled at 30 Hz
   by the message thread.
@@ -216,6 +222,13 @@ sample. Energy normalisation: for VBAP/DBAP, gains are normalised so that
   speaker at −Z — the "imaginary floor" — whose gain is discarded). Find the
   triangle containing the source direction, solve `g = L⁻¹·p` (Pulkki 1997),
   clamp negatives to 0, normalise.
+  - Imaginary speakers: try, in order, none → −Z floor → +Z ceiling → both;
+    use the first hull that encloses the origin, where "encloses" means every
+    face plane is at least sin 5° from the origin. Imaginary gains are
+    discarded and the rest renormalised; a source exactly at an imaginary
+    speaker is shared equally (1/√k) over its k real hull neighbours.
+  - Coplanar faces (> 3 points) are fanned from the lowest-index vertex.
+  - Layouts that cannot span a volume even with ±Z fall back to 2D mode.
 - **Spread**: implement MDAP: render the source as 1 + 8 virtual sources on a
   ring of angular radius `r = spread·90°` around the direction; sum the
   virtual sources' **amplitude** gains per speaker, then normalise (Σ g² = 1).
@@ -252,10 +265,10 @@ Source goes to the speaker(s) selected in the source spec with unit gain
 each; `spread` and position are ignored for rendering (position still shown in
 UI).
 
-### 6.5 Distance model (all spatializers)
+### 6.5 Distance model (all panning spatializers)
 
 Applied as a gain (and optional filter) to the source signal before
-rendering: `g = (r_ref / max(d, r_min))^k`, with `r_ref` = 1 m, `r_min`
+rendering, for every spatializer except `Direct` (which ignores position): `g = (r_ref / max(d, r_min))^k`, with `r_ref` = 1 m, `r_min`
 default 0.5 m, `k` default 1.0 (0 disables). Optional one-pole low-pass whose
 cutoff falls with distance: `fc = 20 kHz · (r_ref / max(d, r_ref))^q`, `q`
 default 0 (off). Parameters are per source.
@@ -266,7 +279,10 @@ default 0 (off). Parameters are per source.
   (so the farthest speaker is 0 dB / 0 ms, nearer ones are delayed and
   attenuated). `c` = 343 m/s, user-adjustable in settings.
 - Effective speaker delay = compensation + `userDelayMs`; effective gain =
-  compensation + `trimDb`.
+  compensation + `trimDb`. `Speaker` (layout) holds the calibration defaults;
+  if a `SpeakerChainSpec` exists for that speaker (live state or recalled
+  scene), its `trimDb`, `userDelayMs` and polarity override the layout's.
+  Mute and EQ exist only on the chain.
 - **LFE speakers** (`lfe: true`, JSON key optional, default false) are
   excluded from panning: VBAP, DBAP and the Ambisonic decoder ignore them
   (they are not part of the hull, the DBAP sum or the AllRAD target layout).
@@ -277,7 +293,8 @@ default 0 (off). Parameters are per source.
   distance > 0.
 - Layout presets (JSON files in `resources/layouts/`): stereo, quad, 5.1,
   7.1, 7.1.4, octagon, 12-ring, 16-ring, dome 22. All at 2 m, standard
-  angles.
+  angles (ITU for 5.1/7.1/7.1.4). Rings start at 0° and are evenly spaced;
+  dome 22 = 8 @ el 0°, 8 @ el 30° (offset 22.5°), 5 @ el 60°, 1 zenith.
 
 ## 8. Sources
 
@@ -299,6 +316,13 @@ default 0 (off). Parameters are per source.
 `ClockSource::advance(n)` is called first in every block. `ClockState.beat`
 advances by `n / sampleRate / secondsPerBeat` while `playing`.
 
+- `advance` returns the state at the **start** of the block.
+  `ClockState.startOffset` is the sample index within that block at which
+  the transport starts (a quantised start, or `play`/`continue`), or −1 if
+  it does not start in this block. The cue engine uses it for
+  sample-accurate beat triggers; motions may ignore it (at most one block
+  of lag at a start, then exact because phase is derived from `beat`).
+
 - **InternalClock** (v1): `bpm` (20–300), `play/stop/continue`, `setBeat`,
   `tap`, quantised start option (next bar). Transport commands arrive via
   the command queue and take effect at the next block.
@@ -309,12 +333,17 @@ advances by `n / sampleRate / secondsPerBeat` while `playing`.
 
 ## 10. Motion
 
+Phase origin: a new motion, and every reset (e.g. cue `restartMotionPhase`),
+puts phase 0 at the start of the next evaluated block; phase is then derived
+from the clock (`beat` or `timeSeconds`) relative to that origin, so it never
+drifts. Beat-grid alignment is obtained by resetting on a bar boundary.
+
 Each source (or each channel when `linkedPoints`) has one `MotionSpec`:
 
 | Kind | Parameters | Position at time |
 |------|------------|------------------|
 | `Manual` | `position`, `smoothMs` | last set value |
-| `Orbit` | `centre` (Position), `radius` m, `period` (beats or seconds), `direction` ±1, `phaseOffset` deg, `elevationWobble` deg, `wobblePeriod` | centre + radius·(sin θ, cos θ, 0) rotated to centre frame, θ = 2π·(t/period)·dir + phase |
+| `Orbit` | `centre` (Position), `radius` m, `period` (beats or seconds), `direction` ±1, `phaseOffset` deg, `elevationWobble` deg, `wobblePeriod` | centre + radius·(sin θ, cos θ, 0) rotated to centre frame (the orbit *plane* is tilted: pitch by centre elevation, then yaw by centre azimuth), θ = 2π·(t/period)·dir + phase |
 | `Line` | `from`, `to`, `period`, `mode` (`once`, `loop`, `pingpong`), `easing` (`linear`, `smooth`) | lerp(from, to, f(t)) |
 | `Lissajous` | `centre`, `ax, ay, az` m, `fx, fy, fz` cycles per period, `period`, `phases` | centre + (ax·sin(2π fx t+φx), ay·sin(2π fy t+φy), az·sin(2π fz t+φz)) |
 | `Path` | `points` (Cartesian list), `period`, `mode`, `interpolation` (`linear`, `catmullrom`), `constantSpeed` | parametric along polyline/spline |
@@ -392,8 +421,10 @@ addresses are ignored and counted.
 ### 12.2 MIDI
 
 - MIDI Learn on any parameter path (same paths as modulators). 7-bit and
-  14-bit CC, NRPN, pitch bend; notes trigger cues; program change selects
-  scenes. Mappings are stored in the project.
+  14-bit CC, NRPN, pitch bend; notes trigger cues. Program change: when
+  `midi.programChangeChannel` is 1–16 (0 = off, default), program N on that
+  channel recalls scene index N (0-based) with a 0 s transition. Mappings
+  and `programChangeChannel` are stored in the project.
 - Per-mapping range (min/max) and curve (linear/log).
 
 ## 13. Plugin hosting
@@ -453,13 +484,13 @@ ignored on load (forward compatibility) but a warning is logged.
      "modulators": [],
      "inserts": []}
   ],
-  "scenes": [{"name": "Intro", "sources": [ "...full SourceSpec list..." ],
-              "speakerChains": [ "..." ], "master": {"gainDb": 0}}],
+  "scenes": [{"name": "Intro", "sources": [], "speakerChains": [],
+              "master": {"gainDb": 0}}],
   "cueLists": [{"name": "Show", "loop": false,
                 "cues": [{"name": "Start", "scene": "Intro", "transitionSeconds": 2.0,
                           "trigger": {"kind": "Manual"}, "restartMotionPhase": true}]}],
   "osc": {"inPort": 9000, "out": {"host": "127.0.0.1", "port": 9001, "enabled": false}},
-  "midi": {"mappings": []},
+  "midi": {"mappings": [], "programChangeChannel": 0},
   "clock": {"kind": "Internal", "bpm": 120, "beatsPerBar": 4}
 }
 ```
