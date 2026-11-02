@@ -1,0 +1,103 @@
+cmake_minimum_required(VERSION 3.25)
+project(Spacer VERSION 0.1.0 LANGUAGES C CXX)
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0" CACHE STRING "Minimum macOS version")
+
+option(SPACER_BUILD_APP   "Build the JUCE desktop application (macOS only)" ON)
+option(SPACER_BUILD_TESTS "Build unit tests" ON)
+
+include(FetchContent)
+set(FETCHCONTENT_QUIET OFF)
+
+# ---------------------------------------------------------------------------
+# Third-party: nlohmann/json (core, header-only)
+# ---------------------------------------------------------------------------
+FetchContent_Declare(nlohmann_json
+    GIT_REPOSITORY https://github.com/nlohmann/json.git
+    GIT_TAG        v3.12.0
+    GIT_SHALLOW    TRUE)
+set(JSON_BuildTests OFF CACHE INTERNAL "")
+FetchContent_MakeAvailable(nlohmann_json)
+
+# ---------------------------------------------------------------------------
+# spacer_core: pure C++20, NO JUCE. Model, maths, spatializers, motion, clock,
+# project file. Everything here must be testable on any platform.
+# ---------------------------------------------------------------------------
+file(GLOB_RECURSE SPACER_CORE_SOURCES CONFIGURE_DEPENDS
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/core/*.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/core/*.h)
+
+add_library(spacer_core STATIC ${SPACER_CORE_SOURCES})
+target_include_directories(spacer_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(spacer_core PUBLIC nlohmann_json::nlohmann_json)
+target_compile_options(spacer_core PRIVATE
+    $<$<CXX_COMPILER_ID:GNU,Clang,AppleClang>:-Wall -Wextra -Wpedantic -Wshadow -Wconversion -Wno-sign-conversion>)
+
+# ---------------------------------------------------------------------------
+# Spacer app: JUCE. macOS only for phase 1.
+# ---------------------------------------------------------------------------
+if(SPACER_BUILD_APP AND APPLE)
+    FetchContent_Declare(JUCE
+        GIT_REPOSITORY https://github.com/juce-framework/JUCE.git
+        GIT_TAG        8.0.15
+        GIT_SHALLOW    TRUE)
+    FetchContent_MakeAvailable(JUCE)
+
+    juce_add_gui_app(Spacer
+        PRODUCT_NAME        "Spacer"
+        COMPANY_NAME        "Spacer"
+        BUNDLE_ID           "org.spacer.app"
+        VERSION             ${PROJECT_VERSION}
+        MICROPHONE_PERMISSION_ENABLED TRUE
+        MICROPHONE_PERMISSION_TEXT "Spacer needs audio input access to receive audio from devices.")
+
+    juce_generate_juce_header(Spacer)
+
+    file(GLOB_RECURSE SPACER_APP_SOURCES CONFIGURE_DEPENDS
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/*.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/*.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/control/*.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/control/*.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/ui/*.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/ui/*.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/app/*.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/app/*.h)
+    target_sources(Spacer PRIVATE ${SPACER_APP_SOURCES})
+
+    target_compile_definitions(Spacer PRIVATE
+        JUCE_WEB_BROWSER=0
+        JUCE_USE_CURL=0
+        JUCE_PLUGINHOST_AU=1
+        JUCE_PLUGINHOST_VST3=0
+        JUCE_DISPLAY_SPLASH_SCREEN=0
+        JUCE_APPLICATION_NAME_STRING="$<TARGET_PROPERTY:Spacer,JUCE_PRODUCT_NAME>"
+        JUCE_APPLICATION_VERSION_STRING="$<TARGET_PROPERTY:Spacer,JUCE_VERSION>")
+
+    target_link_libraries(Spacer
+        PRIVATE
+            spacer_core
+            juce::juce_audio_utils
+            juce::juce_audio_processors
+            juce::juce_audio_formats
+            juce::juce_dsp
+            juce::juce_osc
+            juce::juce_gui_extra
+        PUBLIC
+            juce::juce_recommended_config_flags
+            juce::juce_recommended_lto_flags
+            juce::juce_recommended_warning_flags)
+elseif(SPACER_BUILD_APP)
+    message(STATUS "Spacer app is macOS-only; building spacer_core and tests only.")
+endif()
+
+# ---------------------------------------------------------------------------
+# Tests (Catch2 v3), core only — run anywhere.
+# ---------------------------------------------------------------------------
+if(SPACER_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif()
