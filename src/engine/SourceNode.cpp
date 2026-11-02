@@ -148,6 +148,19 @@ void SourceNode::fadeOut(int numSamples) noexcept {
     gain_.setTargetInSamples(0.0f, std::max(1, numSamples));
 }
 
+void SourceNode::fadeIn(int numSamples) noexcept {
+    gain_.snapTo(0.0f);
+    gain_.setTargetInSamples(gainTarget(), std::max(1, numSamples));
+}
+
+void SourceNode::restartMotion() noexcept {
+    resetMotion();
+}
+
+void SourceNode::takeInputStateFrom(SourceNode& old) noexcept {
+    if (input_ && old.input_) input_->takeStateFrom(*old.input_);
+}
+
 void SourceNode::takeStateFrom(SourceNode& old, bool sameLayout) noexcept {
     // Gain continues from where it is (no fade-in for a source that already
     // played), then ramps to this node's target.

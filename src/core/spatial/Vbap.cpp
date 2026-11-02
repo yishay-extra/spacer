@@ -45,7 +45,7 @@ void Vbap::prepare(const Layout& layout, double /*sampleRate*/, int /*maxBlockSi
         if (std::abs(s.position.elevation) >= kIs3DElevationDeg) elevated = true;
         order[static_cast<std::size_t>(n++)] = i;
     }
-    if (elevated) prepare3D(layout, order, n);  // `order` is still in layout order here
+    if (elevated || always3D_) prepare3D(layout, order, n);  // `order` is still in layout order here
 
     auto az = [&](int layoutIdx) {
         return wrapRad(degToRad(layout.speakers[static_cast<std::size_t>(layoutIdx)].position.azimuth));

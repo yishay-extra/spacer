@@ -24,7 +24,8 @@ catch_discover_tests(spacer_tests)
 if(SPACER_WITH_ENGINE_TESTS)
     file(GLOB SPACER_ENGINE_TEST_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/engine/*.cpp)
 
-    add_executable(spacer_engine_tests ${SPACER_ENGINE_TEST_SOURCES} ${SPACER_ENGINE_SOURCES})
+    add_executable(spacer_engine_tests ${SPACER_ENGINE_TEST_SOURCES} ${SPACER_ENGINE_SOURCES}
+        ${SPACER_CONTROL_SOURCES})
     target_include_directories(spacer_engine_tests PRIVATE ${PROJECT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR})
     target_compile_definitions(spacer_engine_tests PRIVATE
         ${SPACER_ENGINE_JUCE_DEFINITIONS}

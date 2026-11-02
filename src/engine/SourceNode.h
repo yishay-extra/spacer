@@ -74,6 +74,14 @@ public:
 
     /// RT. Ramp to silence over exactly `numSamples` (removed sources, §5.2).
     void fadeOut(int numSamples) noexcept;
+    /// RT. Start from silence and ramp up to the source's gain over exactly
+    /// `numSamples` (scene recall: added sources and crossfaded replacements).
+    void fadeIn(int numSamples) noexcept;
+    /// RT. Scene recall with `restartMotionPhase` (SPEC §10, §11).
+    void restartMotion() noexcept;
+    /// RT. Carry only the input's playback state over from `old` (a replaced
+    /// source continues the same audio while its gain and position start afresh).
+    void takeInputStateFrom(SourceNode& old) noexcept;
 
     /// RT. Graph swap: continue from `old`'s state (current gain, positions,
     /// distance-filter state, input playback state, motion phase) while
@@ -97,6 +105,15 @@ public:
         return prevEnd_[static_cast<std::size_t>(channel)];
     }
     float currentGain() const noexcept { return gain_.current(); }
+    /// Settled at zero gain: rendering is skipped.
+    bool isSilent() const noexcept { return gain_.isSilent(); }
+
+    // ---- live values (scene recall ramps start from these) ----
+    float spread() const noexcept { return spread_; }
+    float width() const noexcept { return width_; }
+    const DistanceModel& distanceModel() const noexcept { return distanceModel_; }
+    /// Manual target of control point `k` (0, or 1 for linkedPoints).
+    Position controlPosition(int k) const noexcept { return target_[static_cast<std::size_t>(k & 1)]; }
 
 private:
     float gainTarget() const noexcept;

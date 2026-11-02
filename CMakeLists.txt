@@ -71,6 +71,11 @@ endif()
 file(GLOB SPACER_ENGINE_SOURCES CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/*.h)
+# Portable control code (cue engine, installation mode): no JUCE types, built
+# into the engine tests too. The app globs src/control itself.
+file(GLOB SPACER_CONTROL_SOURCES CONFIGURE_DEPENDS
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/control/*.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/control/*.h)
 set(SPACER_ENGINE_JUCE_DEFINITIONS
     JUCE_WEB_BROWSER=0
     JUCE_USE_CURL=0)

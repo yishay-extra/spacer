@@ -83,7 +83,7 @@ struct Layout   { std::string name; std::vector<Speaker> speakers; };
 std::vector<SpeakerCompensation> computeCompensation(const Layout&, float c = 343.f);
 
 struct ClockState { double bpm, beat; bool playing; double sampleRate, timeSeconds; int beatsPerBar;
-                    int startOffset; /* §9 */ };
+                    int startOffset; double startBeat; /* §9 */ };
 class ClockSource { ClockState advance(int numSamples); ClockState current() const; };
 
 struct SpeakerBus { float* const* speakers; int numSpeakers;
@@ -132,7 +132,8 @@ struct Project { int schemaVersion; Layout layout; DeviceMapping devices;
 
 - **Control → audio**: a lock-free SPSC FIFO of `Command` (fixed-size POD
   variants: `SetGain{sourceId, dB}`, `SetPosition{sourceId, Position, smoothMs}`,
-  `SetMotionParam{...}`, `RecallScene{snapshotIndex, rampSeconds}`,
+  `SetMotionParam{...}`, `RecallScene{plan*}` (a recall plan built on the
+  message thread from the live state and the target scene),
   `SwapGraph{newGraphPtr}` …). Capacity 4096; overflow is dropped and counted
   on the producer side (the count is reported to the UI as `CommandDropped`).
   **Single producer:** only the message thread pushes commands. OSC, MIDI and
@@ -319,7 +320,9 @@ advances by `n / sampleRate / secondsPerBeat` while `playing`.
 - `advance` returns the state at the **start** of the block.
   `ClockState.startOffset` is the sample index within that block at which
   the transport starts (a quantised start, or `play`/`continue`), or −1 if
-  it does not start in this block. The cue engine uses it for
+  it does not start in this block; `startBeat` is the beat at that sample
+  (valid when `startOffset >= 0`; a quantised start jumps from the frozen
+  beat to the bar boundary). The cue engine uses them for
   sample-accurate beat triggers; motions may ignore it (at most one block
   of lag at a start, then exact because phase is derived from `beat`).
 

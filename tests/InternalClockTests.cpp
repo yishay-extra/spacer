@@ -301,3 +301,60 @@ TEST_CASE("Beats per bar is at least one") {
     clock.setBeatsPerBar(0);
     CHECK(clock.advance(0).beatsPerBar == 1);
 }
+
+TEST_CASE("startOffset is -1 unless the transport starts in the block") {
+    auto clock = makeClock();
+    CHECK(clock.advance(128).startOffset == -1);  // stopped
+    clock.resume();
+    CHECK(clock.advance(128).startOffset == 0);   // started by resume
+    CHECK(clock.advance(128).startOffset == -1);  // running
+    CHECK(clock.advance(128).startOffset == -1);
+}
+
+TEST_CASE("Unquantised play() reports startOffset 0 and the current beat") {
+    auto clock = makeClock();
+    clock.setBeat(3.5);
+    clock.play();
+    const ClockState s = clock.advance(256);
+    CHECK(s.startOffset == 0);
+    CHECK(s.startBeat == Approx(3.5));
+    CHECK(clock.advance(256).startOffset == -1);
+}
+
+TEST_CASE("stop() before the next block cancels a pending immediate start report") {
+    auto clock = makeClock();
+    clock.resume();
+    clock.stop();
+    CHECK(clock.advance(128).startOffset == -1);
+}
+
+TEST_CASE("Quantised start reports the sample at which the bar boundary falls") {
+    InternalClock clock(48000.0, 4);
+    clock.setBpm(120.0);  // 24000 samples per beat
+    clock.setQuantisedStart(true);
+    clock.setBeat(3.0);  // one beat before the bar boundary at 4
+    clock.play();
+
+    // 24000 samples to the boundary; blocks of 10000: starts in the third block at sample 4000.
+    CHECK(clock.advance(10000).startOffset == -1);
+    CHECK(clock.advance(10000).startOffset == -1);
+    const ClockState start = clock.advance(10000);
+    REQUIRE(start.startOffset == 4000);
+    CHECK(start.startBeat == Approx(4.0));
+    CHECK_FALSE(start.playing);  // state at the START of the block
+    CHECK(start.beat == Approx(3.0));
+    const ClockState next = clock.advance(100);
+    CHECK(next.startOffset == -1);
+    CHECK(next.playing);
+    // Beat at the end of that block: boundary + the 6000 remaining samples.
+    CHECK(next.beat == Approx(4.0 + 6000.0 / 24000.0));
+}
+
+TEST_CASE("Quantised start on a bar boundary starts at sample 0") {
+    InternalClock clock(48000.0, 4);
+    clock.setQuantisedStart(true);
+    clock.play();
+    const ClockState s = clock.advance(128);
+    CHECK(s.startOffset == 0);
+    CHECK(s.startBeat == Approx(0.0));
+}

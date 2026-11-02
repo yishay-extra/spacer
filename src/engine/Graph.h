@@ -7,6 +7,7 @@
 
 #include "core/Clock.h"
 #include "core/Layout.h"
+#include "core/SceneDiff.h"
 #include "engine/SourceInput.h"
 #include "engine/SourceNode.h"
 #include "engine/SpeakerChain.h"
@@ -63,11 +64,24 @@ public:
     /// left holding whatever it is given in exchange and must only be deleted.
     void takeStateFrom(Graph& old) noexcept;
 
+    /// Scene recall (SPEC §11): like takeStateFrom, but sources in
+    /// `diff.replacedSources` crossfade (the old node keeps playing as a
+    /// "ghost" that fades out over `crossfadeSamples` while the new node fades
+    /// in and continues the same input), sources in `diff.addedSources` fade in
+    /// over max(transition, crossfade), and sources in `diff.removedSources`
+    /// fade out as ghosts over the same time. Ghosts are freed with the graph
+    /// that holds them, never on the audio thread.
+    void takeStateForRecall(Graph& old, const SceneDiff& diff, int crossfadeSamples,
+                            int transitionSamples) noexcept;
+
     /// Start fading out (over `numSamples`) every source absent from `next`.
     /// Returns how many sources are fading.
     int fadeOutSourcesMissingFrom(Graph& next, int numSamples) noexcept;
 
 private:
+    void takeSpeakerStateFrom(Graph& old) noexcept;
+    void adoptGhost(Graph& old, int sourceId, int fadeSamples) noexcept;
+
     Layout layout_;
     double sampleRate_;
     int maxBlockSize_;
@@ -75,6 +89,8 @@ private:
     int ambisonicOrder_;
 
     std::vector<std::unique_ptr<SourceNode>> sources_;
+    /// Nodes fading out after a scene recall (still rendered until silent).
+    std::vector<std::unique_ptr<SourceNode>> ghosts_;
     std::vector<std::unique_ptr<SpeakerChain>> chains_;
     std::vector<int> outputChannels_;
 
