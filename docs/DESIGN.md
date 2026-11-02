@@ -45,7 +45,7 @@ for live performance and for static installations.
 
 ## 3. Technology
 
-**C++20 with JUCE** (GPL/commercial dual licence).
+**C++20 with JUCE** (AGPLv3/commercial dual licence, no royalties — see §11).
 
 Why C++ over Rust: CoreAudio, AudioUnit hosting, and the HAL virtual-device
 plugin API are C/Objective-C; spatial DSP libraries and reference
@@ -320,5 +320,10 @@ plugin is missing).
    front, elevation up, distance in metres; expose a preference.
 4. Should cue lists support nested/parallel cue lists (e.g. one for lights,
    one for motion)?
-5. Licensing: JUCE under GPLv3 (app must be GPL) vs. commercial JUCE licence
-   (closed source possible). Decide before the first public release.
+5. Licensing: JUCE is dual-licensed AGPLv3 (Spacer would have to be
+   open-sourced under AGPL) or a flat commercial licence with no royalties:
+   Starter free up to $20k/yr total revenue, Indie $800 perpetual up to
+   $300k/yr, Pro $3,500 perpetual unlimited (figures as of late 2026; verify
+   at juce.com). Plan: Starter now, Indie when revenue requires it. The
+   no-licence alternative is a CoreAudio-direct engine with a Swift/AppKit UI,
+   at the cost of rebuilding plugin hosting, OSC, MIDI and device management.
