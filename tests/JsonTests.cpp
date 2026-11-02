@@ -106,7 +106,14 @@ TEST_CASE("Project configuration types round-trip") {
     ROUND_TRIP(AmbisonicsConfig{4});
     ROUND_TRIP((OscConfig{9005, {"example.local", 9006, true}}));
     ROUND_TRIP((MidiMapping{MidiMessageType::Nrpn, 2, 100, "gain", 0.0f, 1.0f, MidiCurve::Log}));
+    ROUND_TRIP((MidiConfig{{MidiMapping{MidiMessageType::Cc, 1, 7, "gain"}}, 16}));
     ROUND_TRIP((ClockConfig{ClockKind::Osc, 99.0, 7, true}));
+}
+
+TEST_CASE("MidiConfig::programChangeChannel defaults to off and is optional in JSON") {
+    REQUIRE(MidiConfig{}.programChangeChannel == 0);
+    const auto cfg = Json::parse(R"({"mappings":[]})").get<MidiConfig>();
+    REQUIRE(cfg.programChangeChannel == 0);
 }
 
 TEST_CASE("Full project round-trips") {

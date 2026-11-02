@@ -953,12 +953,13 @@ void from_json(const Json& j, MidiMapping& v) {
 }
 
 void to_json(Json& j, const MidiConfig& v) {
-    j = Json{{"mappings", v.mappings}};
+    j = Json{{"mappings", v.mappings}, {"programChangeChannel", v.programChangeChannel}};
 }
 void from_json(const Json& j, MidiConfig& v) {
     requireObject(j, "midi");
     v = {};
     fieldObjVec(j, "mappings", v.mappings);
+    field(j, "programChangeChannel", v.programChangeChannel);
 }
 
 void to_json(Json& j, const ClockConfig& v) {

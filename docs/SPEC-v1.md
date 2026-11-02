@@ -259,6 +259,13 @@ layout, no hull required. `spread` maps to `r_s = 0.2 + spread·3.0` m.
   ±Z when needed), decoder = VBAP gains · sampling decoder. Apply max-rE
   weighting by default.
 - Decode matrix is precomputed; per block the decode is a matrix multiply.
+- Normalisation: the matrix is scaled so the mean decoded energy of a unit
+  plane wave is 1 (matching Σ g² = 1 for VBAP/DBAP). The t-design → layout
+  VBAP step always runs in 3D mode, even for horizontal layouts.
+- Spread: effective order `N_eff = N·(1 − spread)`; degrees ≤ ⌊N_eff⌋ get
+  weight 1, the next degree its fractional part, higher degrees 0 (spread 1 =
+  omnidirectional). Weights are energy-compensated against the project's
+  actual decoder (per-degree energy), so loudness is constant over spread.
 
 ### 6.4 Direct
 
