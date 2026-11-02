@@ -96,6 +96,11 @@ TEST_CASE("Layout rules (§7)") {
         REQUIRE_FALSE(hasErrors(issues));
         REQUIRE(hasIssue(issues, "speakers[1]", Issue::Severity::Warning));
     }
+    SECTION("an LFE speaker may share a direction without a warning") {
+        l.speakers[1].position = l.speakers[0].position;
+        l.speakers[1].lfe = true;
+        REQUIRE(validate(l).empty());
+    }
 }
 
 TEST_CASE("Source limits and ids") {

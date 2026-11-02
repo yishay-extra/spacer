@@ -12,7 +12,8 @@
       "trimDb": 0,
       "userDelayMs": 0,
       "polarityInverted": false,
-      "outputChannel": 0
+      "outputChannel": 0,
+      "lfe": false
     },
     {
       "id": 2,
@@ -25,7 +26,8 @@
       "trimDb": 0,
       "userDelayMs": 0,
       "polarityInverted": false,
-      "outputChannel": 1
+      "outputChannel": 1,
+      "lfe": false
     },
     {
       "id": 3,
@@ -38,7 +40,8 @@
       "trimDb": 0,
       "userDelayMs": 0,
       "polarityInverted": false,
-      "outputChannel": 2
+      "outputChannel": 2,
+      "lfe": false
     },
     {
       "id": 4,
@@ -51,7 +54,8 @@
       "trimDb": 0,
       "userDelayMs": 0,
       "polarityInverted": false,
-      "outputChannel": 3
+      "outputChannel": 3,
+      "lfe": false
     }
   ]
 }

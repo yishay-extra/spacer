@@ -12,13 +12,14 @@ inline constexpr int kMaxSources = 64;
 inline constexpr int kVirtualDeviceChannels = 64;
 
 struct Speaker {
-    int id{0};                      // stable within a layout, >= 1
-    std::string name;               // e.g. "L", "Rs", "Dome 7"
-    Position position;              // physical position relative to listener
-    float trimDb{0.0f};             // user trim, applied after compensation
-    float userDelayMs{0.0f};        // user delay, added to compensation delay
+    int id{0};                // stable within a layout, >= 1
+    std::string name;         // e.g. "L", "Rs", "Dome 7"
+    Position position;        // physical position relative to listener
+    float trimDb{0.0f};       // user trim, applied after compensation
+    float userDelayMs{0.0f};  // user delay, added to compensation delay
     bool polarityInverted{false};
-    int outputChannel{-1};          // 0-based device channel; -1 = unassigned
+    int outputChannel{-1};  // 0-based device channel; -1 = unassigned
+    bool lfe{false};        // LFE/subwoofer: never panned (SPEC §7)
 
     bool operator==(const Speaker&) const = default;
 };
@@ -39,8 +40,8 @@ struct Layout {
 /// Per-speaker values derived from geometry (see SPEC §7).
 struct SpeakerCompensation {
     int speakerId{0};
-    float delayMs{0.0f};   // so all wavefronts arrive at the origin together
-    float gainDb{0.0f};    // 1/r equalisation relative to the farthest speaker
+    float delayMs{0.0f};  // so all wavefronts arrive at the origin together
+    float gainDb{0.0f};   // 1/r equalisation relative to the farthest speaker
 };
 
 /// Compute compensation for every speaker in the layout. Implemented in

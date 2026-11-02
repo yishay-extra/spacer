@@ -74,3 +74,17 @@ TEST_CASE("Presets are usable as a full-size layout (compensation is zero at equ
         REQUIRE_THAT(c.gainDb, Catch::Matchers::WithinAbs(0.0, 1e-6));
     }
 }
+
+TEST_CASE("Exactly the LFE speakers of 5.1, 7.1 and 7.1.4 are marked lfe") {
+    for (const auto& id : layoutpresets::ids()) {
+        INFO(id);
+        const auto layout = *layoutpresets::load(id);
+        int lfeCount = 0;
+        for (const auto& s : layout.speakers) {
+            REQUIRE(s.lfe == (s.name == "LFE"));
+            lfeCount += s.lfe ? 1 : 0;
+        }
+        const bool surround = id == "5.1" || id == "7.1" || id == "7.1.4";
+        REQUIRE(lfeCount == (surround ? 1 : 0));
+    }
+}

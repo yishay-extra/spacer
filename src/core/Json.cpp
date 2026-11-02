@@ -193,7 +193,8 @@ void to_json(Json& j, const Speaker& v) {
              {"trimDb", jf(v.trimDb)},
              {"userDelayMs", jf(v.userDelayMs)},
              {"polarityInverted", v.polarityInverted},
-             {"outputChannel", v.outputChannel}};
+             {"outputChannel", v.outputChannel},
+             {"lfe", v.lfe}};
 }
 void from_json(const Json& j, Speaker& v) {
     requireObject(j, "speaker");
@@ -205,6 +206,7 @@ void from_json(const Json& j, Speaker& v) {
     field(j, "userDelayMs", v.userDelayMs);
     field(j, "polarityInverted", v.polarityInverted);
     field(j, "outputChannel", v.outputChannel);
+    field(j, "lfe", v.lfe);
 }
 
 void to_json(Json& j, const Layout& v) {

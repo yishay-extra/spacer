@@ -18,6 +18,7 @@ TEST_CASE("Geometry types round-trip and use the §15 shapes") {
     const Json p = Position{10.0f, 20.0f, 3.0f};
     REQUIRE(p == Json::parse(R"({"az":10,"el":20,"dist":3})"));
     ROUND_TRIP(Speaker{3, "Rs", {110.0f, 0.0f, 2.0f}, -1.5f, 3.0f, true, 5});
+    ROUND_TRIP(Speaker{4, "LFE", {0.0f, 0.0f, 2.0f}, 0.0f, 0.0f, false, 3, true});
     ROUND_TRIP(Layout{
         "Mine", {Speaker{1, "a", {0, 0, 1}, 0, 0, false, -1}, Speaker{2, "b", {90, 0, 1}, 0, 0, false, 0}}});
 }
@@ -136,4 +137,9 @@ TEST_CASE("Error messages carry the key path") {
         REQUIRE(msg.find("sources[0]") != std::string::npos);
         REQUIRE(msg.find("radius") != std::string::npos);
     }
+}
+
+TEST_CASE("Speaker lfe key is optional and defaults to false") {
+    const auto sp = Json::parse(R"({"id":1,"name":"L","position":{"az":0,"el":0,"dist":2}})").get<Speaker>();
+    REQUIRE_FALSE(sp.lfe);
 }
