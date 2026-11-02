@@ -220,8 +220,9 @@ sample. Energy normalisation: for VBAP/DBAP, gains are normalised so that
 
 ### 6.2 DBAP
 
-Lossone & Neukom: `g_i = 1 / d_i^(a/2)` with `d_i = |p − s_i| + r_s`
-(Cartesian, metres), rolloff `a` in dB per doubling of distance (default 6),
+Lossius et al.: `g_i = 1 / d_i^α` with `α = a / (20·log10 2)` (≈ a / 6.02)
+and `d_i = |p − s_i| + r_s` (Cartesian, metres), rolloff `a` in dB per
+doubling of distance (default 6, i.e. α ≈ 1),
 spatial blur `r_s` (default 0.2 m), normalised so Σ g² = 1. Works with any
 layout, no hull required. `spread` maps to `r_s = 0.2 + spread·3.0` m.
 
