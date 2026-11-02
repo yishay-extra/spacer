@@ -1,0 +1,213 @@
+{
+  "name": "16-Ring",
+  "speakers": [
+    {
+      "id": 1,
+      "name": "1",
+      "position": {
+        "az": 0.0,
+        "el": 0,
+        "dist": 2.0
+      },
+      "trimDb": 0,
+      "userDelayMs": 0,
+      "polarityInverted": false,
+      "outputChannel": 0
+    },
+    {
+      "id": 2,
+      "name": "2",
+      "position": {
+        "az": 22.5,
+        "el": 0,
+        "dist": 2.0
+      },
+      "trimDb": 0,
+      "userDelayMs": 0,
+      "polarityInverted": false,
+      "outputChannel": 1
+    },
+    {
+      "id": 3,
+      "name": "3",
+      "position": {
+        "az": 45.0,
+        "el": 0,
+        "dist": 2.0
+      },
+      "trimDb": 0,
+      "userDelayMs": 0,
+      "polarityInverted": false,
+      "outputChannel": 2
+    },
+    {
+      "id": 4,
+      "name": "4",
+      "position": {
+        "az": 67.5,
+        "el": 0,
+        "dist": 2.0
+      },
+      "trimDb": 0,
+      "userDelayMs": 0,
+      "polarityInverted": false,
+      "outputChannel": 3
+    },
+    {
+      "id": 5,
+      "name": "5",
+      "position": {
+        "az": 90.0,
+        "el": 0,
+        "dist": 2.0
+      },
+      "trimDb": 0,
+      "userDelayMs": 0,
+      "polarityInverted": false,
+      "outputChannel": 4
+    },
+    {
+      "id": 6,
+      "name": "6",
+      "position": {
+        "az": 112.5,
+        "el": 0,
+        "dist": 2.0
+      },
+      "trimDb": 0,
+      "userDelayMs": 0,
+      "polarityInverted": false,
+      "outputChannel": 5
+    },
+    {
+      "id": 7,
+      "name": "7",
+      "position": {
+        "az": 135.0,
+        "el": 0,
+        "dist": 2.0
+      },
+      "trimDb": 0,
+      "userDelayMs": 0,
+      "polarityInverted": false,
+      "outputChannel": 6
+    },
+    {
+      "id": 8,
+      "name": "8",
+      "position": {
+        "az": 157.5,
+        "el": 0,
+        "dist": 2.0
+      },
+      "trimDb": 0,
+      "userDelayMs": 0,
+      "polarityInverted": false,
+      "outputChannel": 7
+    },
+    {
+      "id": 9,
+      "name": "9",
+      "position": {
+        "az": 180,
+        "el": 0,
+        "dist": 2.0
+      },
+      "trimDb": 0,
+      "userDelayMs": 0,
+      "polarityInverted": false,
+      "outputChannel": 8
+    },
+    {
+      "id": 10,
+      "name": "10",
+      "position": {
+        "az": -157.5,
+        "el": 0,
+        "dist": 2.0
+      },
+      "trimDb": 0,
+      "userDelayMs": 0,
+      "polarityInverted": false,
+      "outputChannel": 9
+    },
+    {
+      "id": 11,
+      "name": "11",
+      "position": {
+        "az": -135.0,
+        "el": 0,
+        "dist": 2.0
+      },
+      "trimDb": 0,
+      "userDelayMs": 0,
+      "polarityInverted": false,
+      "outputChannel": 10
+    },
+    {
+      "id": 12,
+      "name": "12",
+      "position": {
+        "az": -112.5,
+        "el": 0,
+        "dist": 2.0
+      },
+      "trimDb": 0,
+      "userDelayMs": 0,
+      "polarityInverted": false,
+      "outputChannel": 11
+    },
+    {
+      "id": 13,
+      "name": "13",
+      "position": {
+        "az": -90.0,
+        "el": 0,
+        "dist": 2.0
+      },
+      "trimDb": 0,
+      "userDelayMs": 0,
+      "polarityInverted": false,
+      "outputChannel": 12
+    },
+    {
+      "id": 14,
+      "name": "14",
+      "position": {
+        "az": -67.5,
+        "el": 0,
+        "dist": 2.0
+      },
+      "trimDb": 0,
+      "userDelayMs": 0,
+      "polarityInverted": false,
+      "outputChannel": 13
+    },
+    {
+      "id": 15,
+      "name": "15",
+      "position": {
+        "az": -45.0,
+        "el": 0,
+        "dist": 2.0
+      },
+      "trimDb": 0,
+      "userDelayMs": 0,
+      "polarityInverted": false,
+      "outputChannel": 14
+    },
+    {
+      "id": 16,
+      "name": "16",
+      "position": {
+        "az": -22.5,
+        "el": 0,
+        "dist": 2.0
+      },
+      "trimDb": 0,
+      "userDelayMs": 0,
+      "polarityInverted": false,
+      "outputChannel": 15
+    }
+  ]
+}

@@ -271,3 +271,28 @@ mode relaunch, CI release job on tags, `docs/INSTALL.md`.
 | WP | Status | Notes |
 |----|--------|-------|
 | WP0 | done | see leftovers above |
+| WP1 | done | Model, JSON, `projectfile::{parse,load,save,serialize}`, `validate()`, layout presets (embedded via `cmake/EmbedLayoutPresets.cmake`). Spec gaps filled and open questions: see "WP1 notes" below |
+
+### WP1 notes
+
+Decisions made where SPEC was silent (all additive; nothing in the spec was changed):
+
+- `SourceSpec` has no separate `kind` field; `kind()` is derived from the `InputSpec` variant so the two cannot disagree. JSON still has `"kind"` + `"input"`.
+- Extra `SourceSpec` fields: `width`, `linkedPoints`, `motionRight` (second motion when `linkedPoints`), `directSpeakers` (targets for `Direct`, §6.4 says "selected in the source spec").
+- `Project` gained `name`, `ambisonics {order}` (both in the §15 JSON but not in §4), plus `speakerChains` and `master` (a scene holds these, but the live state outside scenes had nowhere to live).
+- `SpeakerChainSpec::polarity` is named `polarityInverted` (matches `Speaker`); added `mute` (OSC `/speaker/{id}/mute`).
+- Stereo/mono input: JSON `{"channel":n}` vs `{"left","right"}`; `stereo` must agree (validated).
+- File `relativeTo: "project"` is modelled as `FileInputSpec::relativeToProject` (path is relative to the project file).
+- `LfoShape` = sine/triangle/saw/square/sampleAndHold (§10 lists none). `Cue::postWaitSeconds` (in §11, not §4/§15). `AfterPrevious` random range = `randomRange` extra in the same unit.
+- `StepSequenceMotion` and `RandomWalkMotion` carry a `seed` / `glide` bool (needed for the §10 determinism rule).
+- `AtBeat{bar, beat}` is 1-based in `validate()`.
+- Unknown-key detection works by diffing the file against the re-serialised model.
+- `load()` does not call `validate()`; callers decide (a project with a missing plugin or bad cue must still be openable for repair).
+
+Spec issues for the owner (not changed):
+
+1. §7 presets: 5.1 / 7.1 / 7.1.4 include an LFE speaker. It is in the same direction as C, which degenerates VBAP. Layouts probably need a way to mark non-panned speakers (e.g. `role: "lfe"`) — WP2a/WP2b must decide. `validate()` currently *warns* on coincident directions.
+2. §7 "standard angles" is undefined for Dome 22 and the octagon; chosen: octagon at 0°,45°…; dome22 = 8 @0°, 8 @30° (offset 22.5°), 5 @60°, zenith.
+3. §15 example has `"..."` placeholders inside `scenes`; not valid JSON as written.
+4. §11 `Midi{note | cc}` and "program change selects scenes" (§12.2): program-change→scene mapping has no home in `MidiConfig`; not modelled.
+5. §4 `Scene` says "full snapshot ... master" without fields; modelled as `MasterSpec {gainDb}`.

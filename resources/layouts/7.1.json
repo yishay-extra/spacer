@@ -1,0 +1,109 @@
+{
+  "name": "7.1",
+  "speakers": [
+    {
+      "id": 1,
+      "name": "L",
+      "position": {
+        "az": -30,
+        "el": 0,
+        "dist": 2.0
+      },
+      "trimDb": 0,
+      "userDelayMs": 0,
+      "polarityInverted": false,
+      "outputChannel": 0
+    },
+    {
+      "id": 2,
+      "name": "R",
+      "position": {
+        "az": 30,
+        "el": 0,
+        "dist": 2.0
+      },
+      "trimDb": 0,
+      "userDelayMs": 0,
+      "polarityInverted": false,
+      "outputChannel": 1
+    },
+    {
+      "id": 3,
+      "name": "C",
+      "position": {
+        "az": 0,
+        "el": 0,
+        "dist": 2.0
+      },
+      "trimDb": 0,
+      "userDelayMs": 0,
+      "polarityInverted": false,
+      "outputChannel": 2
+    },
+    {
+      "id": 4,
+      "name": "LFE",
+      "position": {
+        "az": 0,
+        "el": 0,
+        "dist": 2.0
+      },
+      "trimDb": 0,
+      "userDelayMs": 0,
+      "polarityInverted": false,
+      "outputChannel": 3
+    },
+    {
+      "id": 5,
+      "name": "Lss",
+      "position": {
+        "az": -90,
+        "el": 0,
+        "dist": 2.0
+      },
+      "trimDb": 0,
+      "userDelayMs": 0,
+      "polarityInverted": false,
+      "outputChannel": 4
+    },
+    {
+      "id": 6,
+      "name": "Rss",
+      "position": {
+        "az": 90,
+        "el": 0,
+        "dist": 2.0
+      },
+      "trimDb": 0,
+      "userDelayMs": 0,
+      "polarityInverted": false,
+      "outputChannel": 5
+    },
+    {
+      "id": 7,
+      "name": "Lrs",
+      "position": {
+        "az": -150,
+        "el": 0,
+        "dist": 2.0
+      },
+      "trimDb": 0,
+      "userDelayMs": 0,
+      "polarityInverted": false,
+      "outputChannel": 6
+    },
+    {
+      "id": 8,
+      "name": "Rrs",
+      "position": {
+        "az": 150,
+        "el": 0,
+        "dist": 2.0
+      },
+      "trimDb": 0,
+      "userDelayMs": 0,
+      "polarityInverted": false,
+      "outputChannel": 7
+    }
+  ]
+}
