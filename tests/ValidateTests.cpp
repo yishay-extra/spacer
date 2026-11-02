@@ -346,6 +346,12 @@ TEST_CASE("Project setting ranges") {
         REQUIRE(hasIssue(issues, "osc.inPort"));
         REQUIRE(hasIssue(issues, "osc.out.port"));
     }
+    SECTION("program change channel") {
+        p.midi.programChangeChannel = 17;
+        REQUIRE(hasIssue(validate(p), "midi.programChangeChannel"));
+        p.midi.programChangeChannel = 16;
+        REQUIRE_FALSE(hasIssue(validate(p), "midi.programChangeChannel"));
+    }
     SECTION("midi mappings") {
         p.midi.mappings[0].parameterPath = "";
         p.midi.mappings[1].min = 0.0f;  // log curve

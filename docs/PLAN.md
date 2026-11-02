@@ -122,7 +122,7 @@ Spec: §6.3.
   adding to `bus.speakers`. Built once per layout/order change.
 
 Acceptance: encoding a direction and decoding on a dense t-design layout
-reproduces the direction (energy vector rE points within 2° for order 3);
+reproduces the direction (energy vector rE error at order 3: mean < 1.5°, max < 2.5°; orders 1–2 within 2° everywhere — revised after WP2d showed 2° everywhere is unreachable for AllRAD within 32 speakers);
 encoder SH values for canonical directions match reference tables; decode
 matrix shape and energy preservation tests; no allocation in render/decode.
 
@@ -151,6 +151,20 @@ az −90 yields signal only on the left channel; compensation delay measured in
 the render matches `computeCompensation`; limiter never exceeds −0.3 dBFS on
 a +12 dB input; command FIFO survives 1M commands without allocation; CI
 benchmark (§17) in place.
+
+---
+
+## WP3b — Ambisonics in the engine · **core + macOS · M**
+
+After WP2d. Wire `AmbisonicEncoder` / `AmbisonicDecoder` into the engine:
+`GraphBuilder` creates encoders for `Ambisonic` sources (replacing the
+current VBAP fallback), allocates the ambisonic bus at the project order,
+runs the decode stage of §5.3 into the speaker bus, rebuilds the decoder on
+layout/order change via `SwapGraph`, and extends the §17 benchmark with 5th-
+order ambisonic sources. Acceptance: offline render of an ambisonic source
+at a speaker direction peaks at that speaker; order change via SwapGraph is
+click-free (crossfade) and allocation-free on the audio thread; benchmark
+within budget.
 
 ---
 
@@ -294,8 +308,11 @@ mode relaunch, CI release job on tags, `docs/INSTALL.md`.
 | WP1 | done | Model, JSON, `projectfile::{parse,load,save,serialize}`, `validate()`, layout presets (embedded via `cmake/EmbedLayoutPresets.cmake`). Spec gaps filled and open questions: see "WP1 notes" below |
 | WP2a | done | `spatial/Vbap` (2D, MDAP spread, LFE ignored) and `spatial/DistanceModel` (`distanceGain`, `distanceCutoffHz`, `DistanceProcessor`). Notes below |
 | WP2b | done | 3D VBAP via `SphereHull` (exhaustive hull, coplanar fan), imaginary floor/ceiling, 3D MDAP; decisions now in SPEC §6.1. Details: PR #8 |
+| WP2d | done | `SphericalHarmonics` (ACN/SN3D, AmbiX), embedded 240-point 21-design, `AmbisonicEncoder` (orders 1–5, spread via effective order), `AmbisonicDecoder` (AllRAD over WP2b `Vbap` with `setAlways3D`, max-rE, LFE excluded). rE criterion revised (see WP2d entry). Engine wiring is WP3b. Details: PR #13 |
+| WP3 | done | Engine (`EngineProcessor`, `Graph`/`GraphBuilder`, `SwapGraph` with state carry-over, `SpeakerChain`: Lagrange delay → gain → 3-band EQ → inserts → limiter), `OfflineRenderer`, `AllocationGuard`, `spatial/Direct`; macOS `AudioEngine` + `AggregateDevice` + `spacer-engine-check` CLI. `LookaheadLimiter` gain computer is hand-written (juce::dsp::Limiter has no look-ahead); its delay is `juce::dsp::DelayLine`. Mac checks: `docs/mac-validation/WP3.md`. Details: PR #11 |
 | WP6 | done | `InternalClock` (tempo, play/resume/stop, setBeat, tap tempo, quantised start). Decisions and open points: see "WP6 notes" below |
 | WP7 | done | `src/core/motion/`: all §10 trajectory kinds, `MotionFactory`, `ModulatorBank` (LFO/OSC/MIDI), `ParameterPath`, seeded `Rng`; shared test `AllocationCounter`. Phase-origin and Orbit decisions now in SPEC §10; other decisions in PR #9. Open: live param edits without phase restart (WP11b), `motionRight.*` modulation paths |
+| WP9 | done | `SceneDiff`, `CueSequencer` (core); `RecallScene{RecallPlan*}` with linear ramps / 50 ms ghost-node crossfades / sample-accurate `AtBeat` scheduling (engine); `CueEngine`, `InstallationMode`, `Autosaver` (control; wired into the app by WP11a). `ClockState::startOffset`/`startBeat`. Mac checks: `docs/mac-validation/WP9.md`. Details: PR #14 |
 | WP2c | done | `spacer::Dbap` (`src/core/spatial/Dbap.h/.cpp`): §6.2 gains, Σg²=1 over panned speakers, `r_s = 0.2 + 3·spread`, LFE speakers excluded from gains, normalisation and render (§7). Tests in `tests/DbapTests.cpp`. Open spec issue: see "WP2c notes" below |
 
 ### WP2c notes

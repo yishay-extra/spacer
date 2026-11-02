@@ -55,6 +55,9 @@ struct MidiMapping {
 };
 struct MidiConfig {
     std::vector<MidiMapping> mappings;
+    /// 1..16: program N on that channel recalls scene index N (0-based) with a
+    /// 0 s transition. 0 = off (SPEC §12.2).
+    int programChangeChannel{0};
     bool operator==(const MidiConfig&) const = default;
 };
 
