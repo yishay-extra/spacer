@@ -41,6 +41,20 @@ target_compile_options(spacer_core PRIVATE
     $<$<CXX_COMPILER_ID:GNU,Clang,AppleClang>:-Wall -Wextra -Wpedantic -Wshadow -Wconversion -Wno-sign-conversion>)
 
 # ---------------------------------------------------------------------------
+# spacer_ui_logic: the testable part of the UI (src/ui/logic) — stage
+# transforms, hit-testing, layout-editor operations, undo history, engine
+# sync planning. Plain C++20, NO JUCE (it may include the JUCE-free engine
+# headers Command.h / Feedback.h). Linked by the app and the core tests.
+# ---------------------------------------------------------------------------
+file(GLOB SPACER_UI_LOGIC_SOURCES CONFIGURE_DEPENDS
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ui/logic/*.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ui/logic/*.h)
+add_library(spacer_ui_logic STATIC ${SPACER_UI_LOGIC_SOURCES})
+target_link_libraries(spacer_ui_logic PUBLIC spacer_core)
+target_compile_options(spacer_ui_logic PRIVATE
+    $<$<CXX_COMPILER_ID:GNU,Clang,AppleClang>:-Wall -Wextra -Wpedantic -Wshadow -Wconversion -Wno-sign-conversion>)
+
+# ---------------------------------------------------------------------------
 # JUCE: needed by the app (macOS) and by the engine tests (any platform). Off
 # macOS only the modules are configured (no juceaide, so no GUI deps needed).
 # ---------------------------------------------------------------------------
@@ -103,6 +117,8 @@ if(SPACER_WITH_APP)
         ${CMAKE_CURRENT_SOURCE_DIR}/src/ui/*.h
         ${CMAKE_CURRENT_SOURCE_DIR}/src/app/*.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/app/*.h)
+    # src/ui/logic is the separate spacer_ui_logic library.
+    list(FILTER SPACER_APP_SOURCES EXCLUDE REGEX "/src/ui/logic/")
     target_sources(Spacer PRIVATE ${SPACER_APP_SOURCES})
 
     target_compile_definitions(Spacer PRIVATE
@@ -115,7 +131,7 @@ if(SPACER_WITH_APP)
 
     target_link_libraries(Spacer
         PRIVATE
-            spacer_core
+            spacer_ui_logic  # brings spacer_core (listing both makes Apple ld warn)
             juce::juce_audio_utils
             juce::juce_audio_processors
             juce::juce_audio_formats
