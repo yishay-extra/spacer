@@ -327,3 +327,4 @@ plugin is missing).
    at juce.com). Plan: Starter now, Indie when revenue requires it. The
    no-licence alternative is a CoreAudio-direct engine with a Swift/AppKit UI,
    at the cost of rebuilding plugin hosting, OSC, MIDI and device management.
+   Full option analysis and migration notes: `docs/JUCE-ALTERNATIVES.md`.

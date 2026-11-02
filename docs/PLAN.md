@@ -176,7 +176,7 @@ checklist in `driver/TESTING.md`.
 
 ---
 
-## WP6 — Internal clock · **core · S**
+## WP6 — Internal clock ✅ done · **core · S**
 
 Spec: §9. `InternalClock` (bpm, play/stop/continue, setBeat, tap, quantised
 start). Acceptance: advancing 48000 samples at 120 bpm adds exactly 2 beats;
@@ -273,6 +273,7 @@ mode relaunch, CI release job on tags, `docs/INSTALL.md`.
 | WP0 | done | see leftovers above |
 | WP1 | done | Model, JSON, `projectfile::{parse,load,save,serialize}`, `validate()`, layout presets (embedded via `cmake/EmbedLayoutPresets.cmake`). Spec gaps filled and open questions: see "WP1 notes" below |
 | WP2a | done | `spatial/Vbap` (2D, MDAP spread, LFE ignored) and `spatial/DistanceModel` (`distanceGain`, `distanceCutoffHz`, `DistanceProcessor`). Notes below |
+| WP6 | done | `InternalClock` (tempo, play/resume/stop, setBeat, tap tempo, quantised start). Decisions and open points: see "WP6 notes" below |
 
 ### WP1 notes
 
@@ -313,3 +314,19 @@ Spec issues for the owner (not changed):
 2. §6.1 MDAP ring in 2D is ambiguous (a ring of angular radius around a horizontal direction); see projection above.
 3. §6.1 "sum gains and normalise" — amplitude sum was assumed (not power sum).
 4. §6.5 with `q > 0` and distance ≤ 1 m the cutoff is 20 kHz, which still low-passes noticeably at 48 kHz with a one-pole; fine, but not transparent.
+
+### WP6 notes
+
+Decisions made where SPEC §9 was silent (`src/core/InternalClock.{h,cpp}`, `tests/InternalClockTests.cpp`):
+
+- `continue` is a C++ keyword, so the transport method is `resume()`. `play()` honours `ClockConfig::quantisedStart`; `resume()` always starts immediately from the frozen beat. `play()` starts from the current beat, not from zero.
+- `advance(n)` returns the state at the start of the block and moves the beat by the block's length, so the effect of an advance is observed in the next call (for example `advance(0)` after `advance(48000)` reads beat 2.0 at 120 bpm).
+- Quantised start: the reported beat stays frozen while armed. The transport starts on the first sample where the grid beat reaches the next bar boundary, and any remainder of that block is added to the beat. A beat already on a boundary counts as "next", so the start is immediate. A tempo change while armed changes how fast the countdown runs.
+- Tap tempo averages the last 4 intervals. A gap over 2 s starts a new series. Tempo is clamped to [20, 300] bpm. Taps are in engine seconds (the `ClockState::timeSeconds` timeline).
+- `setBpm` and `setBeat` ignore non-finite input. `setBeat` on an armed clock re-targets the pending start.
+- Not thread-safe. The engine must call these from the audio thread through the command queue.
+
+Spec issue for the owner (not changed):
+
+1. §9 / §4: `ClockState` has no field for the sample offset at which a quantised start falls inside a block. The start is sample-accurate in the core, but the engine cannot pass that offset on to motions or cue triggers. Either add a `startSampleOffset` (or the engine splits the block at the start) before WP9.
+
