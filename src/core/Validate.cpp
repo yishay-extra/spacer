@@ -365,6 +365,8 @@ Issues validate(const Project& p) {
     if (p.osc.inPort < 1 || p.osc.inPort > 65535) s.error("osc.inPort", "port must be within [1, 65535]");
     if (p.osc.out.port < 1 || p.osc.out.port > 65535)
         s.error("osc.out.port", "port must be within [1, 65535]");
+    if (p.midi.programChangeChannel < 0 || p.midi.programChangeChannel > 16)
+        s.error("midi.programChangeChannel", "programChangeChannel must be within [0, 16]");
     for (std::size_t i = 0; i < p.midi.mappings.size(); ++i) {
         const auto& m = p.midi.mappings[i];
         const std::string path = idx("midi.mappings", i);
