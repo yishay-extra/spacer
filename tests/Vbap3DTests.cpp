@@ -13,7 +13,7 @@
 #include "core/spatial/Vbap.h"
 
 // 3D VBAP (SPEC §6.1, WP2b). The allocation check for render() lives in
-// VbapTests.cpp, which owns the operator new hook.
+// VbapTests.cpp (hook in AllocCounter.cpp).
 
 using Catch::Approx;
 using namespace spacer;
