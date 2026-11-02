@@ -1,0 +1,466 @@
+{
+  "ambisonics": {
+    "order": 3
+  },
+  "clock": {
+    "beatsPerBar": 4,
+    "bpm": 120.0,
+    "kind": "Internal",
+    "quantisedStart": false
+  },
+  "cueLists": [
+    {
+      "cues": [
+        {
+          "name": "A",
+          "postWaitSeconds": 0.0,
+          "restartMotionPhase": false,
+          "scene": "A",
+          "transitionSeconds": 2.0,
+          "trigger": {
+            "kind": "Manual"
+          }
+        },
+        {
+          "name": "B",
+          "postWaitSeconds": 0.0,
+          "restartMotionPhase": false,
+          "scene": "B",
+          "transitionSeconds": 4.0,
+          "trigger": {
+            "kind": "Manual"
+          }
+        }
+      ],
+      "loop": true,
+      "name": "Demo"
+    }
+  ],
+  "devices": {
+    "bufferSize": 128,
+    "outputDeviceName": "",
+    "sampleRate": 48000.0,
+    "speedOfSound": 343.0
+  },
+  "layout": {
+    "name": "Quad",
+    "speakers": [
+      {
+        "id": 1,
+        "lfe": false,
+        "name": "FL",
+        "outputChannel": 0,
+        "polarityInverted": false,
+        "position": {
+          "az": -45.0,
+          "dist": 2.0,
+          "el": 0.0
+        },
+        "trimDb": 0.0,
+        "userDelayMs": 0.0
+      },
+      {
+        "id": 2,
+        "lfe": false,
+        "name": "FR",
+        "outputChannel": 1,
+        "polarityInverted": false,
+        "position": {
+          "az": 45.0,
+          "dist": 2.0,
+          "el": 0.0
+        },
+        "trimDb": 0.0,
+        "userDelayMs": 0.0
+      },
+      {
+        "id": 3,
+        "lfe": false,
+        "name": "RR",
+        "outputChannel": 2,
+        "polarityInverted": false,
+        "position": {
+          "az": 135.0,
+          "dist": 2.0,
+          "el": 0.0
+        },
+        "trimDb": 0.0,
+        "userDelayMs": 0.0
+      },
+      {
+        "id": 4,
+        "lfe": false,
+        "name": "RL",
+        "outputChannel": 3,
+        "polarityInverted": false,
+        "position": {
+          "az": -135.0,
+          "dist": 2.0,
+          "el": 0.0
+        },
+        "trimDb": 0.0,
+        "userDelayMs": 0.0
+      }
+    ]
+  },
+  "master": {
+    "gainDb": 0.0
+  },
+  "midi": {
+    "mappings": []
+  },
+  "name": "Stage demo (WP11a)",
+  "osc": {
+    "inPort": 9000,
+    "out": {
+      "enabled": false,
+      "host": "127.0.0.1",
+      "port": 9001
+    }
+  },
+  "scenes": [
+    {
+      "master": {
+        "gainDb": 0.0
+      },
+      "name": "A",
+      "sources": [
+        {
+          "directSpeakers": [],
+          "distance": {
+            "k": 1.0,
+            "q": 0.0,
+            "rMin": 0.5
+          },
+          "gainDb": -18.0,
+          "id": 1,
+          "input": {
+            "hz": 440.0,
+            "type": "sine"
+          },
+          "inserts": [],
+          "kind": "Generator",
+          "linkedPoints": false,
+          "modulators": [],
+          "motion": {
+            "kind": "Manual",
+            "position": {
+              "az": 0.0,
+              "dist": 1.5,
+              "el": 0.0
+            },
+            "smoothMs": 20.0
+          },
+          "mute": false,
+          "name": "Voice",
+          "spatializer": "Vbap",
+          "spread": 0.0,
+          "stereo": false,
+          "width": 60.0
+        },
+        {
+          "directSpeakers": [],
+          "distance": {
+            "k": 1.0,
+            "q": 0.0,
+            "rMin": 0.5
+          },
+          "gainDb": -24.0,
+          "id": 2,
+          "input": {
+            "type": "pink"
+          },
+          "inserts": [],
+          "kind": "Generator",
+          "linkedPoints": false,
+          "modulators": [],
+          "motion": {
+            "centre": {
+              "az": 0.0,
+              "dist": 0.0,
+              "el": 0.0
+            },
+            "direction": 1,
+            "elevationWobble": 0.0,
+            "kind": "Orbit",
+            "period": {
+              "beats": 16.0
+            },
+            "phaseOffset": 0.0,
+            "radius": 1.5,
+            "wobblePeriod": {
+              "beats": 16.0
+            }
+          },
+          "mute": false,
+          "name": "Pad",
+          "spatializer": "Vbap",
+          "spread": 0.0,
+          "stereo": false,
+          "width": 60.0
+        },
+        {
+          "directSpeakers": [],
+          "distance": {
+            "k": 1.0,
+            "q": 0.0,
+            "rMin": 0.5
+          },
+          "gainDb": -24.0,
+          "id": 3,
+          "input": {
+            "hz": 220.0,
+            "type": "sine"
+          },
+          "inserts": [],
+          "kind": "Generator",
+          "linkedPoints": false,
+          "modulators": [],
+          "motion": {
+            "kind": "Manual",
+            "position": {
+              "az": 180.0,
+              "dist": 1.5,
+              "el": 0.0
+            },
+            "smoothMs": 20.0
+          },
+          "mute": true,
+          "name": "Pair",
+          "spatializer": "Vbap",
+          "spread": 0.0,
+          "stereo": true,
+          "width": 60.0
+        }
+      ],
+      "speakerChains": []
+    },
+    {
+      "master": {
+        "gainDb": 0.0
+      },
+      "name": "B",
+      "sources": [
+        {
+          "directSpeakers": [],
+          "distance": {
+            "k": 1.0,
+            "q": 0.0,
+            "rMin": 0.5
+          },
+          "gainDb": -18.0,
+          "id": 1,
+          "input": {
+            "hz": 440.0,
+            "type": "sine"
+          },
+          "inserts": [],
+          "kind": "Generator",
+          "linkedPoints": false,
+          "modulators": [],
+          "motion": {
+            "kind": "Manual",
+            "position": {
+              "az": 90.0,
+              "dist": 1.5,
+              "el": 0.0
+            },
+            "smoothMs": 20.0
+          },
+          "mute": false,
+          "name": "Voice",
+          "spatializer": "Vbap",
+          "spread": 0.0,
+          "stereo": false,
+          "width": 60.0
+        },
+        {
+          "directSpeakers": [],
+          "distance": {
+            "k": 1.0,
+            "q": 0.0,
+            "rMin": 0.5
+          },
+          "gainDb": -24.0,
+          "id": 2,
+          "input": {
+            "type": "pink"
+          },
+          "inserts": [],
+          "kind": "Generator",
+          "linkedPoints": false,
+          "modulators": [],
+          "motion": {
+            "centre": {
+              "az": 0.0,
+              "dist": 0.0,
+              "el": 0.0
+            },
+            "direction": 1,
+            "elevationWobble": 0.0,
+            "kind": "Orbit",
+            "period": {
+              "beats": 16.0
+            },
+            "phaseOffset": 0.0,
+            "radius": 1.5,
+            "wobblePeriod": {
+              "beats": 16.0
+            }
+          },
+          "mute": false,
+          "name": "Pad",
+          "spatializer": "Vbap",
+          "spread": 0.0,
+          "stereo": false,
+          "width": 60.0
+        },
+        {
+          "directSpeakers": [],
+          "distance": {
+            "k": 1.0,
+            "q": 0.0,
+            "rMin": 0.5
+          },
+          "gainDb": -24.0,
+          "id": 3,
+          "input": {
+            "hz": 220.0,
+            "type": "sine"
+          },
+          "inserts": [],
+          "kind": "Generator",
+          "linkedPoints": false,
+          "modulators": [],
+          "motion": {
+            "kind": "Manual",
+            "position": {
+              "az": 180.0,
+              "dist": 1.5,
+              "el": 0.0
+            },
+            "smoothMs": 20.0
+          },
+          "mute": false,
+          "name": "Pair",
+          "spatializer": "Vbap",
+          "spread": 0.0,
+          "stereo": true,
+          "width": 60.0
+        }
+      ],
+      "speakerChains": []
+    }
+  ],
+  "schemaVersion": 1,
+  "sources": [
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": -18.0,
+      "id": 1,
+      "input": {
+        "hz": 440.0,
+        "type": "sine"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "kind": "Manual",
+        "position": {
+          "az": 0.0,
+          "dist": 1.5,
+          "el": 0.0
+        },
+        "smoothMs": 20.0
+      },
+      "mute": false,
+      "name": "Voice",
+      "spatializer": "Vbap",
+      "spread": 0.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": -24.0,
+      "id": 2,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": 1,
+        "elevationWobble": 0.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 16.0
+        },
+        "phaseOffset": 0.0,
+        "radius": 1.5,
+        "wobblePeriod": {
+          "beats": 16.0
+        }
+      },
+      "mute": false,
+      "name": "Pad",
+      "spatializer": "Vbap",
+      "spread": 0.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": -24.0,
+      "id": 3,
+      "input": {
+        "hz": 220.0,
+        "type": "sine"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "kind": "Manual",
+        "position": {
+          "az": 180.0,
+          "dist": 1.5,
+          "el": 0.0
+        },
+        "smoothMs": 20.0
+      },
+      "mute": true,
+      "name": "Pair",
+      "spatializer": "Vbap",
+      "spread": 0.0,
+      "stereo": true,
+      "width": 60.0
+    }
+  ],
+  "speakerChains": []
+}

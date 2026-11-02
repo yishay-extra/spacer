@@ -68,6 +68,9 @@ public:
 
     Status status() const;
     juce::AudioDeviceManager& deviceManager() noexcept { return deviceManager_; }
+    /// The processor behind send(), for control code that talks to it
+    /// directly (CueEngine). Same rule: message thread only.
+    EngineProcessor& processor() noexcept { return processor_; }
 
 private:
     void audioDeviceIOCallbackWithContext(const float* const* inputChannelData, int numInputChannels,
