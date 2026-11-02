@@ -318,9 +318,9 @@ Spec issues for the owner (not changed):
 
 Spec issues for the owner (not changed):
 
-1. §6.1 2D mode does not say what happens in a ≥180° coverage gap (stereo, or a front-only array); the cross-fade above is my choice.
-2. §6.1 MDAP ring in 2D is ambiguous (a ring of angular radius around a horizontal direction); see projection above.
-3. §6.1 "sum gains and normalise" — amplitude sum was assumed (not power sum).
+1. **Resolved** (now in SPEC §6.1). §6.1 2D mode does not say what happens in a ≥180° coverage gap (stereo, or a front-only array); the cross-fade above is my choice.
+2. **Resolved** (now in SPEC §6.1). §6.1 MDAP ring in 2D is ambiguous (a ring of angular radius around a horizontal direction); see projection above.
+3. **Resolved** (now in SPEC §6.1). §6.1 "sum gains and normalise" — amplitude sum was assumed (not power sum).
 4. §6.5 with `q > 0` and distance ≤ 1 m the cutoff is 20 kHz, which still low-passes noticeably at 48 kHz with a one-pole; fine, but not transparent.
 
 ### WP6 notes
