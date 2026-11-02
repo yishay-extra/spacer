@@ -272,6 +272,7 @@ mode relaunch, CI release job on tags, `docs/INSTALL.md`.
 |----|--------|-------|
 | WP0 | done | see leftovers above |
 | WP1 | done | Model, JSON, `projectfile::{parse,load,save,serialize}`, `validate()`, layout presets (embedded via `cmake/EmbedLayoutPresets.cmake`). Spec gaps filled and open questions: see "WP1 notes" below |
+| WP2a | done | `spatial/Vbap` (2D, MDAP spread, LFE ignored) and `spatial/DistanceModel` (`distanceGain`, `distanceCutoffHz`, `DistanceProcessor`). Notes below |
 
 ### WP1 notes
 
@@ -296,3 +297,19 @@ Spec issues for the owner (not changed):
 3. §15 example has `"..."` placeholders inside `scenes`; not valid JSON as written.
 4. §11 `Midi{note | cc}` and "program change selects scenes" (§12.2): program-change→scene mapping has no home in `MidiConfig`; not modelled.
 5. §4 `Scene` says "full snapshot ... master" without fields; modelled as `MasterSpec {gainDb}`.
+
+### WP2a notes
+
+- `Vbap` skips `lfe` speakers (SPEC §7): gain 0 in `gainsFor` and silent in `render`; tested with the 5.1 preset (LFE shares C's direction, so C still gets gain 1).
+- `Vbap::is2D()` reports whether all panned speakers are |el| < 5°. 3D layouts are WP2b; until then `Vbap` pans them by azimuth only.
+- Coverage gaps ≥ 179.9° (behind stereo, etc.) cannot use the 2x2 solve; the bounding speakers are cross-faded constant-power by angle. Speakers coincident in azimuth: only the first is used.
+- MDAP in 2D: the 8 ring sources are azimuth offsets `r·cos(2πk/8)`, `r = spread·90°` (projection of the ring onto the horizontal plane); amplitude gains are summed then normalised to Σg²=1.
+- Per-sample gain ramp is `g0 + (g1−g0)·i/n` (end gain reached at the start of the next block).
+- `DistanceProcessor` (gain ramp + one-pole LP, coefficient ramped) is the stateful part; the `DistanceModel` struct stays in `Source.h`.
+
+Spec issues for the owner (not changed):
+
+1. §6.1 2D mode does not say what happens in a ≥180° coverage gap (stereo, or a front-only array); the cross-fade above is my choice.
+2. §6.1 MDAP ring in 2D is ambiguous (a ring of angular radius around a horizontal direction); see projection above.
+3. §6.1 "sum gains and normalise" — amplitude sum was assumed (not power sum).
+4. §6.5 with `q > 0` and distance ≤ 1 m the cutoff is 20 kHz, which still low-passes noticeably at 48 kHz with a one-pole; fine, but not transparent.
