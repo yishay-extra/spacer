@@ -204,6 +204,7 @@ scheduled to sample via command timestamps), `OscSender` (30 Hz feedback),
 → `Command` translation. Acceptance: every §12.1 address has a test sending
 a message and observing the resulting command; malformed messages are
 counted, never crash; MIDI learn captures the first moved control.
+Also: add `MidiConfig::programChangeChannel` (model, JSON, round-trip test; SPEC §12.2).
 
 ---
 
@@ -216,6 +217,8 @@ queue; installation mode behaviour (autoload, arm, Go, autosave, no dialogs).
 Acceptance: recall ramps complete in the stated time (offline render of a
 gain change); discrete switches crossfade; cue list loops; `AfterPrevious`
 with range stays within range over 1000 runs; autosave writes a valid file.
+Also: implement `ClockState::startOffset` (SPEC §9) in `InternalClock` and
+use it for sample-accurate beat triggers.
 
 ---
 
@@ -266,6 +269,17 @@ mode relaunch, CI release job on tags, `docs/INSTALL.md`.
 
 ---
 
+## Phase decisions (2026-11-02)
+
+- **WP13 (packaging) is deferred** past the current build-out phase.
+- **No real Mac in this phase.** macOS WPs must compile and pass on macOS CI
+  (PR labelled `macos`), and all logic testable off-Mac must have tests.
+  Anything that needs real hardware or a listener is assumed correct for now;
+  each such WP writes `docs/mac-validation/WP<id>.md` (setup, steps, expected
+  result, pass/fail) and its PR lists which acceptance criteria CI verified
+  and which are deferred to that checklist. The owner runs those checklists
+  later in a local session.
+
 ## Status log
 
 | WP | Status | Notes |
@@ -273,7 +287,9 @@ mode relaunch, CI release job on tags, `docs/INSTALL.md`.
 | WP0 | done | see leftovers above |
 | WP1 | done | Model, JSON, `projectfile::{parse,load,save,serialize}`, `validate()`, layout presets (embedded via `cmake/EmbedLayoutPresets.cmake`). Spec gaps filled and open questions: see "WP1 notes" below |
 | WP2a | done | `spatial/Vbap` (2D, MDAP spread, LFE ignored) and `spatial/DistanceModel` (`distanceGain`, `distanceCutoffHz`, `DistanceProcessor`). Notes below |
+| WP2b | done | 3D VBAP via `SphereHull` (exhaustive hull, coplanar fan), imaginary floor/ceiling, 3D MDAP; decisions now in SPEC §6.1. Details: PR #8 |
 | WP6 | done | `InternalClock` (tempo, play/resume/stop, setBeat, tap tempo, quantised start). Decisions and open points: see "WP6 notes" below |
+| WP7 | done | `src/core/motion/`: all §10 trajectory kinds, `MotionFactory`, `ModulatorBank` (LFO/OSC/MIDI), `ParameterPath`, seeded `Rng`; shared test `AllocationCounter`. Phase-origin and Orbit decisions now in SPEC §10; other decisions in PR #9. Open: live param edits without phase restart (WP11b), `motionRight.*` modulation paths |
 | WP2c | done | `spacer::Dbap` (`src/core/spatial/Dbap.h/.cpp`): §6.2 gains, Σg²=1 over panned speakers, `r_s = 0.2 + 3·spread`, LFE speakers excluded from gains, normalisation and render (§7). Tests in `tests/DbapTests.cpp`. Open spec issue: see "WP2c notes" below |
 
 ### WP2c notes
@@ -302,10 +318,10 @@ Decisions made where SPEC was silent (all additive; nothing in the spec was chan
 Spec issues for the owner (not changed):
 
 1. **Resolved** (SPEC §7: `Speaker::lfe`, excluded from panning, Direct-only). §7 presets: 5.1 / 7.1 / 7.1.4 include an LFE speaker. It is in the same direction as C, which degenerates VBAP. Layouts probably need a way to mark non-panned speakers (e.g. `role: "lfe"`) — WP2a/WP2b must decide. `validate()` currently *warns* on coincident directions.
-2. §7 "standard angles" is undefined for Dome 22 and the octagon; chosen: octagon at 0°,45°…; dome22 = 8 @0°, 8 @30° (offset 22.5°), 5 @60°, zenith.
-3. §15 example has `"..."` placeholders inside `scenes`; not valid JSON as written.
-4. §11 `Midi{note | cc}` and "program change selects scenes" (§12.2): program-change→scene mapping has no home in `MidiConfig`; not modelled.
-5. §4 `Scene` says "full snapshot ... master" without fields; modelled as `MasterSpec {gainDb}`.
+2. **Resolved** (SPEC updated). §7 "standard angles" is undefined for Dome 22 and the octagon; chosen: octagon at 0°,45°…; dome22 = 8 @0°, 8 @30° (offset 22.5°), 5 @60°, zenith.
+3. **Resolved** (SPEC updated). §15 example has `"..."` placeholders inside `scenes`; not valid JSON as written.
+4. **Resolved** (SPEC updated). §11 `Midi{note | cc}` and "program change selects scenes" (§12.2): program-change→scene mapping has no home in `MidiConfig`; not modelled.
+5. **Resolved** (SPEC updated). §4 `Scene` says "full snapshot ... master" without fields; modelled as `MasterSpec {gainDb}`.
 
 ### WP2a notes
 
@@ -336,5 +352,5 @@ Decisions made where SPEC §9 was silent (`src/core/InternalClock.{h,cpp}`, `tes
 
 Spec issue for the owner (not changed):
 
-1. §9 / §4: `ClockState` has no field for the sample offset at which a quantised start falls inside a block. The start is sample-accurate in the core, but the engine cannot pass that offset on to motions or cue triggers. Either add a `startSampleOffset` (or the engine splits the block at the start) before WP9.
+1. **Resolved** (SPEC §9: `ClockState::startOffset`; implement in WP9). §9 / §4: `ClockState` has no field for the sample offset at which a quantised start falls inside a block. The start is sample-accurate in the core, but the engine cannot pass that offset on to motions or cue triggers. Either add a `startSampleOffset` (or the engine splits the block at the start) before WP9.
 
