@@ -41,6 +41,12 @@ class Vbap final : public Spatializer {
 public:
     std::string_view name() const override { return "vbap"; }
 
+    /// Use 3D mode even when every panned speaker is horizontal (2D mode is
+    /// then used only if the hull stays degenerate with ±Z added). For the
+    /// AllRAD decoder (SPEC §6.3: "3D mode, with imaginary speakers at ±Z when
+    /// needed"). Takes effect at the next prepare(). Default false.
+    void setAlways3D(bool always3D) { always3D_ = always3D; }
+
     void prepare(const Layout& layout, double sampleRate, int maxBlockSize) override;
 
     void render(const float* mono, int numSamples, const Position& start, const Position& end, float spread,
@@ -93,6 +99,7 @@ private:
     int numPairs_{0};
     int numLayoutSpeakers_{0};
     bool is3D_{false};
+    bool always3D_{false};
 
     // 3D: hull points are the real speakers [0, numHullReal_) followed by the
     // imaginary ones [numHullReal_, numHull_).
