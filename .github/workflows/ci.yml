@@ -47,5 +47,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: spacer-engine-check-macOS
-          path: build/spacer_engine_check_artefacts/Release/spacer-engine-check
+          path: build/spacer_engine_check_artefacts/
           if-no-files-found: error
