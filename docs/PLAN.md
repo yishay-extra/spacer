@@ -281,7 +281,7 @@ mode relaunch, CI release job on tags, `docs/INSTALL.md`.
 - Built on the WP1 branch (`wp2c-dbap` already contained the WP1 model). Nothing in the spec was changed.
 - `Dbap(rolloffDb = 6)`. Gains are computed relative to the nearest panned speaker, `(d_min/d_i)^(a/2)`, then normalised. This is mathematically the same as `d_i^(-a/2)` after normalisation and cannot overflow for large rolloffs.
 - `render()` adds into the bus. Gains are linearly ramped from start to end over the block, reaching the end gain on the last sample. Steady-state render is allocation-free; buffers are sized in `prepare()`.
-- Spec issue (not changed): §6.2 describes `a` as "dB per doubling of distance (default 6)", but the formula `g = d^(-a/2)` gives about 18 dB of amplitude drop per doubling at a = 6, not 6 dB. The implementation follows the formula literally, so the tests encode `(0.2/2.2)^3`. If the intended exponent is `a/6.02` (≈ 1 at the default), change `Dbap::computeGains` and the hand-computed test together. This needs a decision from the owner.
+- **Resolved** (SPEC §6.2 now `α = a / (20·log10 2)`; code and tests updated). Spec issue: §6.2 described `a` as "dB per doubling of distance (default 6)", but the formula `g = d^(-a/2)` gives about 18 dB of amplitude drop per doubling at a = 6, not 6 dB. The implementation follows the formula literally, so the tests encode `(0.2/2.2)^3`. If the intended exponent is `a/6.02` (≈ 1 at the default), change `Dbap::computeGains` and the hand-computed test together. This needs a decision from the owner.
 
 ### WP1 notes
 

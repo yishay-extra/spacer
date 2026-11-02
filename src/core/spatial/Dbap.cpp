@@ -44,10 +44,11 @@ void Dbap::computeGains(const Position& pos, float spread, std::span<float> out)
     }
     if (dMin == std::numeric_limits<float>::max()) return;  // nothing to pan to
 
-    // 2. g_i = d_i^(-a/2) (SPEC §6.2). Computed relative to the nearest speaker,
-    //    (dMin / d_i)^(a/2) in (0, 1]: identical after normalisation, but cannot
-    //    overflow for large rolloffs.
-    const double exponent = static_cast<double>(rolloffDb_) * 0.5;
+    // 2. g_i = d_i^(-α), α = a / (20·log10 2), so the gain falls by `a` dB per
+    //    doubling of distance (SPEC §6.2). Computed relative to the nearest
+    //    speaker, (dMin / d_i)^α in (0, 1]: identical after normalisation, but
+    //    cannot overflow for large rolloffs.
+    const double exponent = static_cast<double>(rolloffDb_) / (20.0 * std::log10(2.0));
     double sumSquares = 0.0;
     for (std::size_t i = 0; i < n; ++i) {
         if (targets_[i].lfe) continue;

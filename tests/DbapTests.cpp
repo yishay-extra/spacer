@@ -69,16 +69,18 @@ TEST_CASE("DBAP: spread maps to spatial blur r_s = 0.2 + 3·spread (SPEC §6.2)"
 TEST_CASE("DBAP: hand-computed gains for two speakers, source on one of them") {
     // Speakers at (x=+1, y=0) and (x=-1, y=0); source at (+1, 0), spread 0 → r_s = 0.2.
     // d_A = 0 + 0.2 = 0.2, d_B = 2 + 0.2 = 2.2.
-    // g = d^(-a/2) with a = 6 → g_B / g_A = (0.2 / 2.2)^3 = 1/1331.
-    // Normalising Σg² = 1 gives g_A = 1 / sqrt(1 + 1331^-2).
+    // g = d^(-α), α = a / (20·log10 2) ≈ 0.99658 at a = 6
+    // → r = g_B / g_A = (0.2 / 2.2)^α ≈ 0.091558; normalising gives g_A = 1 / sqrt(1 + r²).
     const Layout layout = makeLayout({Position{90, 0, 1}, Position{-90, 0, 1}});
     Dbap dbap;
     dbap.prepare(layout, 48000.0, 512);
 
     const auto gains = gainsOf(dbap, Position{90, 0, 1}, 0.0f, 2);
-    const double gA = 1.0 / std::sqrt(1.0 + 1.0 / (1331.0 * 1331.0));
+    const double alpha = 6.0 / (20.0 * std::log10(2.0));
+    const double r = std::pow(0.2 / 2.2, alpha);
+    const double gA = 1.0 / std::sqrt(1.0 + r * r);
     REQUIRE_THAT(gains[0], WithinAbs(static_cast<float>(gA), 1e-6f));
-    REQUIRE_THAT(gains[1] / gains[0], WithinRel(1.0f / 1331.0f, 1e-4f));
+    REQUIRE_THAT(gains[1] / gains[0], WithinRel(static_cast<float>(r), 1e-4f));
     REQUIRE_THAT(pannedPower(layout, gains), WithinAbs(1.0, 1e-6));
 }
 
@@ -246,4 +248,17 @@ TEST_CASE("DBAP: a layout with only LFE speakers produces silence, not NaN") {
 
     const auto gains = gainsOf(dbap, Position{20, 10, 1}, 0.5f, 2);
     for (float g : gains) REQUIRE(g == 0.0f);
+}
+
+TEST_CASE("DBAP: rolloff a is the gain drop in dB per doubling of distance") {
+    // Speakers at x = ±1; source at x = 0.4 with r_s = 0.2:
+    // d_A = 0.6 + 0.2 = 0.8, d_B = 1.4 + 0.2 = 1.6 = 2·d_A.
+    const Layout layout = makeLayout({Position{90, 0, 1}, Position{-90, 0, 1}});
+    for (const float a : {3.0f, 6.0f, 12.0f}) {
+        INFO("a = " << a);
+        Dbap dbap(a);
+        dbap.prepare(layout, 48000.0, 512);
+        const auto gains = gainsOf(dbap, Position{90, 0, 0.4f}, 0.0f, 2);
+        REQUIRE_THAT(20.0 * std::log10(gains[1] / gains[0]), WithinAbs(-static_cast<double>(a), 1e-3));
+    }
 }
