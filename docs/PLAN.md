@@ -266,6 +266,17 @@ mode relaunch, CI release job on tags, `docs/INSTALL.md`.
 
 ---
 
+## Phase decisions (2026-11-02)
+
+- **WP13 (packaging) is deferred** past the current build-out phase.
+- **No real Mac in this phase.** macOS WPs must compile and pass on macOS CI
+  (PR labelled `macos`), and all logic testable off-Mac must have tests.
+  Anything that needs real hardware or a listener is assumed correct for now;
+  each such WP writes `docs/mac-validation/WP<id>.md` (setup, steps, expected
+  result, pass/fail) and its PR lists which acceptance criteria CI verified
+  and which are deferred to that checklist. The owner runs those checklists
+  later in a local session.
+
 ## Status log
 
 | WP | Status | Notes |
