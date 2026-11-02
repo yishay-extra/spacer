@@ -206,22 +206,31 @@ sample. Energy normalisation: for VBAP/DBAP, gains are normalised so that
 ### 6.1 VBAP
 
 - **2D mode** when all speakers have |elevation| < 5°: pairwise panning on
-  the ring sorted by azimuth. Source elevation is ignored.
+  the ring sorted by azimuth. Source elevation is ignored. Speakers that
+  coincide in azimuth: only the first (lowest index) is used. A coverage gap
+  ≥ 180° between adjacent speakers (stereo, front-only arrays) cannot use the
+  2×2 solve: inside it the two bounding speakers are cross-faded with a
+  constant-power law by angle across the gap.
 - **3D mode** otherwise: triangulate the speaker directions (convex hull of
   unit vectors; if the hull does not enclose the origin, add a virtual
   speaker at −Z — the "imaginary floor" — whose gain is discarded). Find the
   triangle containing the source direction, solve `g = L⁻¹·p` (Pulkki 1997),
   clamp negatives to 0, normalise.
 - **Spread**: implement MDAP: render the source as 1 + 8 virtual sources on a
-  ring of angular radius `spread·90°` around the direction; sum gains and
-  normalise.
+  ring of angular radius `r = spread·90°` around the direction; sum the
+  virtual sources' **amplitude** gains per speaker, then normalise (Σ g² = 1).
+  In 2D mode the ring is projected onto the horizontal plane: the virtual
+  sources are at azimuth offsets `r·cos(2πk/8)`, k = 0…7. In 3D mode they lie
+  on the sphere at angular distance `r` from the direction, evenly spaced in
+  bearing.
 - Sources inside the array (distance < nearest speaker distance) use the
   direction only; the distance model (§6.5) handles level.
 
 ### 6.2 DBAP
 
-Lossone & Neukom: `g_i = 1 / d_i^(a/2)` with `d_i = |p − s_i| + r_s`
-(Cartesian, metres), rolloff `a` in dB per doubling of distance (default 6),
+Lossius et al.: `g_i = 1 / d_i^α` with `α = a / (20·log10 2)` (≈ a / 6.02)
+and `d_i = |p − s_i| + r_s` (Cartesian, metres), rolloff `a` in dB per
+doubling of distance (default 6, i.e. α ≈ 1),
 spatial blur `r_s` (default 0.2 m), normalised so Σ g² = 1. Works with any
 layout, no hull required. `spread` maps to `r_s = 0.2 + spread·3.0` m.
 
