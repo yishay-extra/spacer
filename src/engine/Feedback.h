@@ -45,10 +45,16 @@ struct CommandDropped {
     std::uint64_t total{0};
 };
 
+/// A recall with a non-zero token has been applied (immediately, or at its
+/// scheduled beat).
+struct CueFired {
+    int token{0};
+};
+
 }  // namespace fb
 
 using Feedback = std::variant<fb::SourceMeter, fb::SpeakerMeter, fb::SourcePosition, fb::Clock, fb::Xrun,
-                              fb::CommandDropped>;
+                              fb::CommandDropped, fb::CueFired>;
 
 static_assert(std::is_trivially_copyable_v<Feedback>);
 

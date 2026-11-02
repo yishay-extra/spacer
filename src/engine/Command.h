@@ -17,6 +17,7 @@
 namespace spacer {
 
 class Graph;
+struct RecallPlan;
 
 namespace cmd {
 
@@ -104,6 +105,13 @@ struct SwapGraph {
     Graph* graph{nullptr};
 };
 
+/// Scene recall (SPEC §11). Ownership of `plan` passes to the engine.
+struct RecallScene {
+    RecallPlan* plan{nullptr};
+};
+/// Drops a scheduled (AtBeat) recall that has not fired yet.
+struct CancelScheduledRecall {};
+
 }  // namespace cmd
 
 using Command =
@@ -111,7 +119,8 @@ using Command =
                  cmd::SetSourceWidth, cmd::SetSourceDistance, cmd::SetSpeakerTrim, cmd::SetSpeakerMute,
                  cmd::SetSpeakerDelay, cmd::SetSpeakerPolarity, cmd::SetSpeakerEq, cmd::SetMasterGain,
                  cmd::SetPanic, cmd::ClockPlay, cmd::ClockStop, cmd::ClockContinue, cmd::ClockSetBpm,
-                 cmd::ClockSetBeat, cmd::ClockTap, cmd::SwapGraph>;
+                 cmd::ClockSetBeat, cmd::ClockTap, cmd::SwapGraph, cmd::RecallScene,
+                 cmd::CancelScheduledRecall>;
 
 static_assert(std::is_trivially_copyable_v<Command>);
 

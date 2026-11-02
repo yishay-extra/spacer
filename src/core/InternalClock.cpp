@@ -52,16 +52,19 @@ void InternalClock::play() {
         arm(state_.beat);
     } else {
         state_.playing = true;
+        startNow_ = true;
     }
 }
 
 void InternalClock::resume() {
     armed_ = false;
+    if (!state_.playing) startNow_ = true;
     state_.playing = true;
 }
 
 void InternalClock::stop() {
     armed_ = false;
+    startNow_ = false;
     state_.playing = false;
 }
 
@@ -91,7 +94,14 @@ void InternalClock::tap(double timeSeconds) {
 
 ClockState InternalClock::advance(int numSamples) {
     last_ = state_;
+    last_.startOffset = -1;
     if (numSamples <= 0) return last_;
+
+    if (startNow_) {
+        startNow_ = false;
+        last_.startOffset = 0;
+        last_.startBeat = last_.beat;
+    }
 
     const double sr = state_.sampleRate;
     state_.timeSeconds += static_cast<double>(numSamples) / sr;
@@ -102,6 +112,9 @@ ClockState InternalClock::advance(int numSamples) {
         // rest of the block into the beat.
         const double blockBeats = beatsForSamples(numSamples);
         if (armedBeatsToGo_ <= blockBeats) {
+            const double offset = std::round(armedBeatsToGo_ / blockBeats * numSamples);
+            last_.startOffset = std::clamp(static_cast<int>(offset), 0, numSamples - 1);
+            last_.startBeat = pendingBeat_;
             armed_ = false;
             state_.playing = true;
             state_.beat = pendingBeat_ + (blockBeats - armedBeatsToGo_);
