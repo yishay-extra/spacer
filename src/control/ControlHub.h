@@ -46,7 +46,6 @@ public:
 
 private:
     const Project& project_;
-    EngineProcessor& engine_;
     OscServer server_;
     OscSender sender_;
     MidiMapper mapper_;
