@@ -1,251 +1,324 @@
 # Spacer — Design Document
 
-> Status: **Draft / initial** · Owner: TBD · Last updated: 2026-11-02
+> Status: **Draft v2** · Last updated: 2026-11-02
 
-Spacer is a multichannel audio router for advanced audio setups: it takes audio
-from any number of input devices/streams, mixes and processes it through a
-configurable routing graph, and delivers it to any number of output
-devices/streams with low, predictable latency.
+Spacer is a macOS desktop application for **spatial audio over arbitrary
+speaker arrays**. It receives audio from DAWs and other applications (via a
+virtual audio device) and from audio files, places each source in space over
+2–32 speakers using standard multichannel panning algorithms, and lets the
+positions be manipulated live, automated, and synced to a clock. It is built
+for live performance and for static installations.
 
 ---
 
 ## 1. Goals
 
-1. **Arbitrary N×M routing** — any input channel to any output channel(s), with
-   per-route gain, mute, polarity and delay.
-2. **Multiple devices at once** — aggregate several physical/virtual interfaces,
-   including devices running on independent clocks.
-3. **Low, predictable latency** — target ≤ 10 ms round trip at 48 kHz / 128
-   frames on a typical desktop; never allocate, lock, or do I/O on the audio
-   thread.
-4. **Live reconfiguration** — routes, gains and nodes change at runtime without
-   glitches (click-free ramps, no dropouts).
-5. **Declarative configuration** — the whole setup is a human-readable file
-   that can be versioned, diffed and reloaded.
-6. **Headless-first** — runs as a daemon; UIs (CLI, web, desktop) are clients of
-   a control API.
-7. **Cross-platform** — Linux first, then macOS and Windows.
+1. **Take audio from anywhere** — any app that can select an output device
+   (DAWs, players, browsers) can send to Spacer; Spacer also plays audio files.
+2. **Arbitrary speaker layouts** — 2 to 32 outputs, any physical arrangement
+   (rings, domes, lines, irregular rooms), described by real-world positions.
+3. **Spatialization that respects the room** — distance/delay/gain
+   compensation per speaker, plus established panning algorithms (VBAP, DBAP,
+   ambisonics) so a source "lives" at a point in space rather than on a channel.
+4. **Motion** — source positions are controllable in real time (mouse, OSC,
+   MIDI), driven by programmed trajectories (orbits, paths, random walks), or
+   stepped between positions on a time grid, all synced to a clock.
+5. **Live-performance ready** — scenes and cues are recallable instantly and
+   glitch-free; nothing the UI does can stall the audio.
+6. **Installation ready** — the whole state (layout, sources, motion, cues)
+   is saved in a project file; programs can loop forever, with programmed
+   variation, unattended.
+7. **Low latency** — target ≤ 10 ms added latency at 48 kHz / 128 frames,
+   excluding the virtual-device hop.
 
-## 2. Non-goals (for v1)
+## 2. Non-goals (phase 1)
 
-- Being a DAW: no recording timeline, editing, or plugin hosting (VST/AU/LV2 may
-  come later as a node type).
-- Network audio transports (AES67/Dante/NDI) — designed for as a future
-  backend, not implemented in v1.
-- Sample-rate conversion quality on par with offline mastering tools; we target
-  transparent real-time SRC, not audiophile batch SRC.
+- Binaural / headphone rendering, and ambisonic or object-based file export.
+  (Designed for; not built.)
+- Windows / Linux. The engine stays portable (JUCE), the device layer is
+  macOS-only for now.
+- Being a DAW: no multitrack recording or editing timeline. Spacer's "time" is
+  cues, loops and clocks, not a tape.
+- Network audio (Dante/AES67/AVB): use a CoreAudio driver for those; Spacer
+  sees them as a normal device.
+- Room measurement/correction (FIR). Manual per-speaker trim/delay/EQ only.
 
-## 3. Core concepts
+## 3. Technology
 
-| Concept      | Description |
-|--------------|-------------|
-| **Device**   | An audio endpoint provided by a backend (ALSA, PipeWire/JACK, CoreAudio, WASAPI). Has a set of input and/or output channels, a sample rate and a clock. |
-| **Port**     | A single mono channel on a device or node. Ports are typed `in` or `out`. |
-| **Node**     | A processing unit in the graph: device source, device sink, mixer, gain, delay, EQ, meter, splitter, etc. |
-| **Route**    | A connection from an output port to an input port, carrying gain/mute/polarity/delay parameters. |
-| **Bus**      | A named group of ports (e.g. `stereo-main` = L/R) that can be routed as a unit. |
-| **Graph**    | The full set of nodes and routes. Compiled into an immutable, topologically sorted *execution plan*. |
-| **Clock domain** | Set of devices sharing one hardware clock. Each domain is driven by its own I/O callback. |
-| **Scene**    | A named snapshot of route/parameter state that can be recalled atomically. |
+**C++20 with JUCE** (GPL/commercial dual licence).
 
-## 4. Architecture
+Why C++ over Rust: CoreAudio, AudioUnit hosting, and the HAL virtual-device
+plugin API are C/Objective-C; spatial DSP libraries and reference
+implementations (VBAP, ambisonics decoders, SOFA) are C++; JUCE gives us
+audio I/O, AU hosting, a GUI toolkit, OSC and MIDI in one place; and the
+audio-developer community is C++. Rust was considered for memory safety but
+would cost ecosystem on every front that matters here.
+
+Supporting pieces:
+
+| Need | Choice |
+|------|--------|
+| Audio I/O, device enumeration | JUCE `AudioDeviceManager` over CoreAudio; aggregate devices for multi-interface rigs |
+| Virtual input device | CoreAudio **AudioServerPlugIn** (user-space HAL driver, same mechanism as BlackHole/Loopback), shipped as `Spacer.driver` |
+| File decoding | JUCE audio formats (WAV, AIFF, FLAC, OGG) + CoreAudio/AVFoundation for MP3/AAC/ALAC |
+| Spatial DSP | In-house VBAP/DBAP; ambisonics via an in-house encoder + AllRAD-style decoder (reference: IEM / SPARTA designs) |
+| Plugin hosting | JUCE `AudioPluginFormatManager` — AudioUnit (AUv2) in phase 1 |
+| Control in | JUCE OSC, JUCE MIDI |
+| Sync | Internal clock first; Ableton Link SDK, MIDI Clock/MTC, OSC timecode later |
+| Project files | JSON (`.spacer`), human-readable, versioned schema |
+| Build / CI | CMake, GitHub Actions (macOS), notarized DMG |
+
+## 4. Core concepts
+
+| Concept | Description |
+|---------|-------------|
+| **Speaker layout** | The physical array: N speakers, each with position (azimuth, elevation, distance, or x/y/z in metres), trim gain, delay, and optional EQ. Plus the listening-position origin. Saved as reusable presets. |
+| **Output device** | The CoreAudio device (or aggregate) whose channels the layout maps to. Layout ↔ channel mapping is explicit. |
+| **Source** | A mono or stereo audio stream with a position in space. Kinds: *input source* (channels of the Spacer virtual device or a hardware input), *file source* (player with transport), *generator* (test tones, noise). |
+| **Position** | Where a source is, in the same coordinates as the layout. For stereo sources, two positions linked by a width/angle. |
+| **Spatializer** | The algorithm turning (source signal, position, layout) into N speaker signals: VBAP, DBAP, or Ambisonics (encode → decode). Selectable per source. |
+| **Motion** | What drives a position over time: *manual*, *trajectory* (orbit, line, path, random walk, Lissajous), or *step sequence* (list of positions with durations). |
+| **Clock** | The time reference motions and cues sync to: tempo + transport. Internal, Ableton Link, MIDI Clock/MTC, OSC. |
+| **Scene** | A complete snapshot of the mutable state: sources, positions, motions, levels, plugin parameters. |
+| **Cue** | An instruction to go to a scene (or apply a partial change) with a transition time, triggered manually, by clock position, by OSC/MIDI, or by the previous cue finishing. |
+| **Cue list / Program** | An ordered list of cues; can loop. The unit of a performance or an installation run. |
+| **Project** | Layout + device mapping + sources + scenes + cue lists + I/O mappings. One `.spacer` file. |
+
+## 5. Architecture
 
 ```
-           ┌─────────────────────────── control plane (non-RT) ───────────────────────────┐
-  clients  │                                                                              │
-  ┌──────┐ │  ┌───────────┐   ┌──────────────┐   ┌────────────────┐   ┌───────────────┐   │
-  │ CLI  │─┼─▶│ Control   │──▶│ Graph model  │──▶│ Graph compiler │──▶│ Plan swapper  │───┼──┐
-  │ Web  │ │  │ API (RPC) │   │ (+ config)   │   │ (validate,sort)│   │ (lock-free)   │   │  │
-  └──────┘ │  └───────────┘   └──────────────┘   └────────────────┘   └───────────────┘   │  │
-           │        ▲                                                                     │  │
-           │        │ meters / events (lock-free ring buffers)                            │  │
-           └────────┼─────────────────────────────────────────────────────────────────────┘  │
-                    │                                                                        │
-           ┌────────┴──────────────────────── data plane (RT) ──────────────────────────┐    │
-           │                                                                            │◀───┘
-           │  Clock domain A callback          Clock domain B callback                  │
-           │  ┌─────────┐  ┌────────────┐      ┌─────────┐  ┌────────────┐              │
-           │  │ Dev A in│─▶│ Plan exec  │─────▶│ Bridge  │─▶│ Plan exec  │─▶ Dev B out  │
-           │  └─────────┘  └────────────┘      │ (ASRC)  │  └────────────┘              │
-           │                                   └─────────┘                              │
-           └────────────────────────────────────────────────────────────────────────────┘
-                    ▲                                   ▲
-            ┌───────┴───────────────────────────────────┴───────┐
-            │ Backend abstraction: ALSA · PipeWire/JACK ·        │
-            │ CoreAudio · WASAPI · (future: AES67, file, null)   │
-            └────────────────────────────────────────────────────┘
+ ┌──────────────────────────────────────────────────────────────────────────────┐
+ │ Senders                                                                      │
+ │   DAW / any app ──▶ "Spacer" virtual device (HAL plugin, up to 64 ch)        │
+ │   Audio files    ──▶ file players (disk thread + ring buffers)               │
+ │   Hardware inputs──▶ CoreAudio input channels                                │
+ └───────────────┬──────────────────────────────────────────────────────────────┘
+                 ▼
+ ┌──────────────────────────────── ENGINE (RT) ─────────────────────────────────┐
+ │  Audio callback (one, on the output device / aggregate):                     │
+ │                                                                              │
+ │   per source:  input ─▶ [AU inserts] ─▶ gain ─▶ SPATIALIZER ─┐               │
+ │                                   ▲                          │ N ch          │
+ │                       position ◀──┘ (from Motion engine)     ▼               │
+ │                                                       Σ speaker bus (N)      │
+ │                                                              │               │
+ │   per speaker: delay/gain compensation ─▶ trim/EQ ─▶ [AU inserts] ─▶ limiter │
+ │                                                              ▼               │
+ │                                                    CoreAudio output (N ch)   │
+ │                                                                              │
+ │  Motion engine (RT, sample-accurate): clock ─▶ trajectories/steps ─▶ positions│
+ │  Cue engine (RT-safe): scheduled transitions ─▶ parameter ramps              │
+ └────────────▲──────────────────────────────────────────▲──────────────────────┘
+              │ commands (lock-free queues)               │ meters, positions, clock
+              │                                           ▼ (lock-free, polled)
+ ┌────────────┴────────────────── CONTROL (non-RT) ─────────────────────────────┐
+ │  Project model (single source of truth, undoable)                            │
+ │  ├─ Scene/cue manager          ├─ Clock sources: internal · Link · MIDI · OSC│
+ │  ├─ OSC server / MIDI mapping  ├─ Plugin scanner / editor windows            │
+ │  └─ Project file load/save     └─ Device manager (CoreAudio, aggregates)     │
+ │                                                                              │
+ │  UI (JUCE): stage view (top/side), layout editor, source strips, cue list,  │
+ │             motion editor, meters, device/IO settings                        │
+ └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 4.1 Control plane (non-real-time)
+### 5.1 Engine (real-time)
 
-- **Control API** — local RPC (Unix socket / named pipe) with JSON messages;
-  optional WebSocket for the web UI. Every mutation is a command
-  (`add_route`, `set_gain`, `recall_scene`, …) applied to the graph model.
-- **Graph model** — the authoritative, mutable description of the setup.
-  Serializable to/from the config file.
-- **Graph compiler** — validates (no cycles without explicit delay, channel
-  counts match, devices exist), resolves buses to ports, assigns buffers,
-  topologically sorts nodes per clock domain, and emits an immutable
-  `ExecutionPlan`.
-- **Plan swapper** — publishes the new plan to the RT thread via an atomic
-  pointer swap. Old plans are reclaimed on the control thread (epoch / RCU
-  style), never freed on the audio thread.
+- A **single audio callback** on the output device. Multi-interface rigs are
+  handled by a CoreAudio **aggregate device** (macOS does clock drift
+  correction), which Spacer can create and manage for the user.
+- Virtual-device input arrives via the HAL plugin's shared-memory ring; file
+  sources are pre-buffered by a disk thread. Both are read lock-free in the
+  callback.
+- **Signal path per source:** input → AU inserts → gain → spatializer →
+  speaker bus. **Per speaker:** compensation delay + gain → trim/EQ → AU
+  inserts → limiter → device.
+- **Real-time rules:** no allocation, no locks, no I/O, no plugin scanning in
+  the callback. Enforced by code review and a debug-build allocation guard.
+- **Parameter changes** (gain, position, plugin params) arrive through
+  lock-free queues and are **ramped** (default 10 ms, cue transitions can be
+  seconds) to stay click-free.
+- **Structural changes** (add/remove source, change layout, insert plugin)
+  are prepared on the control thread, then swapped in atomically. Removed
+  sources fade out over one buffer before removal.
 
-### 4.2 Data plane (real-time)
+### 5.2 Spatializers
 
-- One RT callback per clock domain, driven by the backend.
-- Each callback: read device inputs → execute plan nodes in order → write
-  device outputs → push meter data to a lock-free ring.
-- Parameter changes that don't alter topology (gain, mute) go through a
-  lock-free SPSC parameter queue and are applied with per-sample ramps
-  (default 10 ms) to avoid zipper noise/clicks.
-- Topology changes go through plan swap; the new plan crossfades from the old
-  one over one or more buffers where routes are added/removed.
+All take a position in the layout's coordinates and produce N gains (or, for
+ambisonics, an encode + fixed decode matrix). All are computed per block and
+interpolated per sample so moving sources don't zipper.
 
-**RT rules** (enforced by review and, in debug builds, an allocation guard):
-no heap allocation, no locks, no syscalls/logging, bounded execution time.
+| Algorithm | Use when | Notes |
+|-----------|----------|-------|
+| **VBAP** (2D/3D) | Rings, domes, any layout with a well-defined hull | Standard for arbitrary layouts; sharp localisation; needs the listener near the centre |
+| **DBAP** | Irregular layouts, installations where there is no sweet spot | Distance-based, works with speakers anywhere; smoother, less precise; has a rolloff parameter |
+| **Ambisonics** (1st–5th order, AllRAD decode) | Smooth motion, many simultaneous sources, importing ambisonic material | Encode is cheap per source; one decode for all; order limited by speaker count |
+| **Direct / nearest** | Utility: send to one speaker or a fixed set | For stems that should stay on a channel |
 
-### 4.3 Clock domains and drift
+**Source distance** is a parameter too: gain falloff (1/r with a configurable
+exponent and minimum radius), optional low-pass with distance, and for VBAP a
+spread parameter that widens the source as it comes closer/inside the array.
 
-Devices without a shared clock drift relative to each other. Spacer:
+### 5.3 Speaker layout and room compensation
 
-1. Groups devices into clock domains (auto-detected where the backend exposes
-   it, overridable in config).
-2. Picks one **master domain** (configurable; default: first output device).
-3. Connects domains with a **bridge**: a lock-free ring buffer plus an adaptive
-   resampler (ASRC) whose ratio is steered by a PI controller on buffer fill
-   level.
-4. Reports drift (ppm) and bridge latency via the control API.
+- Layouts are edited visually (top and side views) or numerically; presets
+  for stereo, quad, 5.1, 7.1, 7.1.4, octagon, hexadecagon, dome 22, etc.
+- **Automatic compensation** from positions: delay so all speakers' wavefronts
+  arrive at the listening position together, gain so each contributes equally
+  (1/r). Both can be overridden per speaker with measured values.
+- Per-speaker **trim, delay, polarity, 3-band EQ**, and a **limiter** on every
+  output (speaker protection is non-negotiable in live use).
+- Layout → device channel mapping is explicit and saved with the project.
 
-### 4.4 Backends
+### 5.4 Motion engine
 
-A small trait/interface each platform implements:
+Each source position is driven by one *motion*:
 
-```text
-trait Backend {
-    fn enumerate() -> Vec<DeviceInfo>;
-    fn open(device, config: StreamConfig, callback: RtCallback) -> Stream;
-    fn clock_domain_hint(device) -> Option<ClockId>;
-}
-```
+- **Manual** — last value set by UI/OSC/MIDI; smoothing time configurable.
+- **Trajectory** — parametric: *orbit* (centre, radius, speed in rev/bar or
+  rev/s, direction, elevation), *line/bounce*, *Lissajous*, *custom path*
+  (user-drawn polyline/spline, constant speed or time-stamped), *random walk*
+  (bounds, step size, seed). Speed can be expressed in clock units (bars,
+  beats) or seconds.
+- **Step sequence** — an ordered list of `(position | speaker, duration,
+  transition)`; duration in beats or seconds; transition is jump or glide.
+  Loop, ping-pong, or random order; optional probability per step for
+  programmed variation.
+- **Modulation** — any motion parameter can be offset by an LFO or by an
+  OSC/MIDI input (e.g. radius from a fader).
 
-Order of implementation: **PipeWire/JACK** (Linux, most valuable for advanced
-setups) → ALSA (direct, low-level) → CoreAudio → WASAPI → `null`/`file`
-backends for testing.
+Motions are evaluated in the audio callback against the active clock, so
+timing is sample-accurate and survives UI stalls. Phase is derived from the
+clock's beat position, so a Link/MIDI-clock tempo change keeps everything
+locked.
 
-## 5. Built-in nodes (v1)
+### 5.5 Clock
 
-| Node        | Purpose |
-|-------------|---------|
-| `source`    | Device input channels into the graph |
-| `sink`      | Graph into device output channels |
-| `matrix`    | N×M mixer with per-crosspoint gain (the core router) |
-| `gain`      | Gain / mute / polarity per channel |
-| `delay`     | Per-channel delay (samples or ms) for alignment |
-| `meter`     | Peak / RMS metering, published to control plane |
-| `eq`        | Basic parametric biquad EQ (stretch goal for v1) |
-| `tone`      | Test signal generator (sine, pink noise) |
+A `Clock` interface provides `(tempo, beat position, is_playing)` per block.
 
-Nodes implement a common interface: `prepare(sample_rate, max_frames)` (non-RT,
-may allocate) and `process(inputs, outputs, frames)` (RT, must not allocate).
+- **Internal** (phase 1): tempo, play/stop, tap tempo, optional quantised
+  start.
+- **Ableton Link**: shared tempo/beat/phase with other apps on the network.
+- **MIDI Clock** and **MTC**: follow a DAW or hardware.
+- **OSC**: explicit beat/time messages (e.g. from Max/TouchDesigner).
 
-## 6. Configuration
+Only one clock is active; switching is a control-thread operation. Cues and
+motions reference beat position, so they are independent of which clock drives
+it.
 
-TOML, loaded at startup and hot-reloadable (`spacer reload` or file watch).
-Unknown keys are errors. Example:
+### 5.6 Scenes, cues and programs
 
-```toml
-[engine]
-sample_rate = 48000
-buffer_frames = 128
-master_clock = "scarlett"
+- A **scene** stores every mutable parameter. Recall applies all changes as
+  ramps with a per-cue transition time (0 ms → minutes), including positions
+  and motion settings. Motions can be told to restart phase or continue.
+- A **cue** = target scene (or a partial change) + transition + trigger.
+  Triggers: manual (Go button / key), at beat position, after previous cue +
+  delay, OSC address, MIDI note/CC, time of day (installations).
+- A **cue list** is ordered, can loop, and supports **follow-on** chains, so an
+  installation is a looping cue list with randomised durations and step
+  sequences for variation. A performance is a cue list driven by Go.
+- Everything is undoable in the editor and saved in the project.
 
-[devices.scarlett]
-backend = "pipewire"
-match = "Focusrite Scarlett 18i20"
+### 5.7 Control inputs (OSC / MIDI)
 
-[devices.hdmi]
-backend = "pipewire"
-match = "HDMI"
+- OSC server (UDP, configurable port) with a documented address space, e.g.
+  `/spacer/source/{id}/pos/aed azimuth elevation distance`,
+  `/spacer/source/{id}/gain`, `/spacer/cue/go`, `/spacer/scene/recall name`,
+  `/spacer/motion/{id}/speed`. Also OSC *out* for positions and meters.
+- MIDI learn on any parameter; MIDI notes trigger cues; MPE/14-bit CC
+  supported for smooth position control.
+- Both feed the same command queue as the UI; no special paths.
 
-[buses]
-mics      = { device = "scarlett", dir = "in",  channels = [1, 2, 3, 4] }
-monitors  = { device = "scarlett", dir = "out", channels = [1, 2] }
-tv        = { device = "hdmi",     dir = "out", channels = [1, 2] }
+### 5.8 Plugin hosting
 
-[[routes]]
-from = "mics:1"
-to   = ["monitors:1", "monitors:2"]
-gain_db = -6.0
+- AudioUnit (AUv2; AUv3 as follow-up) inserts on each source (pre-spatializer)
+  and on each speaker output (post-compensation). Plugin state is part of
+  scenes; parameters are automatable from cues and modulators.
+- Scanning happens out of process (JUCE's sandboxed scanner) so a crashing
+  plugin can't take Spacer down during setup; at runtime plugins are in
+  process for latency reasons.
+- Plugin latency is reported and compensated per source/speaker chain.
 
-[[routes]]
-from = "mics:2"
-to   = "tv"          # bus-to-bus, mono to both channels
-delay_ms = 12.5
+### 5.9 Virtual audio device (`Spacer.driver`)
 
-[scenes.podcast]
-"mics:1 -> monitors:*" = { gain_db = -3.0 }
-"mics:2 -> tv"         = { mute = true }
-```
+- AudioServerPlugIn with up to 64 input channels, presenting as output device
+  "Spacer" to other apps at the engine's sample rate.
+- Transfers audio to the app through shared memory + a lock-free ring; adds
+  one device buffer of latency.
+- Installed into `/Library/Audio/Plug-Ins/HAL/` by the app's installer; needs
+  a `coreaudiod` restart on first install. Signed and notarized.
+- If the driver is absent, Spacer still works with hardware inputs and files.
 
-## 7. Interfaces
+## 6. User interface (phase 1)
 
-- **CLI** — `spacer daemon`, `spacer devices`, `spacer routes`,
-  `spacer route add mics:1 monitors:1 --gain -6`, `spacer scene recall podcast`,
-  `spacer meter`.
-- **Control API** — versioned JSON-RPC 2.0 over Unix socket; subscriptions for
-  meters, device hot-plug and xrun events.
-- **Web UI** (post-v1) — matrix view of routes, meters, scene buttons.
+- **Stage view** — top-down (and side) view of the layout with sources as
+  draggable objects, trajectories drawn, live meters on speakers. This is the
+  main performance surface.
+- **Layout editor** — place speakers, see computed delays/gains, test each
+  with pink noise, assign device channels.
+- **Source strips** — per source: input selection, gain, spatializer choice,
+  distance params, motion selector, AU inserts, meter.
+- **Motion editor** — parameters for the selected motion; path drawing.
+- **Cue list** — cues with Go, transition time, triggers; scene manager.
+- **Settings** — output device/aggregate management, sample rate, buffer
+  size, OSC/MIDI, clock source.
 
-## 8. Reliability
+## 7. Project file
 
-- **Device hot-plug** — devices disappearing mark their nodes as *offline*
-  (output silence/input zeros); routes are preserved and resume when the device
-  returns.
-- **Xruns** — counted and reported per domain; never crash the engine.
-- **Safe defaults** — new routes start muted or at −∞ and ramp in; optional
-  output limiter on sinks to protect speakers/ears.
-- **Crash isolation** — control-plane errors never stall the RT thread.
+`.spacer` is JSON with a `schema_version`. Top level: `layout`,
+`device_mapping`, `sources`, `scenes`, `cue_lists`, `osc`, `midi`, `clock`.
+Audio files are referenced by path with a relative-to-project fallback;
+"collect files" copies them next to the project. Plugin state is stored as
+base64 blobs plus parameter values (for readability and for recovery if a
+plugin is missing).
 
-## 9. Testing strategy
+## 8. Reliability (live use)
 
-- **Unit tests** for nodes against reference signals (bit-exact where possible).
-- **Graph compiler tests** — validation, cycle detection, bus expansion.
-- **Offline engine tests** using the `file`/`null` backend: render a graph to
-  WAV and compare against golden files.
-- **Drift simulation** — two virtual clocks with configurable ppm offset to
-  verify the ASRC controller converges and stays within latency bounds.
-- **RT-safety checks** — allocation guard in debug builds; latency/jitter
-  benchmarks in CI.
+- Output **limiter** on every speaker, always on, cannot be bypassed by a cue.
+- Device disappears → outputs go silent, engine keeps running, UI warns; on
+  return, resumes with the same mapping.
+- Missing plugin → source plays dry, cue list continues, UI flags it.
+- **Panic**: one key/OSC message fades all outputs to silence in 50 ms.
+- Autosave of the project every few minutes and on every cue-list edit.
+- **Installation mode**: launch at login, open last project, start cue list,
+  no dialogs; optional watchdog that relaunches on crash.
 
-## 10. Technology choice (proposed)
+## 9. Testing
 
-**Rust** — memory safety without GC, good RT story (no hidden allocations if
-disciplined), mature crates: `cpal` (cross-platform I/O, as a starting point),
-`pipewire`/`jack` bindings, `rtrb` (lock-free ring buffers), `arc-swap`
-(plan swapping), `rubato` (resampling), `serde`/`toml`, `tokio` for the control
-plane. Alternative considered: C++ (JUCE) — richer audio ecosystem, but heavier
-licensing and weaker safety guarantees.
+- Spatializer unit tests against reference gains (VBAP triplet cases, DBAP
+  known layouts, ambisonic encode/decode of known directions).
+- Compensation tests: layouts with known geometry produce expected delays and
+  gains.
+- Motion tests: trajectories evaluated at known beat positions are
+  deterministic (fixed seeds for random walks).
+- Offline engine render: project + input WAVs → N-channel WAV compared to
+  golden files.
+- Cue transition tests: ramps are monotonic and complete in the stated time.
+- RT-safety: allocation guard in debug; callback-time benchmark in CI with
+  32 outputs, 32 sources, 5th-order ambisonics.
 
-## 11. Milestones
+## 10. Milestones
 
-| #  | Milestone | Scope |
-|----|-----------|-------|
-| M0 | Skeleton  | Repo layout, CI, config parsing, `null` backend, graph model + compiler |
-| M1 | Single-device router | One device (PipeWire/JACK), matrix + gain + meter nodes, CLI |
-| M2 | Live control | Control API, parameter ramps, plan swap, scenes, hot reload |
-| M3 | Multi-device | Clock domains, ASRC bridges, drift reporting, hot-plug |
-| M4 | Platforms | CoreAudio + WASAPI backends |
-| M5 | UI | Web UI with matrix view and meters |
+| # | Milestone | Scope |
+|---|-----------|-------|
+| M0 | Skeleton | CMake + JUCE app, CoreAudio output, layout model, project file, stage view with static sources, VBAP, per-speaker compensation and limiter |
+| M1 | Inputs | `Spacer.driver` virtual device, hardware inputs, file players with transport |
+| M2 | Motion + clock | Internal clock, trajectories, step sequences, modulation; OSC and MIDI in |
+| M3 | Scenes + cues | Scenes, cue lists, triggers, follow-on, loops, installation mode, autosave |
+| M4 | Plugins + algorithms | AU hosting on sources/outputs; DBAP; ambisonics; distance model |
+| M5 | External sync | Ableton Link, MIDI Clock/MTC, OSC clock |
+| M6 | Polish | Layout presets library, OSC out, DMG + notarization, docs |
 
-## 12. Open questions
+## 11. Open questions
 
-1. Should Spacer expose itself as virtual devices (e.g. a PipeWire node / macOS
-   aggregate driver) so other apps can route *into* it, or only route between
-   existing devices?
-2. Floating-point internal format: `f32` everywhere, or `f64` for mixing sums?
-3. Do we need sample-accurate scheduling of scene changes (e.g. MIDI/OSC
-   triggers, timecode)?
-4. Plugin hosting (LV2/VST3/CLAP) — in scope for v2?
-5. Licensing: MIT/Apache-2.0 vs GPL (affects which backend libraries we can
-   link)?
+1. Virtual device channel count: fixed 64, or user-configurable (requires
+   driver reload)?
+2. Should stereo sources be two linked points or a single point with width?
+   (Proposal: both, as a per-source option.)
+3. Coordinate convention: azimuth clockwise from front (SpatRevolution/IEM
+   style) vs. counter-clockwise (mathematical). Proposal: clockwise from
+   front, elevation up, distance in metres; expose a preference.
+4. Should cue lists support nested/parallel cue lists (e.g. one for lights,
+   one for motion)?
+5. Licensing: JUCE under GPLv3 (app must be GPL) vs. commercial JUCE licence
+   (closed source possible). Decide before the first public release.
