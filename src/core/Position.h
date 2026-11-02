@@ -51,7 +51,7 @@ struct Position {
         deg = std::fmod(deg + 180.0f, 360.0f);
         if (deg < 0.0f) deg += 360.0f;
         deg -= 180.0f;
-        return deg == -180.0f ? 180.0f : deg;
+        return deg <= -180.0f ? 180.0f : deg;  // fmod result is >= -180 here
     }
 
     /// Clamp fields into their valid ranges.
