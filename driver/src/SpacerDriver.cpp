@@ -165,7 +165,9 @@ AudioStreamBasicDescription streamFormat(Float64 sampleRate) {
     AudioStreamBasicDescription f{};
     f.mSampleRate = sampleRate;
     f.mFormatID = kAudioFormatLinearPCM;
-    f.mFormatFlags = kAudioFormatFlagIsFloat | kAudioFormatFlagsNativeEndian | kAudioFormatFlagIsPacked;
+    f.mFormatFlags = static_cast<AudioFormatFlags>(kAudioFormatFlagIsFloat) |
+                     static_cast<AudioFormatFlags>(kAudioFormatFlagsNativeEndian) |
+                     static_cast<AudioFormatFlags>(kAudioFormatFlagIsPacked);
     f.mBytesPerPacket = kBytesPerFrame;
     f.mFramesPerPacket = 1;
     f.mBytesPerFrame = kBytesPerFrame;
@@ -548,7 +550,8 @@ OSStatus putIds(const AudioObjectID* ids, UInt32 count, UInt32 capacity, UInt32*
 OSStatus GetPropertyData(AudioServerPlugInDriverRef driver, AudioObjectID object, pid_t pid,
                          const AudioObjectPropertyAddress* a, UInt32 qualifierSize, const void* qualifier,
                          UInt32 capacity, UInt32* outSize, void* out) {
-    if (!isDriver(driver) || a == nullptr || outSize == nullptr || out == nullptr)
+    // A zero-sized property (e.g. no input streams) may be read with a null buffer.
+    if (!isDriver(driver) || a == nullptr || outSize == nullptr || (out == nullptr && capacity > 0))
         return kAudioHardwareIllegalOperationError;
     if (!HasProperty(driver, object, pid, a)) return kAudioHardwareUnknownPropertyError;
     const AudioObjectID device = kObjectID_Device;
@@ -579,8 +582,9 @@ OSStatus GetPropertyData(AudioServerPlugInDriverRef driver, AudioObjectID object
                     CFStringRef uid = *static_cast<const CFStringRef*>(qualifier);
                     const bool match =
                         uid != nullptr && CFStringCompare(uid, CFSTR(kDeviceUID), 0) == kCFCompareEqualTo;
-                    return put<AudioObjectID>(match ? kObjectID_Device : kAudioObjectUnknown, capacity,
-                                              outSize, out);
+                    return put<AudioObjectID>(
+                        match ? AudioObjectID{kObjectID_Device} : AudioObjectID{kAudioObjectUnknown},
+                        capacity, outSize, out);
                 }
                 case kAudioPlugInPropertyResourceBundle:
                     return put<CFStringRef>(CFSTR(""), capacity, outSize, out);

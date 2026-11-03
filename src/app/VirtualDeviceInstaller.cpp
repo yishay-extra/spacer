@@ -31,7 +31,7 @@ void VirtualDeviceInstaller::install(std::function<void(juce::String error)> don
     }
     const auto script = driverinstall::adminAppleScript(
         driverinstall::installShellCommand(source.getFullPathName().toStdString()));
-    juce::Thread::launch([script, done = std::move(done)] {
+    juce::Thread::launch([script, callback = std::move(done)] {
         juce::ChildProcess process;
         juce::String error;
         if (!process.start(juce::StringArray{"/usr/bin/osascript", "-e", juce::String(script)},
@@ -43,7 +43,7 @@ void VirtualDeviceInstaller::install(std::function<void(juce::String error)> don
                 error =
                     output.isNotEmpty() ? output.trim() : juce::String("Installation cancelled or failed");
         }
-        juce::MessageManager::callAsync([done, error] { done(error); });
+        juce::MessageManager::callAsync([callback, error] { callback(error); });
     });
 }
 

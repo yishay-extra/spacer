@@ -130,8 +130,8 @@ std::string AppContext::installedDriverVersion() const {
 }
 
 void AppContext::installVirtualDevice(std::function<void(std::string error)> done) {
-    VirtualDeviceInstaller::install([done = std::move(done)](juce::String error) {
-        if (done) done(error.toStdString());
+    VirtualDeviceInstaller::install([callback = std::move(done)](juce::String error) {
+        if (callback) callback(error.toStdString());
     });
 }
 
