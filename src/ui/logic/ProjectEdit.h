@@ -13,26 +13,37 @@
 #include <string>
 
 #include "core/Project.h"
+#include "core/motion/MotionParam.h"
 
 namespace spacer {
 
 /// What the engine must do after an edit (or its undo / redo) was applied.
 struct EngineEffect {
     enum class Kind {
-        None,        // model only (e.g. names)
-        Structural,  // rebuild the graph and SwapGraph (SPEC §5.2)
-        Source,      // parameters of source `id` changed
-        Speaker,     // chain parameters of speaker `id` changed
-        Master,      // master gain changed
+        None,         // model only (e.g. names)
+        Structural,   // rebuild the graph and SwapGraph (SPEC §5.2)
+        Source,       // parameters of source `id` changed
+        Speaker,      // chain parameters of speaker `id` changed
+        Master,       // master gain changed
+        MotionParam,  // one live motion parameter of source `id` (see below)
     };
     Kind kind{Kind::None};
     int id{0};
+    /// MotionParam only: which control point (-1 = the source's, 0 / 1 = a
+    /// linkedPoints channel) and which parameter changed. The engine gets the
+    /// parameter's current model value as cmd::SetMotionParam, so the motion
+    /// phase is not restarted.
+    int channel{-1};
+    spacer::MotionParam param{spacer::MotionParam::Radius};
 
     static EngineEffect none() { return {}; }
     static EngineEffect structural() { return {Kind::Structural, 0}; }
     static EngineEffect source(int sourceId) { return {Kind::Source, sourceId}; }
     static EngineEffect speaker(int speakerId) { return {Kind::Speaker, speakerId}; }
     static EngineEffect master() { return {Kind::Master, 0}; }
+    static EngineEffect motionParam(int sourceId, int channel, spacer::MotionParam param) {
+        return {Kind::MotionParam, sourceId, channel, param};
+    }
 };
 
 struct ProjectEdit {

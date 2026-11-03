@@ -16,6 +16,19 @@ void replaceSource(Project& p, const SourceSpec& spec) {
         }
 }
 
+/// A Manual motion's smoothing time is read when the node is built; there is
+/// no command for it.
+float manualSmoothMs(const MotionSpec& m) {
+    const auto* manual = std::get_if<ManualMotion>(&m.value);
+    return manual != nullptr ? manual->smoothMs : 0.0f;
+}
+
+bool manualSmoothingChanged(const SourceSpec& a, const SourceSpec& b) {
+    return manualSmoothMs(a.motion) != manualSmoothMs(b.motion) ||
+           (a.motionRight && b.motionRight &&
+            manualSmoothMs(*a.motionRight) != manualSmoothMs(*b.motionRight));
+}
+
 const SourceSpec* findSource(const Project& p, int id) {
     for (const auto& s : p.sources)
         if (s.id == id) return &s;
@@ -38,11 +51,16 @@ ProjectEdit setSource(const Project& project, SourceSpec after, std::string name
     e.name = std::move(name);
     const SourceSpec* before = findSource(project, after.id);
     if (before == nullptr) return e;
-    // A motion-kind change, or any change to a non-Manual motion, needs a new
-    // graph (motions are built by GraphBuilder); Manual positions and plain
-    // parameters travel as commands.
-    const bool structural = !isManualOnly(*before) || !isManualOnly(after) ||
-                            before->stereo != after.stereo || before->linkedPoints != after.linkedPoints ||
+    // Structural: anything GraphBuilder bakes into a node. A motion change is
+    // structural unless it only moves Manual positions (those travel as
+    // SetSourcePosition). Parameter edits (gain, mute, spread, width,
+    // distance) are commands for every motion kind, so they never restart a
+    // running motion's phase.
+    const bool motionChanged = before->motion != after.motion || before->motionRight != after.motionRight;
+    const bool positionsOnly =
+        isManualOnly(*before) && isManualOnly(after) && !manualSmoothingChanged(*before, after);
+    const bool structural = (motionChanged && !positionsOnly) || before->stereo != after.stereo ||
+                            before->linkedPoints != after.linkedPoints ||
                             before->spatializer != after.spatializer || !(before->input == after.input) ||
                             before->directSpeakers != after.directSpeakers ||
                             before->modulators != after.modulators || before->inserts != after.inserts;

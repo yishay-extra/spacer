@@ -16,6 +16,7 @@
 #include "engine/device/AudioEngine.h"
 #include "ui/logic/FeedbackState.h"
 #include "ui/logic/ProjectHistory.h"
+#include "ui/logic/SourceSelection.h"
 
 namespace spacer {
 
@@ -61,6 +62,7 @@ public:
         SceneRecalled,  // a cue or scene recall changed the live model
         SpeakerTest,    // speaker test started / stopped
         Panic,          // panic engaged / released
+        Selection,      // the selected source changed (selectSource())
     };
 
     class Listener {
@@ -98,6 +100,15 @@ public:
     bool undo();
     bool redo();
     const ProjectHistory& history() const noexcept { return history_; }
+
+    // ---- selection ----------------------------------------------------------
+    /// The selected source (Sources panel, stage view; OSC / MIDI bare paths
+    /// via `selectedSourceId()`, see ControlDispatcher::Config::selectedSource).
+    /// Kept valid across edits, undo, loads and recalls (SourceSelection::reconcile).
+    const SourceSelection& selection() const noexcept { return selection_; }
+    int selectedSourceId() const noexcept { return selection_.selectedId(); }
+    /// Selects `sourceId` (0 = none) and notifies with Change::Selection.
+    void selectSource(int sourceId);
     bool isDirty() const noexcept { return revision_ != savedRevision_; }
 
     void newProject(Project project);
@@ -157,6 +168,7 @@ private:
     std::unique_ptr<ControlHub> control_;  // after cues_: holds a pointer to it
     std::unique_ptr<MidiInputService> midiIn_;
     FeedbackState feedback_;
+    SourceSelection selection_;
 
     InstallationSettings installation_;
     std::filesystem::path installationSettingsPath_;

@@ -219,13 +219,14 @@ void StageView::paintSources(juce::Graphics& g) const {
     }
     for (const auto& s : points) {
         const auto p = toJuce(s.position);
+        const bool selected = context_.selection().isSelected(s.id);
         const bool active =
             (drag_ && drag_->item.kind == StageItem::Kind::Source && drag_->item.id == s.id) ||
             (hover_ && hover_->kind == StageItem::Kind::Source && hover_->id == s.id);
         g.setColour(s.mute ? kSourceMuted : kSource);
         g.fillEllipse(p.x - kSourceRadius, p.y - kSourceRadius, kSourceRadius * 2.0f, kSourceRadius * 2.0f);
-        if (active) {
-            g.setColour(juce::Colours::white);
+        if (active || selected) {
+            g.setColour(active ? juce::Colours::white : kSelected);
             g.drawEllipse(p.x - kSourceRadius - 3.0f, p.y - kSourceRadius - 3.0f, kSourceRadius * 2.0f + 6.0f,
                           kSourceRadius * 2.0f + 6.0f, 1.5f);
         }
@@ -259,6 +260,7 @@ void StageView::mouseDown(const juce::MouseEvent& e) {
     Drag d;
     d.item = *hit;
     if (hit->kind == StageItem::Kind::Source) {
+        if (mode_ == Mode::Perform) context_.selectSource(hit->id);  // the Sources panel follows
         bool found = false;
         for (const auto& s : context_.project().sources)
             if (s.id == hit->id) {

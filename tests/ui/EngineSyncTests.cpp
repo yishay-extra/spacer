@@ -65,11 +65,75 @@ TEST_CASE("Linked points send one position per channel", "[ui][sync]") {
     REQUIRE(seen == 2);
 }
 
-TEST_CASE("Moving or missing sources fall back to a rebuild", "[ui][sync]") {
+TEST_CASE("Missing sources fall back to a rebuild", "[ui][sync]") {
     Project p = makeProject();
     REQUIRE(planEngineSync(p, EngineEffect::source(42)).rebuildGraph);
+}
+
+TEST_CASE("Parameter edits of a moving source are commands, without positions", "[ui][sync]") {
+    // A gain / mute / spread / distance edit must not rebuild (that would restart the phase).
+    Project p = makeProject();
     p.sources[0].motion.value = OrbitMotion{};
-    REQUIRE(planEngineSync(p, EngineEffect::source(3)).rebuildGraph);
+    p.sources[0].gainDb = -9.0f;
+    const auto plan = planEngineSync(p, EngineEffect::source(3));
+    REQUIRE_FALSE(plan.rebuildGraph);
+    REQUIRE(findCommand<cmd::SetSourceGain>(plan)->gainDb == -9.0f);
+    REQUIRE(findCommand<cmd::SetSourceDistance>(plan));
+    REQUIRE(findCommand<cmd::SetSourcePosition>(plan) == nullptr);
+}
+
+TEST_CASE("Linked points: only Manual channels get positions", "[ui][sync]") {
+    Project p = makeProject();
+    p.sources[0].stereo = true;
+    p.sources[0].linkedPoints = true;
+    p.sources[0].motionRight = MotionSpec{OrbitMotion{}};
+    const auto plan = planEngineSync(p, EngineEffect::source(3));
+    REQUIRE_FALSE(plan.rebuildGraph);
+    int positions = 0;
+    for (const auto& c : plan.commands)
+        if (const auto* sp = std::get_if<cmd::SetSourcePosition>(&c)) {
+            REQUIRE(sp->channel == 0);
+            ++positions;
+        }
+    REQUIRE(positions == 1);
+}
+
+TEST_CASE("Live motion parameters become SetMotionParam from the model", "[ui][sync]") {
+    Project p = makeProject();
+    OrbitMotion orbit;
+    orbit.radius = 2.5f;
+    p.sources[0].motion.value = orbit;
+    auto plan = planEngineSync(p, EngineEffect::motionParam(3, -1, MotionParam::Radius));
+    REQUIRE_FALSE(plan.rebuildGraph);
+    REQUIRE(plan.commands.size() == 1);
+    const auto* c = findCommand<cmd::SetMotionParam>(plan);
+    REQUIRE(c);
+    REQUIRE(c->sourceId == 3);
+    REQUIRE(c->channel == -1);
+    REQUIRE(c->param == MotionParam::Radius);
+    REQUIRE(c->value == 2.5f);
+
+    // A parameter the motion no longer has (kind changed), or a missing source: rebuild.
+    p.sources[0].motion.value = LineMotion{};
+    REQUIRE(planEngineSync(p, EngineEffect::motionParam(3, -1, MotionParam::Radius)).rebuildGraph);
+    REQUIRE(planEngineSync(p, EngineEffect::motionParam(99, -1, MotionParam::Radius)).rebuildGraph);
+    // Channel 1 of a source that has only one point.
+    p.sources[0].motion.value = orbit;
+    REQUIRE(planEngineSync(p, EngineEffect::motionParam(3, 1, MotionParam::Radius)).rebuildGraph);
+}
+
+TEST_CASE("Linked-points motion parameters address their own channel", "[ui][sync]") {
+    Project p = makeProject();
+    p.sources[0].stereo = true;
+    p.sources[0].linkedPoints = true;
+    OrbitMotion left, right;
+    left.radius = 1.0f;
+    right.radius = 4.0f;
+    p.sources[0].motion.value = left;
+    p.sources[0].motionRight = MotionSpec{right};
+    const auto plan = planEngineSync(p, EngineEffect::motionParam(3, 1, MotionParam::Radius));
+    REQUIRE(findCommand<cmd::SetMotionParam>(plan)->value == 4.0f);
+    REQUIRE(findCommand<cmd::SetMotionParam>(plan)->channel == 1);
 }
 
 TEST_CASE("Speaker effects use the chain when there is one", "[ui][sync]") {

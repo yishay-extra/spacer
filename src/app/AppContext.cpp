@@ -195,8 +195,15 @@ void AppContext::rememberProjectPath() {
     installation::saveSettings(installation_, installationSettingsPath_);
 }
 
+void AppContext::selectSource(int sourceId) {
+    if (!selection_.select(sourceId)) return;
+    const auto copy = listeners_;
+    for (auto* l : copy) l->projectChanged(Change::Selection);
+}
+
 void AppContext::modelChanged(Change change) {
     ++revision_;
+    selection_.reconcile(project_);
     const auto copy = listeners_;  // listeners may remove themselves
     for (auto* l : copy) l->projectChanged(change);
 }
