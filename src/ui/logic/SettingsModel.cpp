@@ -119,6 +119,13 @@ Parsed<int> parseBeatsPerBar(const std::string& text) {
     return {*v, {}};
 }
 
+Parsed<float> parseLatencyTrim(const std::string& text) {
+    const auto v = toDouble(text);
+    if (!v) return fail<float>("Enter the clock latency trim in ms");
+    if (*v < -1000.0 || *v > 1000.0) return fail<float>("Clock latency trim must be within -1000 to 1000 ms");
+    return {static_cast<float>(*v), {}};
+}
+
 Parsed<float> parseSpeedOfSound(const std::string& text) {
     const auto v = toDouble(text);
     if (!v) return fail<float>("Enter the speed of sound in m/s");
@@ -142,7 +149,9 @@ Delta classify(const SettingsFields& a, const SettingsFields& b) {
     Delta d;
     d.device = a.devices.outputDeviceName != b.devices.outputDeviceName ||
                a.devices.sampleRate != b.devices.sampleRate || a.devices.bufferSize != b.devices.bufferSize;
-    d.graph = a.devices.speedOfSound != b.devices.speedOfSound || !(a.clock == b.clock);
+    ClockConfig clockA = a.clock;
+    clockA.latencyTrimMs = b.clock.latencyTrimMs;  // read live by the app tick
+    d.graph = a.devices.speedOfSound != b.devices.speedOfSound || !(clockA == b.clock);
     d.osc = !(a.osc == b.osc);
     d.midi = a.programChangeChannel != b.programChangeChannel;
     return d;
@@ -162,6 +171,8 @@ std::string validate(const SettingsFields& f) {
     if (!(f.clock.bpm >= kMinBpm && f.clock.bpm <= kMaxBpm)) return "Tempo must be within 20 to 300 bpm";
     if (f.clock.beatsPerBar < 1 || f.clock.beatsPerBar > kMaxBeatsPerBar)
         return "Beats per bar must be within 1 to 32";
+    if (!(f.clock.latencyTrimMs >= -1000.0f && f.clock.latencyTrimMs <= 1000.0f))
+        return "Clock latency trim must be within -1000 to 1000 ms";
     return {};
 }
 

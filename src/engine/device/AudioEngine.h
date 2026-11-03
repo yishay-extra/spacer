@@ -38,6 +38,7 @@ public:
         int bufferSize{0};
         int outputChannels{0};
         int deviceLatencySamples{0};         // device input + output latency
+        int outputLatencySamples{0};         // device output latency alone
         int graphLatencySamples{0};          // limiter look-ahead (SPEC §5.6)
         int virtualDeviceLatencySamples{0};  // Spacer.driver hop when connected (SPEC §5.6, §14)
         int xruns{0};

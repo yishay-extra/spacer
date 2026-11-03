@@ -251,3 +251,18 @@ TEST_CASE("AppSettings: save and load", "[ui][settings]") {
     CHECK(*loaded == s);
     std::filesystem::remove_all(dir);
 }
+
+TEST_CASE("Settings: clock latency trim parses, validates and needs no rebuild (WP14)", "[ui][settings]") {
+    CHECK(settings::parseLatencyTrim("-12.5").value == -12.5f);
+    CHECK_FALSE(settings::parseLatencyTrim("2000"));
+    CHECK_FALSE(settings::parseLatencyTrim("abc"));
+    Project p;
+    auto before = settings::fieldsOf(p);
+    auto after = before;
+    after.clock.latencyTrimMs = 8.0f;
+    CHECK_FALSE(settings::classify(before, after).graph);  // read live, no clock relock
+    after.clock.bpm = 100.0;
+    CHECK(settings::classify(before, after).graph);
+    after.clock.latencyTrimMs = 5000.0f;
+    CHECK_FALSE(settings::validate(after).empty());
+}

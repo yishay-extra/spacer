@@ -381,6 +381,8 @@ Issues validate(const Project& p) {
     if (!std::isfinite(p.clock.bpm) || p.clock.bpm < 20.0 || p.clock.bpm > 300.0)
         s.error("clock.bpm", "bpm must be within [20, 300]");
     if (p.clock.beatsPerBar < 1) s.error("clock.beatsPerBar", "beatsPerBar must be >= 1");
+    if (!std::isfinite(p.clock.latencyTrimMs) || std::abs(p.clock.latencyTrimMs) > 1000.0f)
+        s.error("clock.latencyTrimMs", "latencyTrimMs must be within [-1000, 1000]");
     return out;
 }
 

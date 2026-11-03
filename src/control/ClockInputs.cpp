@@ -1,6 +1,7 @@
 #include "control/ClockInputs.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 
 #include "control/MidiClock.h"
@@ -85,6 +86,16 @@ std::unique_ptr<ClockSource> ClockInputs::makeClock(const ClockConfig& config,
 
 bool ClockInputs::linkAvailable() noexcept {
     return SPACER_WITH_LINK != 0;
+}
+
+double ClockInputs::compensationSeconds(int deviceOutputLatencySamples, int engineLatencySamples,
+                                        double sampleRate, float trimMs) noexcept {
+    if (!(sampleRate > 0.0)) return 0.0;
+    const double automatic =
+        static_cast<double>(std::max(0, deviceOutputLatencySamples) + std::max(0, engineLatencySamples)) /
+        sampleRate;
+    const double trim = std::isfinite(trimMs) ? static_cast<double>(trimMs) * 0.001 : 0.0;
+    return std::max(0.0, automatic + trim);
 }
 
 }  // namespace spacer

@@ -970,7 +970,8 @@ void to_json(Json& j, const ClockConfig& v) {
     j = Json{{"kind", enumName(kClockKinds, v.kind)},
              {"bpm", v.bpm},
              {"beatsPerBar", v.beatsPerBar},
-             {"quantisedStart", v.quantisedStart}};
+             {"quantisedStart", v.quantisedStart},
+             {"latencyTrimMs", v.latencyTrimMs}};
 }
 void from_json(const Json& j, ClockConfig& v) {
     requireObject(j, "clock");
@@ -979,6 +980,7 @@ void from_json(const Json& j, ClockConfig& v) {
     field(j, "bpm", v.bpm);
     field(j, "beatsPerBar", v.beatsPerBar);
     field(j, "quantisedStart", v.quantisedStart);
+    field(j, "latencyTrimMs", v.latencyTrimMs);
 }
 
 void to_json(Json& j, const Project& v) {

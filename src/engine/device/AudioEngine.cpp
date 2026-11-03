@@ -132,6 +132,7 @@ AudioEngine::Status AudioEngine::status() const {
         s.bufferSize = d->getCurrentBufferSizeSamples();
         s.outputChannels = d->getActiveOutputChannels().countNumberOfSetBits();
         s.deviceLatencySamples = d->getInputLatencyInSamples() + d->getOutputLatencyInSamples();
+        s.outputLatencySamples = d->getOutputLatencyInSamples();
     }
     s.graphLatencySamples = processor_.latencySamples();
     if (const auto v = virtual_.status(); v.state == VirtualDeviceReceiver::State::Connected)

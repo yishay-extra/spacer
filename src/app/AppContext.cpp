@@ -509,6 +509,14 @@ void AppContext::timerCallback() {
     // A plugin changed its latency: rebuild so it is compensated (SPEC §5.6).
     if (plugins_->takeLatencyChanged()) rebuildGraph();
 
+    // External clocks report the beat at the time a block is heard (WP14).
+    {
+        const auto status = engine_.status();
+        clockInputs_.setCompensation(
+            ClockInputs::compensationSeconds(status.outputLatencySamples, status.graphLatencySamples,
+                                             status.sampleRate, project_.clock.latencyTrimMs));
+    }
+
     // OSC / MIDI. A cue fired from there changes the live model (SPEC §11).
     // Any recall counts, also an OSC / MIDI scene recall that leaves the cue
     // index alone (PLAN WP14 item, fixed here because the Cues panel shows it).

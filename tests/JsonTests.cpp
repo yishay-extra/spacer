@@ -2,6 +2,7 @@
 
 #include "TestModels.h"
 #include "core/Json.h"
+#include "core/Validate.h"
 
 using namespace spacer;
 using namespace spacer::testing;
@@ -149,4 +150,16 @@ TEST_CASE("Error messages carry the key path") {
 TEST_CASE("Speaker lfe key is optional and defaults to false") {
     const auto sp = Json::parse(R"({"id":1,"name":"L","position":{"az":0,"el":0,"dist":2}})").get<Speaker>();
     REQUIRE_FALSE(sp.lfe);
+}
+
+TEST_CASE("ClockConfig::latencyTrimMs round-trips, is optional and validated (WP14)") {
+    ROUND_TRIP((ClockConfig{ClockKind::Midi, 120.0, 4, false, -12.5f}));
+    ClockConfig c =
+        Json::parse(R"({"kind":"Midi","bpm":120,"beatsPerBar":4,"quantisedStart":false})").get<ClockConfig>();
+    CHECK(c.latencyTrimMs == 0.0f);
+    Project p;
+    p.clock.latencyTrimMs = 5000.0f;
+    bool flagged = false;
+    for (const auto& issue : validate(p)) flagged = flagged || issue.path == "clock.latencyTrimMs";
+    CHECK(flagged);
 }

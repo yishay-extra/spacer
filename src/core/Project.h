@@ -67,6 +67,10 @@ struct ClockConfig {
     double bpm{120.0};
     int beatsPerBar{4};
     bool quantisedStart{false};  // internal clock: start on next bar (SPEC §9)
+    /// External clocks: trim (ms) added to the automatic output-latency
+    /// compensation (device output latency + engine latency), so the beat is
+    /// the one *heard* when the block plays. JSON key optional, default 0.
+    float latencyTrimMs{0.0f};
     bool operator==(const ClockConfig&) const = default;
 };
 
