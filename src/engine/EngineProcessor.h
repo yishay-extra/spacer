@@ -134,7 +134,11 @@ private:
         Command command;
         std::int64_t atSample{-1};  // -1 = as soon as possible
     };
-    void applyCommands() noexcept;
+    /// Commands keep their FIFO order across a SwapGraph: while a swap is
+    /// pending, the first non-swap command waits in held_ (and the rest in the
+    /// queue) until the swap lands, so it acts on the graph it was sent for.
+    /// `holdWhileSwapPending` false drains everything (setGraphWhileStopped).
+    void applyCommands(bool holdWhileSwapPending) noexcept;
     void insertTimed(const QueuedCommand& q) noexcept;
     void applyTimedUpTo(std::int64_t sample) noexcept;
     int nextTimedOffset(std::int64_t blockStart, int numSamples) const noexcept;
@@ -173,6 +177,8 @@ private:
     int xruns_{0}, xrunsReported_{0};
     std::uint64_t droppedReported_{0};
 
+    QueuedCommand held_{};  // never a SwapGraph; see applyCommands()
+    bool hasHeld_{false};
     std::array<QueuedCommand, kMaxTimedCommands> timed_{};  // sorted by atSample
     int numTimed_{0};
     std::int64_t samplePosition_{0};

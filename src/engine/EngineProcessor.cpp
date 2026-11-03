@@ -39,6 +39,8 @@ EngineProcessor::~EngineProcessor() {
         if (auto* s = std::get_if<cmd::SwapGraph>(&q.command)) delete s->graph;
         if (auto* r = std::get_if<cmd::RecallScene>(&q.command)) delete r->plan;
     }
+    if (hasHeld_)
+        if (auto* r = std::get_if<cmd::RecallScene>(&held_.command)) delete r->plan;
     for (int i = 0; i < numTimed_; ++i) {
         auto& c = timed_[static_cast<std::size_t>(i)].command;
         if (auto* s = std::get_if<cmd::SwapGraph>(&c)) delete s->graph;
@@ -90,7 +92,7 @@ int EngineProcessor::collectGarbage() {
 void EngineProcessor::setGraphWhileStopped(std::unique_ptr<Graph> graph) {
     // Apply what is queued first, so a SwapGraph sent before the stop (built
     // for the old device settings) cannot replace `graph` later.
-    applyCommands();
+    applyCommands(false);
     collectGarbage();
     delete pending_;
     pending_ = nullptr;
@@ -152,13 +154,24 @@ ClockState EngineProcessor::advanceClock(int numSamples) noexcept {
     return s;
 }
 
-void EngineProcessor::applyCommands() noexcept {
+void EngineProcessor::applyCommands(bool holdWhileSwapPending) noexcept {
+    if (hasHeld_) {
+        if (holdWhileSwapPending && pending_ != nullptr) return;
+        hasHeld_ = false;
+        apply(held_.command);  // it was due when it was held
+    }
     QueuedCommand q;
     while (commands_.pop(q)) {
-        if (q.atSample > samplePosition_)
+        if (q.atSample > samplePosition_) {
             insertTimed(q);
-        else
+        } else if (holdWhileSwapPending && pending_ != nullptr &&
+                   !std::holds_alternative<cmd::SwapGraph>(q.command)) {
+            held_ = q;
+            hasHeld_ = true;
+            return;
+        } else {
             apply(q.command);
+        }
     }
 }
 
@@ -178,6 +191,7 @@ void EngineProcessor::insertTimed(const QueuedCommand& q) noexcept {
 }
 
 void EngineProcessor::applyTimedUpTo(std::int64_t sample) noexcept {
+    if (pending_ != nullptr) return;  // they act on the graph that is coming
     int done = 0;
     while (done < numTimed_ && timed_[static_cast<std::size_t>(done)].atSample <= sample)
         apply(timed_[static_cast<std::size_t>(done++)].command);
@@ -332,22 +346,29 @@ void EngineProcessor::process(const float* const* inputs, int numInputs, float* 
     const std::int64_t blockStart = samplePosition_;
     const double hostTime = nextHostTime_;
     nextHostTime_ = -1.0;
-    applyCommands();
+    applyCommands(true);
     applyTimedUpTo(blockStart);
 
     // Structural change (SPEC §5.2): sources missing from the new graph are
     // faded out over this block in the old graph; the swap happens at the
     // start of the next block. Without such sources it happens right away.
     bool swapAfterBlock = false;
+    bool swappedNow = false;
     if (pending_ != nullptr) {
         if (fadingOut_ || graph_ == nullptr) {
-            applyPendingSwap();
+            swappedNow = applyPendingSwap();
         } else if (graph_->fadeOutSourcesMissingFrom(*pending_, numSamples) > 0) {
             fadingOut_ = true;
             swapAfterBlock = true;
         } else {
-            applyPendingSwap();
+            swappedNow = applyPendingSwap();
         }
+    }
+    // Commands held for that swap act on the new graph in this block. A
+    // further SwapGraph found here waits for the next block's swap decision.
+    if (swappedNow) {
+        applyCommands(true);
+        applyTimedUpTo(blockStart);
     }
 
     const ClockState clockAtStart = advanceClock(numSamples);
