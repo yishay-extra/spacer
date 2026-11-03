@@ -14,6 +14,7 @@
 
 namespace spacer {
 
+class PluginHost;
 class DiskStreamer;
 
 /// Builds a ready-to-run Graph from a Project (SPEC §5.2). Non-RT: runs on
@@ -26,6 +27,10 @@ class DiskStreamer;
 /// state; the Speaker fields are the defaults); mute and EQ come only from
 /// the chain.
 ///
+/// Insert slots (SPEC §13) are instantiated through the PluginHost given with
+/// setPluginHost(), which reuses the running instances of unchanged slots.
+/// Without a host every slot is a pass-through (as for a missing plugin). The
+/// built graph pads all chains to a common latency (Graph::alignInsertLatencies).
 /// Source inputs: the input factory (if any) is asked first; when it returns
 /// null the source gets its live input from SourceInputFactory (hardware,
 /// file, generator; SPEC §8). File players are streamed by the DiskStreamer
@@ -39,6 +44,9 @@ public:
     /// Overrides the input of some sources (tests, offline renders, tools);
     /// null = the source's own live input.
     GraphBuilder& setInputFactory(InputFactory factory);
+    /// Plugin instances for insert slots. Must outlive the built graphs' use
+    /// of it (build() only; instances are shared, not owned by the host).
+    GraphBuilder& setPluginHost(PluginHost* host);
     /// Disk thread for file sources. Must outlive the built graphs.
     GraphBuilder& setDiskStreamer(DiskStreamer* streamer);
     /// Base directory for project-relative file paths.
@@ -65,6 +73,7 @@ public:
 private:
     Project project_;
     InputFactory inputFactory_;
+    PluginHost* pluginHost_{nullptr};
     DiskStreamer* streamer_{nullptr};
     juce::File projectDirectory_;
     int numOutputChannels_{-1};

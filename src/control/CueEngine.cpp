@@ -4,6 +4,7 @@
 #include <utility>
 
 #include "core/SceneDiff.h"
+#include "engine/PluginHost.h"
 #include "engine/RecallPlanner.h"
 
 namespace spacer {
@@ -28,6 +29,8 @@ bool CueEngine::armFirst(const CueTick& tick) {
 }
 
 bool CueEngine::recall(const Scene& scene, float seconds, bool restart, double atBeat, int token) {
+    // Plugin edits made in editors are part of the current state (SPEC §11).
+    if (config_.pluginHost != nullptr) config_.pluginHost->captureState(project_);
     RecallRequest r;
     r.project = &project_;
     r.target = &scene;
@@ -36,6 +39,7 @@ bool CueEngine::recall(const Scene& scene, float seconds, bool restart, double a
     r.sampleRate = config_.sampleRate;
     r.maxBlockSize = config_.maxBlockSize;
     r.inputFactory = config_.inputFactory;
+    r.pluginHost = config_.pluginHost;
     r.numOutputChannels = config_.numOutputChannels;
     r.atBeat = atBeat;
     r.token = token;

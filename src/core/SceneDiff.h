@@ -41,12 +41,19 @@ enum class RampTarget {
     SpeakerEqHighFreq,
     SpeakerEqHighGainDb,
     MasterGainDb,
+    // Insert slots (SPEC §13), `slot` = index into the inserts list.
+    SourceInsertParam,   // `param` = plugin parameter index, normalised value
+    SourceInsertBypass,  // discrete: the engine crossfades the bypass itself
+    SpeakerInsertParam,
+    SpeakerInsertBypass,
 };
 
 struct Ramp {
     RampTarget target{RampTarget::SourceGainDb};
     int id{0};        // source id or speaker id (unused for the master)
     int channel{-1};  // SourcePosition only
+    int slot{-1};     // insert targets only
+    int param{-1};    // *InsertParam only
     float from{0.0f};
     float to{0.0f};
     Position fromPosition;  // SourcePosition only
@@ -61,16 +68,27 @@ struct SceneDiff {
     /// Present in both but changed in a way that cannot be ramped: the old
     /// source crossfades to a new one built from the target.
     std::vector<int> replacedSources;
-    /// Speakers whose insert slots differ (WP10; nothing in the engine yet).
+    /// Present in both (not replaced) but the insert slots differ in structure
+    /// (see sameInsertStructure): the source keeps playing and its insert chain
+    /// crossfades from the old plugins to the new ones (SPEC §11, §13).
+    std::vector<int> sourceInsertChanges;
+    /// Speakers whose insert slots differ in structure (same crossfade).
     std::vector<int> speakerInsertChanges;
 
     /// True when a new graph is needed.
     bool structural() const {
         return !addedSources.empty() || !removedSources.empty() || !replacedSources.empty() ||
-               !speakerInsertChanges.empty();
+               !sourceInsertChanges.empty() || !speakerInsertChanges.empty();
     }
     bool empty() const { return ramps.empty() && !structural(); }
 };
+
+/// Two insert lists have the same structure when they have the same length
+/// and every slot has the same plugin and state blob: then only parameter
+/// values and bypass flags differ, which ramp / crossfade in place. Anything
+/// else (a slot added, removed, reordered, another plugin or another state)
+/// needs new plugin instances.
+bool sameInsertStructure(const std::vector<PluginSlot>& a, const std::vector<PluginSlot>& b);
 
 /// Effective per-speaker state of a scene: the scene's chain spec if it has
 /// one, else the layout speaker's own defaults (matches GraphBuilder).

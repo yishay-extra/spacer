@@ -10,6 +10,7 @@
 #include <type_traits>
 #include <variant>
 
+#include "core/InsertParamPath.h"
 #include "core/Position.h"
 #include "core/Source.h"
 #include "core/SpeakerChain.h"
@@ -117,6 +118,22 @@ struct SetSpeakerEq {
     Eq3 eq;
 };
 
+/// Insert slot parameter (SPEC §13 parameter paths), normalised 0..1.
+struct SetInsertParam {
+    InsertOwner owner{InsertOwner::Source};
+    int id{0};  // source or speaker id
+    int slot{0};
+    int index{0};
+    float value{0.0f};
+};
+/// Bypass an insert slot (crossfaded, latency-aligned).
+struct SetInsertBypass {
+    InsertOwner owner{InsertOwner::Source};
+    int id{0};
+    int slot{0};
+    bool bypassed{false};
+};
+
 struct SetMasterGain {
     float gainDb{0.0f};
     float rampMs{-1.0f};
@@ -159,9 +176,9 @@ using Command =
                  cmd::SetSourceWidth, cmd::SetSourceDistance, cmd::SetMotionParam, cmd::ResetMotion,
                  cmd::SetModulatorValue, cmd::FilePlay, cmd::FileStop, cmd::FileSeek, cmd::SetSpeakerTrim,
                  cmd::SetSpeakerMute, cmd::SetSpeakerDelay, cmd::SetSpeakerPolarity, cmd::SetSpeakerEq,
-                 cmd::SetMasterGain, cmd::SetPanic, cmd::ClockPlay, cmd::ClockStop, cmd::ClockContinue,
-                 cmd::ClockSetBpm, cmd::ClockSetBeat, cmd::ClockTap, cmd::SwapGraph, cmd::RecallScene,
-                 cmd::CancelScheduledRecall>;
+                 cmd::SetInsertParam, cmd::SetInsertBypass, cmd::SetMasterGain, cmd::SetPanic, cmd::ClockPlay,
+                 cmd::ClockStop, cmd::ClockContinue, cmd::ClockSetBpm, cmd::ClockSetBeat, cmd::ClockTap,
+                 cmd::SwapGraph, cmd::RecallScene, cmd::CancelScheduledRecall>;
 
 static_assert(std::is_trivially_copyable_v<Command>);
 

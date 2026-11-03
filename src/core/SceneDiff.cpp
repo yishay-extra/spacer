@@ -34,6 +34,7 @@ SourceSpec withContinuousFrom(SourceSpec base, const SourceSpec& from) {
     base.spread = from.spread;
     base.width = from.width;
     base.distance = from.distance;
+    if (sameInsertStructure(base.inserts, from.inserts)) base.inserts = from.inserts;
     if (auto* m = asManual(base.motion))
         if (const auto* f = asManual(from.motion)) m->position = f->position;
     if (base.motionRight && from.motionRight)
@@ -42,10 +43,12 @@ SourceSpec withContinuousFrom(SourceSpec base, const SourceSpec& from) {
     return base;
 }
 
-/// True when only continuous values (and the name) differ.
+/// True when only continuous values (and the name, and the inserts, which
+/// are diffed separately) differ.
 bool sameStructure(const SourceSpec& a, const SourceSpec& b) {
     SourceSpec probe = withContinuousFrom(b, a);
     probe.name = a.name;
+    probe.inserts = a.inserts;
     return probe == a;
 }
 
@@ -85,6 +88,37 @@ void diffSource(std::vector<Ramp>& out, const SourceSpec& a, const SourceSpec& b
         addPosition(out, b.id, 1, asManual(*a.motionRight), asManual(*b.motionRight));
 }
 
+/// Parameter ramps and bypass switches between two inserts lists of the same
+/// structure. Parameters only the current side has are left alone.
+void diffInserts(std::vector<Ramp>& out, bool speaker, int id, const std::vector<PluginSlot>& a,
+                 const std::vector<PluginSlot>& b) {
+    for (std::size_t i = 0; i < b.size() && i < a.size(); ++i) {
+        const int slot = static_cast<int>(i);
+        if (a[i].bypassed != b[i].bypassed) {
+            Ramp r;
+            r.target = speaker ? RampTarget::SpeakerInsertBypass : RampTarget::SourceInsertBypass;
+            r.id = id;
+            r.slot = slot;
+            r.from = a[i].bypassed ? 1.0f : 0.0f;
+            r.to = b[i].bypassed ? 1.0f : 0.0f;
+            out.push_back(r);
+        }
+        for (const auto& [index, value] : b[i].params) {
+            const auto it = a[i].params.find(index);
+            if (it != a[i].params.end() && it->second == value) continue;
+            Ramp r;
+            r.target = speaker ? RampTarget::SpeakerInsertParam : RampTarget::SourceInsertParam;
+            r.id = id;
+            r.slot = slot;
+            r.param = index;
+            r.from =
+                it != a[i].params.end() ? it->second : value;  // unknown: the engine reads the live value
+            r.to = value;
+            out.push_back(r);
+        }
+    }
+}
+
 void diffChain(std::vector<Ramp>& out, const SpeakerChainSpec& a, const SpeakerChainSpec& b) {
     const int id = b.speakerId;
     addScalar(out, RampTarget::SpeakerTrimDb, id, a.trimDb, b.trimDb);
@@ -107,6 +141,13 @@ bool contains(const std::vector<int>& v, int x) {
 
 }  // namespace
 
+bool sameInsertStructure(const std::vector<PluginSlot>& a, const std::vector<PluginSlot>& b) {
+    if (a.size() != b.size()) return false;
+    for (std::size_t i = 0; i < a.size(); ++i)
+        if (a[i].pluginId != b[i].pluginId || a[i].stateBase64 != b[i].stateBase64) return false;
+    return true;
+}
+
 SpeakerChainSpec effectiveChain(const Scene& scene, const Speaker& speaker) {
     if (const auto* c = findChain(scene, speaker.id)) return *c;
     SpeakerChainSpec c;
@@ -128,6 +169,10 @@ SceneDiff diffScenes(const Scene& current, const Scene& target, const Layout& la
             diff.replacedSources.push_back(t.id);
         } else {
             diffSource(diff.ramps, *c, t);
+            if (sameInsertStructure(c->inserts, t.inserts))
+                diffInserts(diff.ramps, false, t.id, c->inserts, t.inserts);
+            else
+                diff.sourceInsertChanges.push_back(t.id);
         }
     }
     for (const auto& c : current.sources)
@@ -137,7 +182,10 @@ SceneDiff diffScenes(const Scene& current, const Scene& target, const Layout& la
         const SpeakerChainSpec a = effectiveChain(current, sp);
         const SpeakerChainSpec b = effectiveChain(target, sp);
         diffChain(diff.ramps, a, b);
-        if (a.inserts != b.inserts) diff.speakerInsertChanges.push_back(sp.id);
+        if (sameInsertStructure(a.inserts, b.inserts))
+            diffInserts(diff.ramps, true, sp.id, a.inserts, b.inserts);
+        else
+            diff.speakerInsertChanges.push_back(sp.id);
     }
 
     addScalar(diff.ramps, RampTarget::MasterGainDb, 0, current.master.gainDb, target.master.gainDb);
@@ -165,6 +213,7 @@ Scene intermediateScene(const Scene& current, const Scene& target, const SceneDi
         t.polarityInverted = c.polarityInverted;
         t.mute = c.mute;
         t.eq = c.eq;
+        if (sameInsertStructure(c.inserts, t.inserts)) t.inserts = c.inserts;
         out.speakerChains.push_back(std::move(t));
     }
     return out;

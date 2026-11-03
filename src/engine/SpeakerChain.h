@@ -6,6 +6,7 @@
 
 #include "core/SpeakerChain.h"
 #include "engine/GainRamp.h"
+#include "engine/InsertStage.h"
 #include "engine/LookaheadLimiter.h"
 
 namespace spacer {
@@ -26,7 +27,7 @@ struct SpeakerChainSettings {
 ///   delay (compensation + user, fractional, max 100 ms, 50 ms crossfade on change)
 ///   → gain (compensation + trim, mute, polarity; linear ramp)
 ///   → 3-band EQ (low shelf, peak, high shelf biquads; bands at 0 dB are skipped)
-///   → [insert slots — WP10]
+///   → insert slots (InsertStage, SPEC §13)
 ///   → look-ahead limiter (always on).
 ///
 /// Polarity is folded into the ramped gain, so flipping it ramps through
@@ -36,6 +37,11 @@ class SpeakerChain {
 public:
     static constexpr float kMaxDelayMs = 100.0f;
     static constexpr float kDelayCrossfadeMs = 50.0f;
+
+    /// Non-RT, before prepare(): the speaker's insert slots. Without one the
+    /// chain gets an empty stage.
+    void setInserts(std::unique_ptr<InsertStage> inserts) { inserts_ = std::move(inserts); }
+    InsertStage& inserts() noexcept { return *inserts_; }
 
     void prepare(double sampleRate, int maxBlockSize);
 
@@ -51,8 +57,9 @@ public:
 
     /// RT. Graph swap with state carry-over: keep this chain's signal state
     /// (delay contents, filters, limiter) and move towards `fresh`'s settings
-    /// with the usual ramps / delay crossfade.
-    void retargetTo(const SpeakerChain& fresh) noexcept;
+    /// with the usual ramps / delay crossfade, and its insert configuration
+    /// (crossfaded if the plugins differ; see InsertStage::retargetTo).
+    void retargetTo(SpeakerChain& fresh) noexcept;
 
     /// RT. In place.
     void process(float* samples, int numSamples) noexcept;
@@ -93,6 +100,7 @@ private:
     GainRamp gain_;
     std::array<Filter, 3> eq_;
     std::array<bool, 3> eqActive_{};
+    std::unique_ptr<InsertStage> inserts_;
     LookaheadLimiter limiter_;
     float peak_{0.0f};
 };
