@@ -507,7 +507,12 @@ TEST_CASE("Ambisonic decoder: energy is preserved on presets and with spread") {
     enc.prepare(l, 48000.0, 64);
     AmbisonicDecoder dec;
     dec.prepare(l, order);
-    const auto dirs = sphereDirections(1000);
+    // Horizontal layouts are normalised over the horizontal plane (WP14).
+    std::vector<Position> dirs = sphereDirections(1000);
+    if (AmbisonicDecoder::isHorizontalLayout(l)) {
+        dirs.clear();
+        for (int k = 0; k < 360; ++k) dirs.push_back({static_cast<float>(k), 0.0f, 2.0f});
+    }
     auto meanEnergy = [&](float spread) {
         double m = 0.0;
         for (const Position& p : dirs)
@@ -708,4 +713,42 @@ TEST_CASE("AmbisonicEncoder::useDecoder gives the same spread weights as prepare
         shared.spreadWeights(spread, b);
         for (int l = 0; l <= 3; ++l) CHECK(a[l] == Catch::Approx(b[l]));
     }
+}
+
+TEST_CASE("Ambisonic decoder: an in-plane source on a horizontal layout matches VBAP's level (WP14)") {
+    const char* id = GENERATE("octagon", "quad", "5.1");
+    const int order = GENERATE(1, 3, 5);
+    const Layout l = preset(id);
+    REQUIRE(AmbisonicDecoder::isHorizontalLayout(l));
+    AmbisonicEncoder enc(order);
+    enc.prepare(l, 48000.0, 64);
+    AmbisonicDecoder dec;
+    dec.prepare(l, order);
+    CHECK(dec.normalisedInPlane());
+    double mean = 0.0;
+    for (int k = 0; k < 360; ++k)
+        mean += energy(decodedGains(enc, dec, l, {static_cast<float>(k), 0.0f, 2.0f})) / 360.0;
+    INFO(id << " order " << order << " in-plane mean energy " << mean);
+    CHECK(10.0 * std::log10(mean) == Approx(0.0).margin(0.05));  // was +0.7..1.1 dB
+    // A spread sweep stays loudness-constant in the plane.
+    for (float spread : {0.5f, 1.0f}) {
+        double m = 0.0;
+        for (int k = 0; k < 360; ++k)
+            m += energy(decodedGains(enc, dec, l, {static_cast<float>(k), 0.0f, 2.0f}, spread)) / 360.0;
+        CHECK(10.0 * std::log10(m) == Approx(0.0).margin(0.1));
+    }
+}
+
+TEST_CASE("Ambisonic decoder: 3D layouts keep the sphere normalisation; max-rE can be turned off (WP14)") {
+    const Layout l = preset("7.1.4");
+    CHECK_FALSE(AmbisonicDecoder::isHorizontalLayout(l));
+    AmbisonicDecoder withRe, without;
+    withRe.prepare(l, 3, true);
+    without.prepare(l, 3, false);
+    CHECK_FALSE(withRe.normalisedInPlane());
+    bool differs = false;
+    for (int s = 0; s < withRe.numSpeakers(); ++s)
+        for (int n = 0; n < withRe.numChannels(); ++n)
+            differs = differs || std::abs(withRe.coefficient(s, n) - without.coefficient(s, n)) > 1e-4f;
+    CHECK(differs);
 }

@@ -25,4 +25,14 @@ MotionTime MotionTimeline::advance(const MotionContext& ctx) {
     return t;
 }
 
+void MotionTimeline::reanchor(const Period& from, const Period& to) {
+    if (pending_ || from.value <= 0.0 || to.value <= 0.0) return;
+    const bool fromBeats = from.unit == Period::Unit::Beats;
+    const double cycles = (fromBeats ? prevBeat_ - originBeat_ : prevSeconds_ - originSeconds_) / from.value;
+    if (to.unit == Period::Unit::Beats)
+        originBeat_ = prevBeat_ - cycles * to.value;
+    else
+        originSeconds_ = prevSeconds_ - cycles * to.value;
+}
+
 }  // namespace spacer

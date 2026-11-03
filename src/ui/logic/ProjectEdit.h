@@ -28,6 +28,7 @@ struct EngineEffect {
         MotionParam,          // one live motion parameter of source `id` (see below)
         InsertBypass,         // bypass flag of insert slot `channel` of source `id`
         SpeakerInsertBypass,  // bypass flag of insert slot `channel` of speaker `id`
+        Modulators,           // modulators of source `id` edited or appended (live, cmd::SetModulator)
     };
     Kind kind{Kind::None};
     int id{0};
@@ -50,6 +51,7 @@ struct EngineEffect {
     static EngineEffect speakerInsertBypass(int speakerId, int slot) {
         return {Kind::SpeakerInsertBypass, speakerId, slot, spacer::MotionParam::Radius};
     }
+    static EngineEffect modulators(int sourceId) { return {Kind::Modulators, sourceId}; }
     static EngineEffect motionParam(int sourceId, int channel, spacer::MotionParam param) {
         return {Kind::MotionParam, sourceId, channel, param};
     }

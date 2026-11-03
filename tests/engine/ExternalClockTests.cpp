@@ -320,3 +320,61 @@ TEST_CASE("OscServer: clock tap sees /clock/beat on the receiver thread with hos
     REQUIRE(got.size() == 1);
     CHECK(std::holds_alternative<ev::ClockBeat>(got[0]));
 }
+
+TEST_CASE("ClockInputs: compensation = device output + engine latency + trim (WP14)", "[clock][control]") {
+    CHECK(ClockInputs::compensationSeconds(480, 72, 48000.0, 0.0f) == Approx((480.0 + 72.0) / 48000.0));
+    CHECK(ClockInputs::compensationSeconds(480, 72, 48000.0, 5.0f) == Approx(552.0 / 48000.0 + 0.005));
+    CHECK(ClockInputs::compensationSeconds(0, 0, 48000.0, -50.0f) == 0.0);  // never negative
+    CHECK(ClockInputs::compensationSeconds(480, 0, 0.0, 0.0f) == 0.0);      // no device yet
+}
+
+TEST_CASE("External clocks report the beat at the time the block is heard (WP14)", "[clock][control]") {
+    // Two MIDI clocks fed the same 120 bpm clock; one compensates 100 ms.
+    ClockInputs plain, compensated;
+    compensated.setCompensation(0.1);
+    REQUIRE(compensated.compensation() == Approx(0.1));
+    ClockConfig cfg;
+    cfg.kind = ClockKind::Midi;
+    double now = 10.0;
+    const auto host = [&now] { return now; };
+    auto a = plain.makeClock(cfg, host);
+    auto b = compensated.makeClock(cfg, host);
+    a->setSampleRate(kSr);
+    b->setSampleRate(kSr);
+    const std::uint8_t start = 0xFA, tick = 0xF8;
+    const double t0 = 10.01, tickPeriod = 60.0 / 120.0 / 24.0;
+    plain.handleMidi(&start, 1, t0);
+    compensated.handleMidi(&start, 1, t0);
+    int n = 0;
+    ClockState sa, sb;
+    for (int i = 0; i < static_cast<int>(8.0 * kSr / kBlock); ++i) {
+        while (t0 + 0.001 + n * tickPeriod <= now) {
+            plain.handleMidi(&tick, 1, t0 + 0.001 + n * tickPeriod);
+            compensated.handleMidi(&tick, 1, t0 + 0.001 + n * tickPeriod);
+            ++n;
+        }
+        sa = a->advance(kBlock);
+        sb = b->advance(kBlock);
+        now += kBlock / kSr;
+    }
+    REQUIRE(sa.playing);
+    REQUIRE(sb.playing);
+    CHECK(sb.beat - sa.beat == Approx(0.1 * 2.0).margin(0.01));  // 100 ms at 2 beats/s
+}
+
+TEST_CASE("ClockSelector: a latency trim change does not recreate the clock (WP14)", "[clock][engine]") {
+    int made = 0;
+    ClockSelector sel;
+    sel.setFactory([&made](const ClockConfig&) -> std::unique_ptr<ClockSource> {
+        ++made;
+        return std::make_unique<FakeClock>();
+    });
+    ClockConfig cfg;
+    cfg.kind = ClockKind::Midi;
+    auto g = buildGraph();
+    CHECK(sel.apply(*g, cfg));
+    cfg.latencyTrimMs = 10.0f;
+    auto g2 = buildGraph();
+    CHECK_FALSE(sel.apply(*g2, cfg));
+    CHECK(made == 1);
+}

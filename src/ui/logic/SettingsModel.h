@@ -57,6 +57,8 @@ Parsed<std::string> parseHost(const std::string& text);
 Parsed<double> parseBpm(const std::string& text);
 Parsed<int> parseBeatsPerBar(const std::string& text);
 Parsed<float> parseSpeedOfSound(const std::string& text);
+/// External-clock latency trim in ms, -1000..1000 (WP14).
+Parsed<float> parseLatencyTrim(const std::string& text);
 
 // ---- the edit ----------------------------------------------------------------------
 
@@ -75,6 +77,7 @@ void apply(Project& project, const SettingsFields& fields);
 struct Delta {
     bool device{false};  // output device, sample rate or buffer size: reopen the device
     bool graph{false};   // speed of sound or clock config: rebuild the graph (ClockSelector switches)
+                         // (the clock latency trim alone is read live: no rebuild)
     bool osc{false};     // OSC in / out: re-bind the ports
     bool midi{false};    // MIDI program-change channel: reload the mapper
     bool any() const { return device || graph || osc || midi; }

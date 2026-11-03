@@ -94,7 +94,7 @@ void AppContext::start() {
     startTimerHz(kTickHz);
 }
 
-void AppContext::resetCueEngine() {
+CueEngine::Config AppContext::cueConfig() {
     const auto status = engine_.status();
     CueEngine::Config config;
     config.sampleRate = status.sampleRate > 0.0 ? status.sampleRate : project_.devices.sampleRate;
@@ -103,14 +103,27 @@ void AppContext::resetCueEngine() {
         std::max(status.bufferSize > 0 ? status.bufferSize : project_.devices.bufferSize, 512);
     if (status.outputChannels > 0) config.numOutputChannels = status.outputChannels;
     config.pluginHost = plugins_.get();
+    // A recall changes the running graph and the live model, not the engine's
+    // copy: keep that current so a later device restart rebuilds the live state.
+    config.onLiveChanged = [this](const Project& live) {
+        if (!speakerTest_) engine_.updateProject(live);
+    };
+    return config;
+}
+
+void AppContext::resetCueEngine() {
     if (midiIn_) midiIn_->close();
     control_.reset();
-    cues_ = std::make_unique<CueEngine>(engine_.processor(), project_, std::move(config));
+    cues_ = std::make_unique<CueEngine>(engine_.processor(), project_, cueConfig());
     resetControl();
 }
 
 void AppContext::resetControl() {
-    control_ = std::make_unique<ControlHub>(project_, engine_.processor(), cues_.get());
+    // Bare MIDI paths / OSC id 0 act on the UI-selected source; motion
+    // parameters and file transport use the engine commands (dispatcher defaults).
+    ControlDispatcher::Config config;
+    config.selectedSource = [this] { return selectedSourceId(); };
+    control_ = std::make_unique<ControlHub>(project_, engine_.processor(), cues_.get(), std::move(config));
     // OSC receive thread: /spacer/clock/beat (and /stop) feed an active
     // OscClock directly, timestamped on arrival (WP12).
     control_->osc().setClockTap([this](const ControlEvent& e, double hostTime) {
@@ -162,11 +175,8 @@ void AppContext::applyRuntimeSettings() {
     appliedSettings_ = now;
     // Speed of sound and clock changes are structural edits: the graph was
     // rebuilt by syncEngine() and AudioEngine's ClockSelector switched the clock.
-    if (delta.device) {
-        reopenDevice();  // also re-binds OSC / MIDI through resetCueEngine()
-    } else if ((delta.osc || delta.midi) && control_) {
-        control_->applyProject();
-    }
+    if (delta.device) reopenDevice();  // keeps the cue engine and the control hub
+    if ((delta.osc || delta.midi) && control_) control_->applyProject();
 }
 
 void AppContext::reopenDevice() {
@@ -175,17 +185,18 @@ void AppContext::reopenDevice() {
         const auto copy = listeners_;
         for (auto* l : copy) l->projectChanged(Change::SpeakerTest);
     }
-    // The engine's project copy goes stale after cue recalls (PLAN WP14):
-    // refresh it so the graph the device restart builds shows the live state.
-    engine_.setProject(project_);
+    // Parameter commands (and recalls) reach the running graph, not the
+    // engine's project copy: refresh it (no rebuild) so the graph the device
+    // restart builds shows the live state.
+    engine_.updateProject(project_);
     deviceError_ =
         engine_.openDevice(project_.devices, GraphBuilder::requiredInputChannels(project_)).toStdString();
-    // The cue engine's rate and block size are fixed at construction (WP14):
-    // rebuild it and re-arm the same list (the position in the list restarts).
-    std::string armedList;
-    if (cues_ && cues_->armed()) armedList = cues_->sequencer().list().name;
-    resetCueEngine();
-    if (!armedList.empty()) cues_->arm(armedList, cueTick());
+    // The cue engine follows the new rate / block size and keeps its state
+    // (armed list and position).
+    if (cues_)
+        cues_->setConfig(cueConfig(), cueTick());
+    else
+        resetCueEngine();
     feedback_.clearPositions();
 }
 
@@ -305,15 +316,12 @@ void AppContext::newProject(Project project) {
     history_.clear();
     autosaver_.reset();
     engine_.setProject(project_);
-    // A project that names another device / rate / buffer reopens the device
-    // (which also rebuilds the cue engine and control with the new rate).
+    // A project that names another device / rate / buffer reopens the device.
     const auto fields = settings::fieldsOf(project_);
     const bool deviceChanged = settings::classify(appliedSettings_, fields).device;
     appliedSettings_ = fields;
-    if (deviceChanged)
-        reopenDevice();
-    else
-        resetCueEngine();
+    if (deviceChanged) reopenDevice();
+    resetCueEngine();  // a new project: fresh sequencer state
     feedback_.clearPositions();
     savedRevision_ = revision_ + 1;  // a fresh project is not dirty
     modelChanged(Change::Loaded);
@@ -432,7 +440,9 @@ CueTick AppContext::cueTick() const {
 
 bool AppContext::go() {
     const auto tick = cueTick();
-    if (!cues_->armed() && !cues_->armFirst(tick)) return false;
+    // Nothing armed: the default cue list (installation settings), else the first.
+    if (!cues_->armed() && !installation::armDefault(*cues_, installation_, tick) && !cues_->armFirst(tick))
+        return false;
     // A recall rebuilds the engine graph from the model: the test overlay ends.
     if (speakerTest_) stopSpeakerTest();
     if (!cues_->go(tick)) return false;
@@ -500,6 +510,19 @@ void AppContext::timerCallback() {
     if (rebuildPending_ && now - lastRebuild_ >= kGestureRebuildSeconds) rebuildGraph();
     // A plugin changed its latency: rebuild so it is compensated (SPEC §5.6).
     if (plugins_->takeLatencyChanged()) rebuildGraph();
+    // An edit in a plugin editor modifies the project (dirty, autosave).
+    if (plugins_->takeEdited()) {
+        ++revision_;
+        notify(Change::PluginEdited);
+    }
+
+    // External clocks report the beat at the time a block is heard (WP14).
+    {
+        const auto status = engine_.status();
+        clockInputs_.setCompensation(
+            ClockInputs::compensationSeconds(status.outputLatencySamples, status.graphLatencySamples,
+                                             status.sampleRate, project_.clock.latencyTrimMs));
+    }
 
     // OSC / MIDI. A cue fired from there changes the live model (SPEC §11).
     // Any recall counts, also an OSC / MIDI scene recall that leaves the cue
@@ -514,7 +537,9 @@ void AppContext::timerCallback() {
 
     if (autosaver_) {
         const bool dirty = revision_ != autosavedRevision_;
-        if (autosaver_->tick(now, project_, dirty)) autosavedRevision_ = revision_;
+        // Live plugin state (editor edits) is part of the project (SPEC §13).
+        if (autosaver_->tick(now, project_, dirty, [this](Project&) { capturePluginState(); }))
+            autosavedRevision_ = revision_;
     }
 
     const auto copy = listeners_;

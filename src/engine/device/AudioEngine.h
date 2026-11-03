@@ -38,6 +38,7 @@ public:
         int bufferSize{0};
         int outputChannels{0};
         int deviceLatencySamples{0};         // device input + output latency
+        int outputLatencySamples{0};         // device output latency alone
         int graphLatencySamples{0};          // limiter look-ahead (SPEC §5.6)
         int virtualDeviceLatencySamples{0};  // Spacer.driver hop when connected (SPEC §5.6, §14)
         int xruns{0};
@@ -61,6 +62,11 @@ public:
     /// Structural change: builds a new graph for the running device and
     /// swaps it in (SPEC §5.2). Also used before the device is open.
     void setProject(const Project& project);
+    /// Message thread. Replaces the project copy the next device (re)start
+    /// builds its graph from, without rebuilding now: for changes that already
+    /// reached the running graph some other way (cue recalls, parameter
+    /// commands), so a later device change does not revert them.
+    void updateProject(const Project& project) { project_ = project; }
 
     /// Overrides source inputs for graphs built from now on (tools feeding
     /// test signals); a null result = the source's own live input (SPEC §8).

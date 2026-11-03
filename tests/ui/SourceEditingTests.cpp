@@ -472,7 +472,13 @@ TEST_CASE("Structural source edits rebuild", "[ui][sources]") {
         REQUIRE(edit);
         REQUIRE(edit->effect.kind == Kind::Structural);
     }
-    REQUIRE(editAddModulator(p, 1)->effect.kind == Kind::Structural);
+    // Removing a modulator shifts the indices: rebuild (WP14; adding one is live).
+    Project withMod = p;
+    withMod.sources[0].modulators.resize(2);
+    REQUIRE(withMod.sources[0].id == 1);
+    const auto remove = editRemoveModulator(withMod, 1, 0);
+    REQUIRE(remove);
+    REQUIRE(remove->effect.kind == Kind::Structural);
 }
 
 TEST_CASE("A continuous motion parameter is a live SetMotionParam edit", "[ui][sources]") {
@@ -615,4 +621,61 @@ TEST_CASE("Scoped undo leaves other sources alone", "[ui][sources]") {
     h.undo(p);
     REQUIRE(p.sources[0].gainDb == 0.0f);
     REQUIRE(p.sources[1].gainDb == -12.0f);
+}
+
+TEST_CASE("Modulator edits and appends are live SetModulator commands (WP14)", "[ui][sources]") {
+    Project p = makeProject();
+    auto add = editAddModulator(p, 1);
+    REQUIRE(add);
+    REQUIRE(add->effect.kind == Kind::Modulators);
+    ProjectHistory h;
+    auto effect = h.perform(p, *add);
+    REQUIRE(effect);
+    auto plan = planEngineSync(p, *effect);
+    REQUIRE_FALSE(plan.rebuildGraph);
+    const auto* set = commandOf<cmd::SetModulator>(plan);
+    REQUIRE(set != nullptr);
+    CHECK(set->sourceId == 1);
+    CHECK(set->index == 0);
+    CHECK(set->count == 1);
+    CHECK(set->modulator.lfo);
+
+    auto depth = editSourceField(p, 1, "mod.0.depth", "0.25");
+    REQUIRE(depth);
+    REQUIRE(depth->effect.kind == Kind::Modulators);
+    effect = h.perform(p, *depth);
+    plan = planEngineSync(p, *effect);
+    REQUIRE_FALSE(plan.rebuildGraph);
+    CHECK(commandOf<cmd::SetModulator>(plan)->modulator.depth == 0.25f);
+
+    // Undo both: the model has no modulators again; the engine is told to drop it.
+    h.undo(p);
+    effect = h.undo(p);
+    REQUIRE(effect);
+    plan = planEngineSync(p, *effect);
+    REQUIRE_FALSE(plan.rebuildGraph);
+    set = commandOf<cmd::SetModulator>(plan);
+    REQUIRE(set != nullptr);
+    CHECK(set->index == -1);
+    CHECK(set->count == 0);
+}
+
+TEST_CASE("Modulator targets include motionRight.* and listed insert parameters (WP14)", "[ui][sources]") {
+    SourceSpec s;
+    s.id = 1;
+    s.stereo = true;
+    s.linkedPoints = true;
+    s.motion.value = OrbitMotion{};
+    s.motionRight = MotionSpec{OrbitMotion{}};
+    PluginSlot slot;
+    slot.pluginId = "x";
+    slot.params = {{4, 0.5f}};
+    s.inserts = {slot};
+    const auto targets = modulatorTargets(s);
+    const auto has = [&](const char* t) {
+        return std::find(targets.begin(), targets.end(), t) != targets.end();
+    };
+    CHECK(has("motion.radius"));
+    CHECK(has("motionRight.radius"));
+    CHECK(has("insert.0.param.4"));
 }

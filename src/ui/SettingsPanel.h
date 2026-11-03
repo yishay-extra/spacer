@@ -99,6 +99,8 @@ private:
     juce::TextEditor bpmEdit_;
     juce::Label bpbLabel_{{}, "Beats per bar"};
     juce::TextEditor bpbEdit_;
+    juce::Label trimLabel_{{}, "Clock latency trim (ms)"};
+    juce::TextEditor trimEdit_;
     juce::ToggleButton quantiseToggle_{"Start on next bar"};
     juce::Label clockHint_;
     // Installation mode.

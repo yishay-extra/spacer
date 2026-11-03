@@ -53,6 +53,13 @@ HostedPlugin::~HostedPlugin() {
 void HostedPlugin::audioProcessorChanged(juce::AudioProcessor*, const ChangeDetails& details) {
     // May arrive on any thread: only flag it; PluginHost polls on the message thread.
     if (details.latencyChanged && latencyFlag_) latencyFlag_->store(true, std::memory_order_release);
+    if ((details.nonParameterStateChanged || details.programChanged) && editedFlag_)
+        editedFlag_->store(true, std::memory_order_release);
+}
+
+void HostedPlugin::audioProcessorParameterChangeGestureEnd(juce::AudioProcessor*, int) {
+    // Gestures come from editors (a knob released), never from host automation.
+    if (editedFlag_) editedFlag_->store(true, std::memory_order_release);
 }
 
 float HostedPlugin::parameter(int index) const noexcept {

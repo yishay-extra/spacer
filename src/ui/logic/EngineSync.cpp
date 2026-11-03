@@ -115,6 +115,25 @@ EngineSyncPlan planEngineSync(const Project& project, const EngineEffect& effect
                                      chain->inserts[static_cast<std::size_t>(effect.channel)].bypassed});
             break;
         }
+        case EngineEffect::Kind::Modulators: {
+            const SourceSpec* spec = nullptr;
+            for (const auto& s : project.sources)
+                if (s.id == effect.id) spec = &s;
+            if (spec == nullptr || spec->modulators.size() > static_cast<std::size_t>(kMaxModulators)) {
+                plan.rebuildGraph = true;
+                break;
+            }
+            // Every modulator from the model plus the count, so apply, undo
+            // (the appended one is dropped again) and redo share this path.
+            sourceCommands(*spec, plan);
+            const int count = static_cast<int>(spec->modulators.size());
+            if (count == 0) plan.commands.push_back(cmd::SetModulator{spec->id, -1, 0, {}});
+            for (int i = 0; i < count; ++i)
+                plan.commands.push_back(cmd::SetModulator{
+                    spec->id, i, count,
+                    ModulatorBank::Live::fromSpec(spec->modulators[static_cast<std::size_t>(i)])});
+            break;
+        }
         case EngineEffect::Kind::Master:
             plan.commands.push_back(cmd::SetMasterGain{project.master.gainDb, -1.0f});
             break;

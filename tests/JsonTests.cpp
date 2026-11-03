@@ -2,6 +2,7 @@
 
 #include "TestModels.h"
 #include "core/Json.h"
+#include "core/Validate.h"
 
 using namespace spacer;
 using namespace spacer::testing;
@@ -104,6 +105,7 @@ TEST_CASE("TimeOfDay uses HH:MM") {
 TEST_CASE("Project configuration types round-trip") {
     ROUND_TRIP((DeviceMapping{"Dev", 44100.0, 512, 331.0f}));
     ROUND_TRIP(AmbisonicsConfig{4});
+    ROUND_TRIP((AmbisonicsConfig{2, false}));  // maxRe (WP14)
     ROUND_TRIP((OscConfig{9005, {"example.local", 9006, true}}));
     ROUND_TRIP((MidiMapping{MidiMessageType::Nrpn, 2, 100, "gain", 0.0f, 1.0f, MidiCurve::Log}));
     ROUND_TRIP((MidiConfig{{MidiMapping{MidiMessageType::Cc, 1, 7, "gain"}}, 16}));
@@ -149,4 +151,20 @@ TEST_CASE("Error messages carry the key path") {
 TEST_CASE("Speaker lfe key is optional and defaults to false") {
     const auto sp = Json::parse(R"({"id":1,"name":"L","position":{"az":0,"el":0,"dist":2}})").get<Speaker>();
     REQUIRE_FALSE(sp.lfe);
+}
+
+TEST_CASE("ClockConfig::latencyTrimMs round-trips, is optional and validated (WP14)") {
+    ROUND_TRIP((ClockConfig{ClockKind::Midi, 120.0, 4, false, -12.5f}));
+    ClockConfig c =
+        Json::parse(R"({"kind":"Midi","bpm":120,"beatsPerBar":4,"quantisedStart":false})").get<ClockConfig>();
+    CHECK(c.latencyTrimMs == 0.0f);
+    Project p;
+    p.clock.latencyTrimMs = 5000.0f;
+    bool flagged = false;
+    for (const auto& issue : validate(p)) flagged = flagged || issue.path == "clock.latencyTrimMs";
+    CHECK(flagged);
+}
+
+TEST_CASE("AmbisonicsConfig::maxRe is optional and defaults to on (WP14)") {
+    CHECK(Json::parse(R"({"order":3})").get<AmbisonicsConfig>().maxRe);
 }

@@ -110,6 +110,8 @@ void AudioEngine::audioDeviceIOCallbackWithContext(const float* const* in, int n
         allocguard::ScopedAudioThread audioThread;
         virtual_.pull(numSamples);
     }
+    // Callback host time for OSC timetags (EngineProcessor::sampleAtHostTime).
+    processor_.setBlockHostTime(juce::Time::getMillisecondCounterHiRes() * 0.001);
     processor_.process(in, numIn, out, numOut, numSamples, haveVirtual ? virtual_.channels() : nullptr,
                        haveVirtual ? VirtualDeviceReceiver::kNumChannels : 0);
 }
@@ -130,6 +132,7 @@ AudioEngine::Status AudioEngine::status() const {
         s.bufferSize = d->getCurrentBufferSizeSamples();
         s.outputChannels = d->getActiveOutputChannels().countNumberOfSetBits();
         s.deviceLatencySamples = d->getInputLatencyInSamples() + d->getOutputLatencyInSamples();
+        s.outputLatencySamples = d->getOutputLatencyInSamples();
     }
     s.graphLatencySamples = processor_.latencySamples();
     if (const auto v = virtual_.status(); v.state == VirtualDeviceReceiver::State::Connected)

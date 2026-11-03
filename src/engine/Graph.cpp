@@ -146,8 +146,11 @@ void Graph::process(const InputContext& ctx, const ClockState& clock, float* con
     }
 
     for (auto& s : sources_) s->process(ctx, clock, n, bus, crossfading ? &legacy : nullptr);
-    for (auto& g : ghosts_)
-        if (!g->isSilent()) g->process(ctx, clock, n, bus);
+    for (auto& g : ghosts_) {
+        if (g->isSilent()) continue;
+        const SourceNode* mirror = g->inputMirror() != 0 ? findSource(g->inputMirror()) : nullptr;
+        g->process(ctx, clock, n, bus, nullptr, mirror);
+    }
 
     // Ambisonic bus → decode → added to the speaker bus (SPEC §5.3).
     if (ambisonicOrder_ > 0) decodeAmbisonics(n);
@@ -271,6 +274,12 @@ void Graph::takeStateForRecall(Graph& old, const SceneDiff& diff, int crossfadeS
         } else if (listed(diff.replacedSources, id)) {
             s->takeInputStateFrom(*previous);
             s->fadeIn(crossfadeSamples);
+            // A file's stream can feed only one node: the ghost replays the
+            // new node's input so the 50 ms crossfade is a true crossfade.
+            if (previous->inputHandedOver()) {
+                previous->setInputMirror(id);
+                s->setKeepRawInput(true);
+            }
             adoptGhost(old, id, crossfadeSamples);
         } else {
             s->takeStateFrom(*previous, sameLayout);
@@ -281,6 +290,10 @@ void Graph::takeStateForRecall(Graph& old, const SceneDiff& diff, int crossfadeS
     // Ghosts still fading from an earlier recall keep going.
     for (auto& g : old.ghosts_)
         if (g && !g->isSilent() && ghosts_.size() < ghosts_.capacity()) ghosts_.push_back(std::move(g));
+    // Mirroring ghosts follow the node of their id in this graph.
+    for (auto& g : ghosts_)
+        if (g->inputMirror() != 0)
+            if (SourceNode* leader = findSource(g->inputMirror())) leader->setKeepRawInput(true);
 
     takeSpeakerStateFrom(old);
     claimInserts();

@@ -67,4 +67,18 @@ struct CompensationRow {
 /// Rows in layout order, with `project.devices.speedOfSound`.
 std::vector<CompensationRow> compensationRows(const Project& project);
 
+/// What the speaker table shows in a cell (SPEC §7 override made visible):
+/// for trim, delay and polarity of a speaker whose speaker chain overrides
+/// the layout, the chain's (effective) value, marked as coming from the
+/// chain; the layout value it hides is in the tooltip. The cell is then not
+/// editable from the table (the layout value would have no effect); the
+/// chain is edited in the speaker inspector / by scenes.
+struct TableCell {
+    std::string text;
+    bool fromChain{false};
+    bool editable{true};
+    std::string tooltip;
+};
+TableCell tableCell(const Project& project, const Speaker& speaker, SpeakerField field);
+
 }  // namespace spacer::layoutedit

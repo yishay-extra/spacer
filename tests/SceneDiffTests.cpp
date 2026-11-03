@@ -3,6 +3,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "core/SceneDiff.h"
+#include "core/motion/MotionParam.h"
 
 using Catch::Approx;
 using namespace spacer;
@@ -456,4 +457,37 @@ TEST_CASE("SceneDiff: the intermediate scene keeps live insert parameters when t
     const Scene mid = intermediateScene(a, b, d, layout);
     CHECK(mid.sources[0].inserts == a.sources[0].inserts);
     CHECK(effectiveChain(mid, layout.speakers[0]).inserts == a.speakerChains[0].inserts);
+}
+
+TEST_CASE("SceneDiff: continuous motion parameters of the same kind ramp, no crossfade (WP14)") {
+    SourceSpec s = manualSource(1);
+    OrbitMotion o;
+    o.radius = 2.0f;
+    o.period = Period::seconds(4);
+    s.motion.value = o;
+    const Scene a = sceneWith({s});
+    Scene b = a;
+    std::get<OrbitMotion>(b.sources[0].motion.value).radius = 3.0f;
+    std::get<OrbitMotion>(b.sources[0].motion.value).centre.azimuth = 10.0f;
+    SceneDiff d = diffScenes(a, b, twoSpeakers());
+    CHECK(d.replacedSources.empty());
+    CHECK_FALSE(d.structural());
+    REQUIRE(d.ramps.size() == 2);
+    for (const Ramp& r : d.ramps) {
+        CHECK(r.target == RampTarget::SourceMotionParam);
+        CHECK(r.channel == -1);
+        if (r.param == static_cast<int>(MotionParam::Radius)) {
+            CHECK(r.from == 2.0f);
+            CHECK(r.to == 3.0f);
+        } else {
+            CHECK(r.param == static_cast<int>(MotionParam::CentreAz));
+        }
+    }
+    // The intermediate scene keeps the current values (the ramps move them).
+    const Scene mid = intermediateScene(a, b, d, twoSpeakers());
+    CHECK(std::get<OrbitMotion>(mid.sources[0].motion.value).radius == 2.0f);
+    // A period change is still structural (it re-anchors through SwapGraph).
+    std::get<OrbitMotion>(b.sources[0].motion.value).period = Period::seconds(8);
+    d = diffScenes(a, b, twoSpeakers());
+    CHECK(d.replacedSources == std::vector<int>{1});
 }

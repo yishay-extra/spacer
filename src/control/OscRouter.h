@@ -22,6 +22,9 @@ public:
     };
 
     static Result route(const juce::OSCMessage& message);
+
+private:
+    static Result routeAddress(const juce::OSCMessage& message);
 };
 
 }  // namespace spacer

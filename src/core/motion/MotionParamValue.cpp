@@ -77,4 +77,65 @@ std::optional<float> motionParamValue(const MotionSpec& spec, MotionParam param)
     return std::visit(Lookup{param}, spec.value);
 }
 
+namespace {
+float* positionPtr(Position& p, MotionParam param, MotionParam az, MotionParam el, MotionParam dist) {
+    if (param == az) return &p.azimuth;
+    if (param == el) return &p.elevation;
+    if (param == dist) return &p.distance;
+    return nullptr;
+}
+
+struct Field {
+    MotionParam p;
+    float* operator()(ManualMotion& m) const {
+        return positionPtr(m.position, p, MotionParam::PositionAz, MotionParam::PositionEl,
+                           MotionParam::PositionDist);
+    }
+    float* operator()(OrbitMotion& m) const {
+        if (auto* v = positionPtr(m.centre, p, MotionParam::CentreAz, MotionParam::CentreEl,
+                                  MotionParam::CentreDist))
+            return v;
+        if (p == MotionParam::Radius) return &m.radius;
+        if (p == MotionParam::PhaseOffset) return &m.phaseOffset;
+        if (p == MotionParam::ElevationWobble) return &m.elevationWobble;
+        return nullptr;
+    }
+    float* operator()(LineMotion& m) const {
+        if (auto* v = positionPtr(m.from, p, MotionParam::FromAz, MotionParam::FromEl, MotionParam::FromDist))
+            return v;
+        return positionPtr(m.to, p, MotionParam::ToAz, MotionParam::ToEl, MotionParam::ToDist);
+    }
+    float* operator()(LissajousMotion& m) const {
+        if (auto* v = positionPtr(m.centre, p, MotionParam::CentreAz, MotionParam::CentreEl,
+                                  MotionParam::CentreDist))
+            return v;
+        if (p == MotionParam::Ax) return &m.ax;
+        if (p == MotionParam::Ay) return &m.ay;
+        if (p == MotionParam::Az) return &m.az;
+        if (p == MotionParam::PhaseX) return &m.phases[0];
+        if (p == MotionParam::PhaseY) return &m.phases[1];
+        if (p == MotionParam::PhaseZ) return &m.phases[2];
+        return nullptr;
+    }
+    float* operator()(PathMotion&) const { return nullptr; }
+    float* operator()(RandomWalkMotion& m) const {
+        return p == MotionParam::StepMetres ? &m.stepMetres : nullptr;
+    }
+    float* operator()(StepSequenceMotion&) const { return nullptr; }
+};
+}  // namespace
+
+float* motionParamField(MotionSpec& spec, MotionParam param) {
+    return std::visit(Field{param}, spec.value);
+}
+
+std::optional<Period> primaryPeriod(const MotionSpec& spec) {
+    if (const auto* m = std::get_if<OrbitMotion>(&spec.value)) return m->period;
+    if (const auto* m = std::get_if<LineMotion>(&spec.value)) return m->period;
+    if (const auto* m = std::get_if<LissajousMotion>(&spec.value)) return m->period;
+    if (const auto* m = std::get_if<PathMotion>(&spec.value)) return m->period;
+    if (const auto* m = std::get_if<RandomWalkMotion>(&spec.value)) return m->stepPeriod;
+    return std::nullopt;
+}
+
 }  // namespace spacer

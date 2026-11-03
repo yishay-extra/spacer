@@ -321,3 +321,85 @@ TEST_CASE("CueEngine: recallCount counts every recall that changed the live mode
     CHECK_FALSE(show.cues->recallScene("Missing", 0.0f, false));
     CHECK(show.cues->recallCount() == 2);
 }
+
+TEST_CASE("CueEngine: setConfig keeps the armed list and position (device change, WP14)") {
+    Show show({cue("one", "B", 0.0f), cue("two", "C", 0.0f), cue("three", "A", 0.0f)});
+    show.cues->armFirst(show.tick());
+    show.cues->go(show.tick());
+    show.cues->go(show.tick());
+    REQUIRE(show.cues->sequencer().current() == 1);
+    CueEngine::Config cfg = show.cues->config();
+    cfg.sampleRate = 96000.0;
+    cfg.maxBlockSize = 512;
+    show.cues->setConfig(cfg, show.tick());
+    CHECK(show.cues->armed());
+    CHECK(show.cues->sequencer().current() == 1);
+    CHECK(show.cues->config().sampleRate == 96000.0);
+    CHECK(show.cues->go(show.tick()));
+    CHECK(show.cues->sequencer().current() == 2);
+}
+
+TEST_CASE("CueEngine: setConfig re-plans a pending AtBeat recall (WP14)") {
+    Trigger atBeat{trigger::AtBeat{2, 1.0}};  // beat 4 = 2 s at 120 bpm
+    Show show({cue("first", "A", 0.0f), cue("beat", "B", 0.0f, atBeat)}, false, /*playing*/ true);
+    show.cues->armFirst(show.tick());
+    REQUIRE(show.cues->go(show.tick()));
+    show.run(1.0);
+    show.cues->setConfig(show.cues->config(), show.tick());
+    show.run(1.5);
+    CHECK(show.cues->sequencer().current() == 1);
+    CHECK(show.last() == Approx(0.5f * juce::Decibels::decibelsToGain(-12.0f)).margin(1e-4));
+}
+
+TEST_CASE("CueEngine: onLiveChanged sees every recall's live model (WP14)") {
+    Trigger atBeat{trigger::AtBeat{2, 1.0}};
+    Show show({cue("one", "C", 0.0f), cue("beat", "B", 0.0f, atBeat)}, false, /*playing*/ true);
+    std::vector<float> seen;
+    CueEngine::Config cfg = show.cues->config();
+    cfg.onLiveChanged = [&](const Project& p) { seen.push_back(p.sources[0].gainDb); };
+    show.cues->setConfig(cfg, show.tick());
+    show.cues->armFirst(show.tick());
+    show.cues->go(show.tick());                // cue: C
+    show.cues->recallScene("A", 0.0f, false);  // scene manager / OSC
+    show.run(2.5);                             // AtBeat cue fired in the engine: B
+    CHECK(seen == std::vector<float>{-24.0f, 0.0f, -12.0f});
+}
+
+TEST_CASE("Installation mode: autosave runs beforeSave (plugin state capture) only when it writes (WP14)") {
+    const auto dir = std::filesystem::temp_directory_path() / "spacer_wp14_autosave";
+    std::filesystem::create_directories(dir);
+    const auto projectPath = dir / "show.spacer";
+    std::filesystem::remove(installation::autosavePath(projectPath));
+    Show show({cue("a", "B", 0.0f)});
+    Autosaver saver(projectPath, 60.0);
+    int calls = 0;
+    const auto capture = [&calls](Project& p) {
+        ++calls;
+        p.name = "captured";
+    };
+    CHECK_FALSE(saver.tick(0.0, show.project, true, capture));
+    CHECK_FALSE(saver.tick(61.0, show.project, false, capture));
+    CHECK(calls == 0);
+    CHECK(saver.tick(62.0, show.project, true, capture));
+    CHECK(calls == 1);
+    const auto loaded = projectfile::load(saver.path());
+    REQUIRE(loaded);
+    CHECK(loaded->project.name == "captured");
+    std::filesystem::remove_all(dir);
+}
+
+TEST_CASE("Installation mode: armDefault arms the default cue list, else the first (WP14)") {
+    Show show({cue("a", "B", 0.0f)});
+    CueList other;
+    other.name = "Other";
+    other.cues = {cue("x", "C", 0.0f)};
+    show.project.cueLists.push_back(other);
+    InstallationSettings s;
+    CHECK(installation::armDefault(*show.cues, s, show.tick()));
+    CHECK(show.cues->armedName() == "Show");
+    s.defaultCueList = "Other";
+    CHECK(installation::armDefault(*show.cues, s, show.tick()));
+    CHECK(show.cues->armedName() == "Other");
+    s.defaultCueList = "Missing";
+    CHECK_FALSE(installation::armDefault(*show.cues, s, show.tick()));
+}

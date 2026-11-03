@@ -72,8 +72,17 @@ ProjectEdit setSource(const Project& project, SourceSpec after, std::string name
                             before->linkedPoints != after.linkedPoints ||
                             before->spatializer != after.spatializer || !(before->input == after.input) ||
                             before->directSpeakers != after.directSpeakers ||
-                            before->modulators != after.modulators || before->inserts != after.inserts;
-    e.effect = structural ? EngineEffect::structural() : EngineEffect::source(after.id);
+                            before->inserts != after.inserts;
+    // Modulators edited in place or appended are live (cmd::SetModulator, LFO
+    // phase kept); removing one shifts the indices, so that rebuilds.
+    const bool modulatorsChanged = before->modulators != after.modulators;
+    const bool modulatorsLive = after.modulators.size() >= before->modulators.size();
+    if (structural || (modulatorsChanged && !modulatorsLive))
+        e.effect = EngineEffect::structural();
+    else if (modulatorsChanged)
+        e.effect = EngineEffect::modulators(after.id);
+    else
+        e.effect = EngineEffect::source(after.id);
     e.apply = [after = std::move(after)](Project& p) { replaceSource(p, after); };
     e.revert = [b = *before](Project& p) { replaceSource(p, b); };
     return e;

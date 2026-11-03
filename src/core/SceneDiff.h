@@ -46,14 +46,18 @@ enum class RampTarget {
     SourceInsertBypass,  // discrete: the engine crossfades the bypass itself
     SpeakerInsertParam,
     SpeakerInsertBypass,
+    // A continuous parameter of a running (non-Manual) motion of the same
+    // kind (WP14): `param` = MotionParam, `channel` as SourcePosition. The
+    // engine applies it with SetMotionParam semantics (phase kept).
+    SourceMotionParam,
 };
 
 struct Ramp {
     RampTarget target{RampTarget::SourceGainDb};
     int id{0};        // source id or speaker id (unused for the master)
-    int channel{-1};  // SourcePosition only
+    int channel{-1};  // SourcePosition / SourceMotionParam only
     int slot{-1};     // insert targets only
-    int param{-1};    // *InsertParam only
+    int param{-1};    // *InsertParam: plugin parameter index; SourceMotionParam: MotionParam
     float from{0.0f};
     float to{0.0f};
     Position fromPosition;  // SourcePosition only

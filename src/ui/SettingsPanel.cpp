@@ -93,9 +93,9 @@ SettingsPanel::SettingsPanel(AppContext& context) : context_(context) {
         styleHeader(*h);
         addAndMakeVisible(*h);
     }
-    for (auto* l :
-         {&deviceLabel_, &rateLabel_, &bufferLabel_, &speedLabel_, &driverLabel_, &vdevLatencyLabel_,
-          &oscInLabel_, &midiInputsLabel_, &pcLabel_, &clockLabel_, &bpmLabel_, &bpbLabel_, &autosaveLabel_})
+    for (auto* l : {&deviceLabel_, &rateLabel_, &bufferLabel_, &speedLabel_, &driverLabel_,
+                    &vdevLatencyLabel_, &oscInLabel_, &midiInputsLabel_, &pcLabel_, &clockLabel_, &bpmLabel_,
+                    &bpbLabel_, &trimLabel_, &autosaveLabel_})
         addAndMakeVisible(*l);
     for (auto* n : {&audioStatus_, &driverStatus_, &oscStatus_, &clockStatus_, &clockHint_}) {
         styleNote(*n);
@@ -105,8 +105,8 @@ SettingsPanel::SettingsPanel(AppContext& context) : context_(context) {
     errorLabel_.setFont(juce::FontOptions(12.0f));
     addAndMakeVisible(errorLabel_);
 
-    for (auto* e :
-         {&speedEdit_, &oscInEdit_, &oscHostEdit_, &oscOutPortEdit_, &bpmEdit_, &bpbEdit_, &autosaveEdit_})
+    for (auto* e : {&speedEdit_, &oscInEdit_, &oscHostEdit_, &oscOutPortEdit_, &bpmEdit_, &bpbEdit_,
+                    &trimEdit_, &autosaveEdit_})
         addAndMakeVisible(*e);
     styleEditor(speedEdit_, 6);
     styleEditor(oscInEdit_, 5);
@@ -114,6 +114,10 @@ SettingsPanel::SettingsPanel(AppContext& context) : context_(context) {
     styleEditor(oscOutPortEdit_, 5);
     styleEditor(bpmEdit_, 7);
     styleEditor(bpbEdit_, 2);
+    styleEditor(trimEdit_, 7);
+    trimEdit_.setTooltip(
+        "Added to the automatic compensation (device output latency + engine latency) "
+        "so an external clock's beat is the one heard");
     styleEditor(autosaveEdit_, 5);
     for (auto* b : {&deviceBox_, &rateBox_, &bufferBox_, &vdevLatencyBox_, &pcBox_, &clockBox_})
         addAndMakeVisible(*b);
@@ -164,7 +168,8 @@ SettingsPanel::SettingsPanel(AppContext& context) : context_(context) {
                                                                  {&oscHostEdit_, "Change OSC Output"},
                                                                  {&oscOutPortEdit_, "Change OSC Output"},
                                                                  {&bpmEdit_, "Change Tempo"},
-                                                                 {&bpbEdit_, "Change Beats per Bar"}};
+                                                                 {&bpbEdit_, "Change Beats per Bar"},
+                                                                 {&trimEdit_, "Change Clock Latency Trim"}};
     for (const auto& [editor, name] : editors) {
         editor->onReturnKey = [this, name] {
             if (!refreshing_) commit(name);
@@ -220,6 +225,7 @@ SettingsPanel::SettingsPanel(AppContext& context) : context_(context) {
                                   {&clockLabel_, {&clockBox_, &clockStatus_}},
                                   {&bpmLabel_, {&bpmEdit_}},
                                   {&bpbLabel_, {&bpbEdit_}},
+                                  {&trimLabel_, {&trimEdit_}},
                                   {nullptr, {&quantiseToggle_}},
                                   {nullptr, {&clockHint_}, 18},
                                   {&headerInstall_, {}, 22, true},
@@ -368,11 +374,13 @@ void SettingsPanel::refresh() {
             clockBox_.setSelectedId(static_cast<int>(i) + 1, juce::dontSendNotification);
     bpmEdit_.setText(juce::String(p.clock.bpm, 1), false);
     bpbEdit_.setText(juce::String(p.clock.beatsPerBar), false);
+    trimEdit_.setText(juce::String(p.clock.latencyTrimMs, 1), false);
     quantiseToggle_.setToggleState(p.clock.quantisedStart, juce::dontSendNotification);
     const bool internal = p.clock.kind == ClockKind::Internal;
     bpmEdit_.setEnabled(internal ||
                         p.clock.kind == ClockKind::Mtc);  // MTC derives beats from the tempo (SPEC §9)
     quantiseToggle_.setEnabled(internal);
+    trimEdit_.setEnabled(!internal);  // only external clocks are compensated
     clockHint_.setText(juce::String(settings::clockKindHint(p.clock.kind)), juce::dontSendNotification);
 
     const auto& inst = context_.installationSettings();
@@ -452,6 +460,7 @@ void SettingsPanel::commit(const char* undoName) {
         fields.clock.kind = clockOptions_[static_cast<std::size_t>(i)].kind;
     take(settings::parseBpm(text(bpmEdit_)), fields.clock.bpm);
     take(settings::parseBeatsPerBar(text(bpbEdit_)), fields.clock.beatsPerBar);
+    take(settings::parseLatencyTrim(text(trimEdit_)), fields.clock.latencyTrimMs);
     fields.clock.quantisedStart = quantiseToggle_.getToggleState();
 
     if (error.empty()) error = settings::validate(fields);

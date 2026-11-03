@@ -184,3 +184,36 @@ TEST_CASE("Editing a field reports only real changes", "[ui][layout]") {
     REQUIRE(editSpeakerField(l, id, SpeakerField::TrimDb, "-4"));
     REQUIRE(l.speakers[0].trimDb == -4.0f);
 }
+
+TEST_CASE("Speaker table shows a chain's override of trim / delay / polarity (SPEC §7, WP14)",
+          "[ui][layout]") {
+    Project p;
+    p.layout = quad();
+    p.layout.speakers[2].trimDb = -1.0f;
+    SpeakerChainSpec chain;
+    chain.speakerId = p.layout.speakers[2].id;
+    chain.trimDb = -6.0f;
+    chain.userDelayMs = 3.0f;
+    chain.polarityInverted = true;
+    p.speakerChains.push_back(chain);
+
+    const Speaker& plain = p.layout.speakers[0];
+    const auto free = tableCell(p, plain, SpeakerField::TrimDb);
+    CHECK(free.editable);
+    CHECK_FALSE(free.fromChain);
+    CHECK(free.text == formatField(plain, SpeakerField::TrimDb));
+
+    const Speaker& overridden = p.layout.speakers[2];
+    const auto trim = tableCell(p, overridden, SpeakerField::TrimDb);
+    CHECK(trim.fromChain);
+    CHECK_FALSE(trim.editable);
+    CHECK(trim.text.find("-6") == 0);
+    CHECK(trim.text.find("(chain)") != std::string::npos);
+    CHECK(trim.tooltip.find(formatField(overridden, SpeakerField::TrimDb)) != std::string::npos);
+    CHECK(tableCell(p, overridden, SpeakerField::DelayMs).text.find("3") == 0);
+    CHECK(tableCell(p, overridden, SpeakerField::Polarity).text == "inv (chain)");
+    // Fields a chain does not override stay editable layout values.
+    const auto az = tableCell(p, overridden, SpeakerField::Azimuth);
+    CHECK(az.editable);
+    CHECK_FALSE(az.fromChain);
+}

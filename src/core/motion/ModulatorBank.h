@@ -34,19 +34,54 @@ class Trajectory;
 /// change); everything else is RT-safe and must run on the audio thread.
 class ModulatorBank {
 public:
+    /// Summed offset for one insert parameter (`insert.{slot}.param.{index}`).
+    struct InsertOutput {
+        int slot{0};
+        int index{0};
+        float value{0.0f};
+    };
     struct Output {
         SourceModulation source;
-        MotionModulation motion;
+        MotionModulation motion;       // `motion.*`
+        MotionModulation motionRight;  // `motionRight.*` (linkedPoints right point)
+        std::array<InsertOutput, kMaxModulators> inserts{};
+        int numInserts{0};
+    };
+
+    /// One modulator in a trivially copyable form (travels through the
+    /// engine command queue as cmd::SetModulator). The osc / midi source's
+    /// address is not needed here: external values arrive by index.
+    struct Live {
+        bool lfo{true};
+        LfoShape shape{LfoShape::Sine};
+        Period period{Period::beats(4)};
+        bool targetValid{false};
+        ParameterPath target;
+        float depth{1.0f};
+        float offset{0.0f};
+        static Live fromSpec(const ModulatorSpec& spec);
     };
 
     void configure(const std::vector<ModulatorSpec>& specs);
 
     /// Restart every LFO's phase at the next process().
-    void reset() { timeline_.restart(); }
+    void reset();
 
-    /// Adopt `other`'s LFO time origin (edited modulators replacing running
-    /// ones keep their phase). RT-safe.
-    void continueTimelineFrom(const ModulatorBank& other) { timeline_ = other.timeline_; }
+    /// Adopt `other`'s LFO timeline, so modulators replacing running ones
+    /// continue: each LFO keeps the phase the one at its index had reached
+    /// (also across a period change, re-anchored like motions, SPEC §8), and
+    /// external sources keep their last value. RT-safe.
+    void continueTimelineFrom(const ModulatorBank& other);
+
+    /// Live edit (RT): replace modulator `index`, or append it when `index`
+    /// == size(); `count` (<= kMaxModulators) is the number of modulators
+    /// afterwards. An edited LFO keeps its phase; an appended one starts at
+    /// phase 0. Indices past `count` are dropped; `index` < 0 only drops
+    /// (truncates to `count`).
+    void setLive(int index, const Live& m, int count);
+
+    /// True if any active modulator targets `p`.
+    bool targets(SourceParam p) const;
 
     /// Feed an external (osc / midi) source value. Ignored for out-of-range
     /// indices and LFO modulators.
@@ -68,6 +103,7 @@ private:
     enum class Kind { Lfo, External };
     struct Slot {
         Kind kind{Kind::Lfo};
+        double cycleOffset{0.0};  // LFO phase continuity across edits (cycles)
         LfoShape shape{LfoShape::Sine};
         Period period;
         bool valid{false};
@@ -78,9 +114,14 @@ private:
         float last{0.0f};
     };
 
+    static Slot slotFrom(const Live& m);
+    /// Cycle offset that keeps `next` at the phase `prev` has at last_.
+    double continuedOffset(const Slot& prev, const Slot& next) const;
+
     std::array<Slot, kMaxModulators> slots_{};
     int count_{0};
     MotionTimeline timeline_;
+    MotionTime last_{};  // time of the last process() (end of that block)
 };
 
 }  // namespace spacer

@@ -12,6 +12,8 @@
 #include "engine/EngineProcessor.h"
 #include "engine/GraphBuilder.h"
 #include "engine/OfflineRenderer.h"
+#include "engine/RecallPlanner.h"
+#include "engine/SourceInputFactory.h"
 
 using Catch::Approx;
 using namespace spacer;
@@ -448,4 +450,151 @@ TEST_CASE("Source motion: restartMotion (scene recall restartMotionPhase) resets
     rig.run();
     CHECK(rig.pos().azimuth == Approx(reference.pos().azimuth).margin(1e-3));
     CHECK(rig.pos().distance == Approx(reference.pos().distance).margin(1e-4));
+}
+
+// ---- WP14 -------------------------------------------------------------------------
+
+TEST_CASE("Source motion: a live period change re-anchors the phase (SPEC §8, WP14)") {
+    Project p = quad();
+    p.sources = {orbitSource(Period::seconds(1.0))};
+    Rig rig(p);
+    rig.run(25);  // 90 degrees
+    const float before = rig.pos().azimuth;
+    Project edited = p;
+    std::get<OrbitMotion>(edited.sources[0].motion.value).period = Period::seconds(4.0);
+    rig.proc.swapGraph(rig.build(edited));
+    rig.run(1);
+    // Continuous: one 10 ms block further at the new 4 s period (0.9 degrees),
+    // not the 25 * 0.9 = 22.5 degrees elapsed time alone would give.
+    CHECK(std::abs(Position::wrapAzimuth(rig.pos().azimuth - before) - 0.9f) < 0.05f);
+    rig.run(100);  // one more second = 90 degrees at 4 s
+    CHECK(std::abs(Position::wrapAzimuth(rig.pos().azimuth - before) - 0.9f - 90.0f) < 0.1f);
+}
+
+TEST_CASE("Source modulators: SetModulator edits live without restarting the LFO (WP14)") {
+    Project p = quad();
+    p.sources = {orbitSource(Period::seconds(1000.0))};
+    p.sources[0].modulators = {
+        ModulatorSpec{LfoSource{LfoShape::Saw, Period::seconds(1.0)}, "motion.radius", 0.5f, 0.0f}};
+    Project reference = p;
+    reference.sources[0].modulators[0].depth = 1.0f;
+    Rig rig(p), ref(reference);
+    rig.run(30);
+    ref.run(30);
+    ModulatorBank::Live live = ModulatorBank::Live::fromSpec(reference.sources[0].modulators[0]);
+    rig.proc.push(cmd::SetModulator{1, 0, 1, live});
+    rig.run(7);
+    ref.run(7);
+    CHECK(rig.source().modulators().value(0) == Approx(ref.source().modulators().value(0)));
+    CHECK(rig.pos().distance == Approx(ref.pos().distance).margin(1e-4));
+    // Appending a gain modulator live switches gain modulation on.
+    ModulatorBank::Live gain;
+    gain.lfo = false;
+    gain.targetValid = true;
+    gain.target = *ParameterPath::parse("gain");
+    gain.depth = 1.0f;
+    rig.proc.push(cmd::SetModulator{1, 1, 2, gain});
+    rig.proc.push(cmd::SetModulatorValue{1, 1, -100.0f});
+    rig.run(10);
+    CHECK(rig.source().modulators().size() == 2);
+    CHECK(peakAbs(rig.out.getReadPointer(0), kBlock) < 1e-3f);
+}
+
+TEST_CASE("Source modulators: motionRight.* drives the right point of a linked pair (WP14)") {
+    Project p = quad();
+    SourceSpec s = orbitSource(Period::seconds(1000.0));
+    s.stereo = true;
+    s.linkedPoints = true;
+    s.input.value = GeneratorSpec{};
+    s.motionRight = MotionSpec{orbit(Period::seconds(1000.0), 2.0f)};
+    s.modulators = {ModulatorSpec{OscSource{"/r"}, "motionRight.radius", 1.0f, 0.0f},
+                    ModulatorSpec{OscSource{"/l"}, "motion.radius", 1.0f, 0.0f}};
+    p.sources = {s};
+    Rig rig(p);
+    rig.proc.push(cmd::SetModulatorValue{1, 0, 1.0f});
+    rig.proc.push(cmd::SetModulatorValue{1, 1, 0.5f});
+    rig.run(3);
+    CHECK(rig.pos(1, 0).distance == Approx(2.5f).margin(1e-3));
+    CHECK(rig.pos(1, 1).distance == Approx(3.0f).margin(1e-3));
+}
+
+TEST_CASE("Source motion: a scene recall ramps orbit parameters without restarting the phase (WP14)") {
+    Project p = quad();
+    p.sources = {orbitSource(Period::seconds(1.0), 2.0f)};
+    Rig rig(p);
+    rig.run(25);  // 90 degrees
+    Scene target = captureScene(p, "wide");
+    std::get<OrbitMotion>(target.sources[0].motion.value).radius = 4.0f;
+    RecallRequest r;
+    r.project = &p;
+    r.target = &target;
+    r.transitionSeconds = 1.0f;
+    r.sampleRate = kSr;
+    r.maxBlockSize = kBlock;
+    auto plan = buildRecallPlan(r);
+    REQUIRE(plan);
+    REQUIRE(plan->diff.replacedSources.empty());
+    REQUIRE(rig.proc.push(cmd::RecallScene{plan.release()}));
+    rig.run(50);  // half the transition
+    CHECK(rig.pos().distance == Approx(3.0f).margin(0.05f));
+    // Phase kept: 75 blocks = 0.75 s of a 1 s orbit -> 270 degrees.
+    CHECK(std::abs(Position::wrapAzimuth(rig.pos().azimuth - wrapDeg(3.6 * 75))) < 0.5f);
+    rig.run(60);
+    CHECK(rig.pos().distance == Approx(4.0f).margin(1e-3));
+}
+
+TEST_CASE("Engine: WP14 audio-thread paths do not allocate (timed commands, SetModulator, recalls)") {
+    const auto dir = juce::File::createTempFile("spacer-alloc-wp14");
+    REQUIRE(dir.createDirectory());
+    const auto wav = dir.getChildFile("a.wav");
+    OfflineRenderer::Result tone;
+    tone.sampleRate = kSr;
+    tone.audio = sine(kSr, 440.0, 0.5f, 48000);
+    REQUIRE_FALSE(OfflineRenderer::writeWav(tone, wav).has_value());
+    {
+        Project p = quad();
+        SourceSpec orb = orbitSource(Period::seconds(2.0));
+        orb.modulators = {
+            ModulatorSpec{LfoSource{LfoShape::Sine, Period::seconds(1.0)}, "motion.radius", 0.5f, 0.0f}};
+        SourceSpec file = makeSource(2, {45.0f, 0.0f, 2.0f});
+        FileInputSpec f;
+        f.path = wav.getFullPathName().toStdString();
+        f.loop = true;
+        file.input.value = f;
+        p.sources = {orb, file};
+        Rig rig(p);
+        rig.proc.push(cmd::FilePlay{2});
+        rig.run(5);
+
+        // Recall plans are built here (message thread); only their application is measured.
+        Scene moved = captureScene(p, "moved");
+        std::get<OrbitMotion>(moved.sources[0].motion.value).radius = 3.0f;  // motion-param ramp
+        moved.sources[1].spatializer = SpatializerKind::Dbap;                // file source replaced
+        RecallRequest r;
+        r.project = &p;
+        r.target = &moved;
+        r.transitionSeconds = 0.5f;
+        r.sampleRate = kSr;
+        r.maxBlockSize = kBlock;
+        auto factory = std::make_shared<SourceInputFactory>();
+        factory->setDiskStreamer(&rig.streamer);
+        r.inputFactory = [factory](const SourceSpec& s) { return factory->create(s); };
+        auto plan = buildRecallPlan(r);
+        REQUIRE(plan);
+        ModulatorBank::Live live = ModulatorBank::Live::fromSpec(orb.modulators[0]);
+        live.period = Period::seconds(3.0);
+
+        allocguard::setMode(allocguard::Mode::Count);
+        allocguard::resetViolations();
+        for (int i = 0; i < 200; ++i) {
+            const std::int64_t next = rig.proc.snapshot().blockStartSample + kBlock;
+            if (i == 20) rig.proc.pushAt(cmd::SetSourceGain{1, -6.0f, -1.0f}, next + 100);
+            if (i == 30) rig.proc.push(cmd::SetModulator{1, 0, 1, live});
+            if (i == 40) rig.proc.push(cmd::RecallScene{plan.release()});
+            rig.run();
+        }
+        CHECK(allocguard::violations() == 0);
+        allocguard::setMode(allocguard::Mode::Assert);
+    }
+    dir.deleteRecursively();
 }

@@ -51,13 +51,30 @@ void AmbisonicDecoder::prepare(const Layout& layout, int order, bool maxRe) {
         }
     }
 
-    // Per-degree energy, then normalise: mean over the t-design of
-    // Σ_s (D·Y(θ_k))_s² = Σ_{l,l'} E(l, l') = 1.
+    // Per-degree energy, then normalise: mean over the evaluation directions
+    // of Σ_s (D·Y(θ_k))_s² = Σ_{l,l'} E(l, l') = 1. Those directions are the
+    // t-design (the sphere), or for a horizontal layout the horizontal plane,
+    // where its sources live: there the sphere mean leaves an in-plane source
+    // ≈ +0.7..1.1 dB above the Σg² = 1 of VBAP/DBAP (WP3b note, WP14).
+    horizontal_ = isHorizontalLayout(layout);
+    std::vector<double> ring;
+    int evalPoints = numPoints;
+    const double* evalSh = sh.data();
+    if (horizontal_) {
+        evalPoints = kHorizontalPoints;
+        ring.resize(static_cast<std::size_t>(evalPoints) * C);
+        for (int k = 0; k < evalPoints; ++k) {
+            const auto az = static_cast<float>(360.0 * k / evalPoints);
+            sphericalHarmonicsSN3D(order_, Position{az, 0.0f, 1.0f}.toCartesian(), y);
+            for (std::size_t n = 0; n < C; ++n) ring[static_cast<std::size_t>(k) * C + n] = y[n];
+        }
+        evalSh = ring.data();
+    }
     const int degrees = order_ + 1;
     std::vector<double> e(static_cast<std::size_t>(degrees * degrees), 0.0);
     std::vector<double> part(static_cast<std::size_t>(degrees));
-    for (int k = 0; k < numPoints; ++k) {
-        const double* yk = &sh[static_cast<std::size_t>(k) * C];
+    for (int k = 0; k < evalPoints; ++k) {
+        const double* yk = &evalSh[static_cast<std::size_t>(k) * C];
         for (std::size_t s = 0; s < S; ++s) {
             for (int l = 0; l < degrees; ++l) {
                 double g = 0.0;
@@ -72,7 +89,7 @@ void AmbisonicDecoder::prepare(const Layout& layout, int order, bool maxRe) {
         }
     }
     double energy = 0.0;
-    for (double v : e) energy += v / numPoints;
+    for (double v : e) energy += v / evalPoints;
     const double scale = energy > 0.0 ? 1.0 / std::sqrt(energy) : 0.0;
     for (std::size_t s = 0; s < S; ++s)
         for (std::size_t n = 0; n < C; ++n)
@@ -81,7 +98,17 @@ void AmbisonicDecoder::prepare(const Layout& layout, int order, bool maxRe) {
     for (int l = 0; l < degrees; ++l)
         for (int lp = 0; lp < degrees; ++lp)
             degreeEnergy_[static_cast<std::size_t>(l * (kMaxAmbisonicOrder + 1) + lp)] =
-                e[static_cast<std::size_t>(l * degrees + lp)] / numPoints * scale * scale;
+                e[static_cast<std::size_t>(l * degrees + lp)] / evalPoints * scale * scale;
+}
+
+bool AmbisonicDecoder::isHorizontalLayout(const Layout& layout) {
+    bool any = false;
+    for (const auto& sp : layout.speakers) {
+        if (sp.lfe) continue;
+        any = true;
+        if (std::abs(sp.position.elevation) >= kHorizontalElevationDeg) return false;
+    }
+    return any;
 }
 
 void AmbisonicDecoder::decode(SpeakerBus& bus) const {
