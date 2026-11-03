@@ -13,6 +13,7 @@
 
 #include "EngineTestUtils.h"
 #include "core/Json.h"
+#include "core/SceneDiff.h"
 #include "engine/OfflineRenderer.h"
 #include "engine/PluginHost.h"
 #include "engine/PluginState.h"
