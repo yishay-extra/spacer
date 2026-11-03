@@ -48,7 +48,7 @@ void StatusBar::paint(juce::Graphics& g) {
 void StatusBar::resized() {
     auto area = getLocalBounds().reduced(8, 2);
     if (installButton_.isVisible()) {
-        installButton_.setBounds(area.removeFromRight(90));
+        installButton_.setBounds(area.removeFromRight(160));
         area.removeFromRight(6);
     }
     // Fixed widths for the short items, the rest goes to the long text of the device, clock and driver.

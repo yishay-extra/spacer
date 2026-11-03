@@ -35,7 +35,7 @@ private:
     AppContext& context_;
     juce::TooltipWindow tooltips_{this, 600};
     std::array<juce::Label, 7> labels_;  // device, cpu, xruns, latency, clock, cues, driver
-    juce::TextButton installButton_{"Install..."};
+    juce::TextButton installButton_{"Install virtual device..."};
     bool offerInstall_{false};
     int countdown_{0};
 

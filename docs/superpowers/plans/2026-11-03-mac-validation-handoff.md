@@ -11,7 +11,7 @@
 ## State
 - Local Release (`build/`) and Debug (`build-debug/`) builds exist in the
   main checkout; ctest 723/723. Tool binary:
-  `build/spacer_engine_check_artefacts/Release/spacer_engine_check` (#38).
+  `build/spacer_engine_check_artefacts/Release/spacer-engine-check` (#38).
 - Done and recorded: WP3 (all 10 checks, objective part), WP4 (all 11,
   objective part), WP5 check 1. Results sections appended to the WP files.
 - Issues filed: #36 (FilePlay dropped after SwapGraph — engine, confirmed
