@@ -18,6 +18,7 @@
 #include "engine/PluginHost.h"
 #include "engine/device/AudioEngine.h"
 #include "ui/logic/AppSettings.h"
+#include "ui/logic/DocumentRevision.h"
 #include "ui/logic/FeedbackState.h"
 #include "ui/logic/ProjectHistory.h"
 #include "ui/logic/SettingsModel.h"
@@ -100,7 +101,7 @@ public:
     // ---- model --------------------------------------------------------------
     const Project& project() const noexcept { return project_; }
     /// Monotonic; changes whenever the model changes.
-    std::uint64_t revision() const noexcept { return revision_; }
+    std::uint64_t revision() const noexcept { return revision_.value(); }
     /// Applies and records an undoable edit and syncs the engine. False if the
     /// edit was invalid.
     bool perform(ProjectEdit edit);
@@ -120,7 +121,7 @@ public:
     int selectedSourceId() const noexcept { return selection_.selectedId(); }
     /// Selects `sourceId` (0 = none) and notifies with Change::Selection.
     void selectSource(int sourceId);
-    bool isDirty() const noexcept { return revision_ != savedRevision_; }
+    bool isDirty() const noexcept { return revision_.isDirty(); }
 
     void newProject(Project project);
     /// Opens a project file. Returns an error message (empty on success).
@@ -226,7 +227,8 @@ private:
     void resetCueEngine();
     CueEngine::Config cueConfig();
     void resetControl();
-    void modelChanged(Change change);
+    enum class Saved { No, Yes };
+    void modelChanged(Change change, Saved saved = Saved::No);
     void notify(Change change);
     void syncArmedList();
     void loadInstallationSettings();
@@ -256,8 +258,7 @@ private:
 
     std::filesystem::path projectPath_;
     std::string deviceError_;
-    std::uint64_t revision_{0};
-    std::uint64_t savedRevision_{0};
+    DocumentRevision revision_;
     std::uint64_t autosavedRevision_{0};
     std::optional<int> speakerTest_;
     bool panic_{false};
