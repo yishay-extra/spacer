@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+#include "core/InsertParamPath.h"
+
 namespace spacer {
 
 namespace {
@@ -95,6 +97,13 @@ R routeSource(const EntityRef& ref, const Tokens& t, const juce::OSCMessage& m, 
         if (!numbers(m, 1, v)) return bad();
         return ok(ev::SetSourceParam{ref, "motion." + std::string(b), v[0]});
     }
+    if (n == 7 && a == "insert" && t[5] == "param") {
+        const std::string tail = "insert." + std::string(b) + ".param." + std::string(t[6]);
+        const auto p = InsertParamPath::parseUnscoped(tail);
+        if (!p) return ok(ev::OscTrigger{address});
+        if (!numbers(m, 1, v)) return bad();
+        return ok(ev::SetInsertParam{InsertOwner::Source, ref, p->slot, p->index, v[0]});
+    }
     if (n == 5 && a == "file" && (b == "play" || b == "stop")) {
         if (m.size() != 0) return bad();
         return ok(ev::SourceFile{
@@ -116,6 +125,13 @@ R routeSpeaker(const EntityRef& ref, const Tokens& t, const juce::OSCMessage& m,
     if (t.size() == 4 && t[3] == "mute") {
         if (!numbers(m, 1, v)) return bad();
         return ok(ev::SetSpeakerMute{ref, v[0] >= 0.5f});
+    }
+    if (t.size() == 7 && t[3] == "insert" && t[5] == "param") {
+        const auto p =
+            InsertParamPath::parseUnscoped("insert." + std::string(t[4]) + ".param." + std::string(t[6]));
+        if (!p) return ok(ev::OscTrigger{address});
+        if (!numbers(m, 1, v)) return bad();
+        return ok(ev::SetInsertParam{InsertOwner::Speaker, ref, p->slot, p->index, v[0]});
     }
     return ok(ev::OscTrigger{address});
 }

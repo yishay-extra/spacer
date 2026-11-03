@@ -150,6 +150,12 @@ struct ControlDispatcher::Visitor {
         const int id = d.resolveSpeaker(e.speaker);
         return id != 0 && d.send(cmd::SetSpeakerMute{id, e.mute, -1.0f});
     }
+    bool operator()(const ev::SetInsertParam& e) const {
+        const int id =
+            e.owner == InsertOwner::Source ? d.resolveSource(e.target) : d.resolveSpeaker(e.target);
+        if (id == 0 || !std::isfinite(e.value)) return false;
+        return d.send(cmd::SetInsertParam{e.owner, id, e.slot, e.index, std::clamp(e.value, 0.0f, 1.0f)});
+    }
     bool operator()(const ev::SetMasterGain& e) const { return d.send(cmd::SetMasterGain{e.gainDb, -1.0f}); }
     bool operator()(const ev::Panic& e) const { return d.send(cmd::SetPanic{e.engaged}); }
 
