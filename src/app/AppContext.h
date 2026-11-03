@@ -223,6 +223,7 @@ private:
     void syncEngine(const EngineEffect& effect);
     void rebuildGraph();
     void resetCueEngine();
+    CueEngine::Config cueConfig();
     void resetControl();
     void modelChanged(Change change);
     void notify(Change change);

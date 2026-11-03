@@ -12,6 +12,22 @@ namespace spacer {
 CueEngine::CueEngine(EngineProcessor& engine, Project& project, Config config)
     : engine_(engine), project_(project), config_(std::move(config)), sequencer_({}, config_.randomSeed) {}
 
+void CueEngine::setConfig(Config config, const CueTick& tick) {
+    config_ = std::move(config);
+    if (beatScheduled_) {
+        engine_.push(cmd::CancelScheduledRecall{});
+        beatScheduled_ = false;
+        scheduleBeatTrigger(tick);
+    }
+}
+
+void CueEngine::applied(const Scene& scene) {
+    applyScene(project_, scene);
+    ++recallCount_;
+    lastRecalled_ = scene.name;
+    if (config_.onLiveChanged) config_.onLiveChanged(project_);
+}
+
 bool CueEngine::arm(const std::string& name, const CueTick& tick) {
     for (const auto& list : project_.cueLists) {
         if (list.name != name) continue;
@@ -96,9 +112,7 @@ bool CueEngine::fire(int cueIndex, const CueTick& tick) {
     if (const Scene* scene = findScene(project_, cue.sceneName)) {
         const Scene target = *scene;  // the recall must not alias the live model
         recall(target, cue.transitionSeconds, cue.restartMotionPhase, -1.0, 0);
-        applyScene(project_, target);
-        ++recallCount_;
-        lastRecalled_ = target.name;
+        applied(target);
     } else {
         lastError_ = "cue \"" + cue.name + "\": scene \"" + cue.sceneName + "\" not found";
     }
@@ -160,9 +174,8 @@ bool CueEngine::onEngineCueFired(int token, const CueTick& t) {
     beatScheduled_ = false;
     const Cue& cue = sequencer_.list().cues[static_cast<std::size_t>(index)];
     if (const Scene* scene = findScene(project_, cue.sceneName)) {
-        applyScene(project_, *scene);
-        ++recallCount_;
-        lastRecalled_ = scene->name;
+        const Scene target = *scene;  // applyScene must not alias the live model
+        applied(target);
     }
     scheduleBeatTrigger(t);
     return true;
@@ -173,11 +186,7 @@ bool CueEngine::recallScene(const std::string& sceneName, float seconds, bool re
     if (scene == nullptr) return false;
     const Scene target = *scene;
     const bool ok = recall(target, seconds, restart, -1.0, 0);
-    if (ok) {
-        applyScene(project_, target);
-        ++recallCount_;
-        lastRecalled_ = target.name;
-    }
+    if (ok) applied(target);
     return ok;
 }
 

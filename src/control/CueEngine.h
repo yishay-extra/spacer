@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <optional>
 #include <string>
 
@@ -35,9 +36,20 @@ public:
         PluginHost* pluginHost{nullptr};
         int numOutputChannels{-1};
         std::uint64_t randomSeed{1};
+        /// Called after a recall applied a scene to the live project (cue,
+        /// AtBeat cue, scene manager): lets the app keep other copies of the
+        /// model current without rebuilding the graph (AudioEngine::updateProject).
+        std::function<void(const Project&)> onLiveChanged;
     };
 
     CueEngine(EngineProcessor& engine, Project& project, Config config);
+
+    /// New device rate / block size / outputs (device change) without losing
+    /// the sequencer state: the armed list and its position stay. A pending
+    /// AtBeat recall was planned for the old graph settings: it is cancelled
+    /// and planned again with the new ones. (The randomSeed is not re-applied.)
+    void setConfig(Config config, const CueTick& tick);
+    const Config& config() const noexcept { return config_; }
 
     /// Arms the named list (only one list is armed at a time). False if no such list.
     bool arm(const std::string& cueListName, const CueTick& tick);
@@ -89,6 +101,7 @@ private:
     bool fire(int cueIndex, const CueTick& tick);
     bool recall(const Scene& scene, float seconds, bool restart, double atBeat, int token);
     void scheduleBeatTrigger(const CueTick& tick);
+    void applied(const Scene& scene);
 
     EngineProcessor& engine_;
     Project& project_;

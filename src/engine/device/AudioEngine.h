@@ -61,6 +61,11 @@ public:
     /// Structural change: builds a new graph for the running device and
     /// swaps it in (SPEC §5.2). Also used before the device is open.
     void setProject(const Project& project);
+    /// Message thread. Replaces the project copy the next device (re)start
+    /// builds its graph from, without rebuilding now: for changes that already
+    /// reached the running graph some other way (cue recalls, parameter
+    /// commands), so a later device change does not revert them.
+    void updateProject(const Project& project) { project_ = project; }
 
     /// Overrides source inputs for graphs built from now on (tools feeding
     /// test signals); a null result = the source's own live input (SPEC §8).
