@@ -118,6 +118,8 @@ void SourceNode::prepare(const Layout& layout, double sampleRate, int maxBlockSi
     inserts_->prepare(sampleRate, maxBlockSize, numChannels());
     buffer_.setSize(2, std::max(1, maxBlockSize));
     buffer_.clear();
+    raw_.setSize(2, std::max(1, maxBlockSize));
+    raw_.clear();
     for (auto& d : distance_) d.prepare(sampleRate);
     gain_.prepare(sampleRate, 0.0f);
     gain_.setTarget(gainTarget());
@@ -312,14 +314,22 @@ bool SourceNode::adoptLegacySpatializer(SourceNode& old) noexcept {
 }
 
 void SourceNode::process(const InputContext& ctx, const ClockState& clock, int n, SpeakerBus& bus,
-                         SpeakerBus* legacyBus) noexcept {
+                         SpeakerBus* legacyBus, const SourceNode* mirror) noexcept {
     const int channels = numChannels();
     float* ch[2] = {buffer_.getWritePointer(0), buffer_.getWritePointer(1)};
 
-    if (input_)
+    if (mirror != nullptr) {
+        // Ghost of a replaced file source: the same audio the new node plays.
+        for (int c = 0; c < channels; ++c)
+            std::copy(mirror->rawInput(std::min(c, mirror->numChannels() - 1)),
+                      mirror->rawInput(std::min(c, mirror->numChannels() - 1)) + n, ch[c]);
+    } else if (input_ && mirrorOf_ == 0) {
         input_->read(ctx, ch, channels, n);
-    else
+    } else {
         for (int c = 0; c < channels; ++c) std::fill(ch[c], ch[c] + n, 0.0f);
+    }
+    if (keepRaw_)
+        for (int c = 0; c < channels; ++c) std::copy(ch[c], ch[c] + n, raw_.getWritePointer(c));
 
     // Modulators first (SPEC §10), at the end of this block; insert
     // parameter targets apply to this block's plugin processing.

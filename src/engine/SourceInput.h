@@ -38,6 +38,11 @@ public:
     /// RT. Graph swap: continue from `old`'s playback state where that makes
     /// sense (same kind). Default: nothing to carry.
     virtual void takeStateFrom(SourceInput& /*old*/) noexcept {}
+    /// True once another input's takeStateFrom() moved this input's playback
+    /// (a file's disk stream) away: it can no longer produce the same audio.
+    /// A scene-recall ghost holding such an input mirrors the new node
+    /// instead (SourceNode::setInputMirror).
+    virtual bool handedOver() const noexcept { return false; }
 
     // ---- transport (RT; only file players have one) ----
     virtual void play() noexcept {}

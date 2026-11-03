@@ -94,6 +94,19 @@ public:
     /// RT. Carry only the input's playback state over from `old` (a replaced
     /// source continues the same audio while its gain and position start afresh).
     void takeInputStateFrom(SourceNode& old) noexcept;
+    /// True if the input's playback was moved to another node (see
+    /// SourceInput::handedOver).
+    bool inputHandedOver() const noexcept { return input_ && input_->handedOver(); }
+    /// RT. Scene-recall ghost whose input was handed over: instead of
+    /// reading its own input it replays the raw input of the node it is
+    /// crossfading into (Graph passes it to process()), so a file source
+    /// truly crossfades. 0 = off.
+    void setInputMirror(int sourceId) noexcept { mirrorOf_ = sourceId; }
+    int inputMirror() const noexcept { return mirrorOf_; }
+    /// RT. Keep a copy of each block's raw input for a mirroring ghost.
+    void setKeepRawInput(bool keep) noexcept { keepRaw_ = keep; }
+    /// The last block's raw input (pre-inserts), valid while keepRawInput is on.
+    const float* rawInput(int channel) const noexcept { return raw_.getReadPointer(channel & 1); }
 
     /// RT. Graph swap: continue from `old`'s state (current gain, positions,
     /// distance-filter state, input playback state, motion phase) while
@@ -108,8 +121,10 @@ public:
     /// `legacyBus` (optional) is the ambisonic bus of an ambisonic-decoder
     /// crossfade (see adoptLegacySpatializer): when non-null and this node
     /// holds a legacy spatializer, the block is also encoded into it.
+    /// `mirror` (optional, with `mirrorChannels`): read this block's input
+    /// from these buffers instead of the node's own input (setInputMirror).
     void process(const InputContext& ctx, const ClockState& clock, int numSamples, SpeakerBus& bus,
-                 SpeakerBus* legacyBus = nullptr) noexcept;
+                 SpeakerBus* legacyBus = nullptr, const SourceNode* mirror = nullptr) noexcept;
 
     /// Ambisonic order / layout change (SPEC §5.2 swap): takes over `old`'s
     /// ambisonic encoder (a pointer swap, nothing is allocated or freed) so
@@ -186,6 +201,9 @@ private:
 
     double sampleRate_{48000.0};
     juce::AudioBuffer<float> buffer_;
+    juce::AudioBuffer<float> raw_;  // raw input copy for a mirroring ghost
+    bool keepRaw_{false};
+    int mirrorOf_{0};
     GainRamp gain_;
     GainRamp modGain_;  // gain modulation, ramped per block
     std::array<DistanceProcessor, 2> distance_;

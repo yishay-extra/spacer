@@ -124,6 +124,7 @@ void FilePlayer::takeStateFrom(SourceInput& old) noexcept {
         // Pointer swap only (no reference-count traffic on the audio thread);
         // the unused fresh stream goes back with the old graph.
         std::swap(stream_, o->stream_);
+        o->handedOver_ = true;
         stream_->setLoop(spec_.loop);
         generation_ = o->generation_;
         waiting_ = o->waiting_;
