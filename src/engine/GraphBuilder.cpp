@@ -4,6 +4,7 @@
 #include <utility>
 #include <variant>
 
+#include "core/spatial/AmbisonicDecoder.h"
 #include "engine/PluginHost.h"
 #include "engine/SourceInputFactory.h"
 #include "engine/SpatializerFactory.h"
@@ -103,8 +104,17 @@ std::unique_ptr<Graph> GraphBuilder::build(double sampleRate, int maxBlockSize,
                                            std::vector<std::string>* warnings) const {
     const Layout& layout = project_.layout;
     const int outputs = numOutputChannels_ >= 0 ? numOutputChannels_ : requiredOutputChannels(layout);
-    auto graph =
-        std::make_unique<Graph>(layout, sampleRate, maxBlockSize, outputs, ambisonicBusOrder(project_));
+    const int busOrder = ambisonicBusOrder(project_);
+    auto graph = std::make_unique<Graph>(layout, sampleRate, maxBlockSize, outputs, busOrder);
+
+    // One AllRAD decoder per graph, built here (non-RT, SPEC §6.3) and shared
+    // with the encoders for their spread compensation; per block the decode
+    // is a matrix multiply in Graph::process.
+    AmbisonicDecoder decoder;
+    if (busOrder > 0) {
+        decoder.prepare(layout, busOrder);
+        graph->setAmbisonicDecoder(decoder);
+    }
 
     const auto chains = chainSettings(project_);
     const auto numSpeakers = std::min<std::size_t>(chains.size(), kMaxSpeakers);
@@ -128,7 +138,8 @@ std::unique_ptr<Graph> GraphBuilder::build(double sampleRate, int maxBlockSize,
         const SourceSpec& spec = project_.sources[i];
         auto input = inputFactory_ ? inputFactory_(spec) : nullptr;
         if (!input) input = liveInputs.create(spec, warnings);
-        auto node = std::make_unique<SourceNode>(spec, makeSpatializer(spec), std::move(input));
+        auto node = std::make_unique<SourceNode>(
+            spec, makeSpatializer(spec, busOrder > 0 ? &decoder : nullptr), std::move(input));
         node->setInserts(std::make_unique<InsertStage>(buildInserts(pluginHost_, InsertOwner::Source, spec.id,
                                                                     spec.inserts, spec.stereo ? 2 : 1,
                                                                     sampleRate, maxBlockSize)));

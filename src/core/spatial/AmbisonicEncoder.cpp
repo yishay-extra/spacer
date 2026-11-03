@@ -24,9 +24,16 @@ void AmbisonicEncoder::resetEnergyModel() {
 }
 
 void AmbisonicEncoder::prepare(const Layout& layout, double /*sampleRate*/, int /*maxBlockSize*/) {
-    resetEnergyModel();
+    if (energyFromDecoder_) return;
     AmbisonicDecoder dec;
     dec.prepare(layout, order_, maxRe_);
+    useDecoder(dec);
+    energyFromDecoder_ = false;  // prepare() stays re-runnable for another layout
+}
+
+void AmbisonicEncoder::useDecoder(const AmbisonicDecoder& dec) {
+    resetEnergyModel();
+    energyFromDecoder_ = true;
     double total = 0.0;
     for (int l = 0; l <= order_; ++l)
         for (int lp = 0; lp <= order_; ++lp) total += dec.degreeEnergy(l, lp);

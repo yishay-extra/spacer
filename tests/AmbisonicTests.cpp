@@ -686,3 +686,26 @@ TEST_CASE("Ambisonic decoder: degenerate layouts give finite gains") {
     CHECK(g[0] > 0.0f);
     CHECK(g[1] == 0.0f);
 }
+
+TEST_CASE("AmbisonicEncoder::useDecoder gives the same spread weights as prepare() on that layout") {
+    Layout layout;
+    for (int i = 0; i < 6; ++i) {
+        Speaker s;
+        s.id = i + 1;
+        s.position = {-180.0f + 60.0f * static_cast<float>(i), 0.0f, 2.0f};
+        s.outputChannel = i;
+        layout.speakers.push_back(s);
+    }
+    AmbisonicEncoder own(3), shared(3);
+    own.prepare(layout, 48000.0, 128);
+    AmbisonicDecoder decoder;
+    decoder.prepare(layout, 3);
+    shared.useDecoder(decoder);
+    shared.prepare(layout, 48000.0, 128);  // keeps the supplied decoder
+    for (float spread : {0.0f, 0.3f, 0.8f}) {
+        float a[4], b[4];
+        own.spreadWeights(spread, a);
+        shared.spreadWeights(spread, b);
+        for (int l = 0; l <= 3; ++l) CHECK(a[l] == Catch::Approx(b[l]));
+    }
+}

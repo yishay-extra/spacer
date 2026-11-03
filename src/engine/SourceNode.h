@@ -99,7 +99,18 @@ public:
 
     /// RT. Render one block (numSamples <= maxBlockSize) into `bus`. `clock`
     /// is the state at the start of the block.
-    void process(const InputContext& ctx, const ClockState& clock, int numSamples, SpeakerBus& bus) noexcept;
+    /// `legacyBus` (optional) is the ambisonic bus of an ambisonic-decoder
+    /// crossfade (see adoptLegacySpatializer): when non-null and this node
+    /// holds a legacy spatializer, the block is also encoded into it.
+    void process(const InputContext& ctx, const ClockState& clock, int numSamples, SpeakerBus& bus,
+                 SpeakerBus* legacyBus = nullptr) noexcept;
+
+    /// Ambisonic order / layout change (SPEC §5.2 swap): takes over `old`'s
+    /// ambisonic encoder (a pointer swap, nothing is allocated or freed) so
+    /// the graph can render the old encoding through the old decoder while it
+    /// crossfades to the new one. Only if both nodes are ambisonic; returns
+    /// whether it did. The legacy encoder is kept until the graph is deleted.
+    bool adoptLegacySpatializer(SourceNode& old) noexcept;
 
     // ---- feedback (audio thread) ----
     float takePeak(int channel) noexcept {
@@ -138,6 +149,7 @@ private:
     DistanceModel distanceModel_;
 
     std::unique_ptr<Spatializer> spatializer_;
+    std::unique_ptr<Spatializer> legacySpatializer_;  // see adoptLegacySpatializer
     std::unique_ptr<SourceInput> input_;
     std::unique_ptr<InsertStage> inserts_;
 
