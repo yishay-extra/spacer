@@ -465,14 +465,18 @@ addresses are ignored and counted.
 - CoreAudio `AudioServerPlugIn`, bundle id `org.spacer.driver`, one device
   "Spacer" with **64 output channels** (as seen by sender apps), 44.1–96 kHz,
   float32, following the sample rate the Spacer app sets.
-- Transport: a POSIX shared-memory ring (per channel interleaved frames,
-  ≥ 8192 frames) + a sequence counter; the app reads it in its callback.
+- Transport: a POSIX shared-memory ring (interleaved 64-channel frames,
+  ≥ 8192 frames; created by the driver, opened by the app) + a sequence counter; the app reads it in its callback.
   Rate mismatch between driver and app is handled by the app resampling
   (slow drift expected; use a simple fill-level-steered resampler).
 - The driver has no UI. Installed by the app ("Install virtual device…")
   with admin prompt; the app detects and reports driver version.
-- Added latency: one driver buffer (default 512 frames at 48 kHz ≈ 10.7 ms;
-  user-selectable 128/256/512).
+- Added latency: target buffering of max(selected, sender IO buffer) frames
+  (selected default 512 at 48 kHz ≈ 10.7 ms; user-selectable 128/256/512,
+  an app setting, not stored in the project).
+- Open risk (verify on a Mac, docs/mac-validation/WP5.md): coreaudiod's
+  sandbox may refuse `shm_open`; if so the transport moves to a mach shared
+  memory handle (e.g. via XPC) with the same ring layout.
 
 ## 15. Project file
 
