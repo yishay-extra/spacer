@@ -28,11 +28,23 @@ Graph::Graph(const Layout& layout, double sampleRate, int maxBlockSize, int numO
         ambisonicPointers_.resize(static_cast<std::size_t>(n));
         for (int c = 0; c < n; ++c)
             ambisonicPointers_[static_cast<std::size_t>(c)] = ambisonicBus_.getWritePointer(c);
+
+        // Room for the old encoding of a decoder crossfade (any order <= 5).
+        legacyBus_.setSize(kMaxAmbisonicChannels, maxBlockSize_);
+        legacyBus_.clear();
+        legacyPointers_.resize(static_cast<std::size_t>(kMaxAmbisonicChannels));
+        for (int c = 0; c < kMaxAmbisonicChannels; ++c)
+            legacyPointers_[static_cast<std::size_t>(c)] = legacyBus_.getWritePointer(c);
+        ramp_.assign(static_cast<std::size_t>(maxBlockSize_), 0.0f);
     }
     sources_.reserve(kMaxSources);
     ghosts_.reserve(2 * kMaxSources);
     chains_.reserve(kMaxSpeakers);
     outputChannels_.reserve(kMaxSpeakers);
+}
+
+void Graph::setAmbisonicDecoder(const AmbisonicDecoder& decoder) {
+    decoder_ = decoder;
 }
 
 void Graph::addSource(std::unique_ptr<SourceNode> node) {
@@ -79,11 +91,23 @@ void Graph::process(const InputContext& ctx, const ClockState& clock, float* con
     bus.ambisonicOrder = ambisonicOrder_;
     bus.numSamples = n;
 
-    for (auto& s : sources_) s->process(ctx, clock, n, bus);
+    SpeakerBus legacy = bus;
+    const bool crossfading = isAmbisonicCrossfading();
+    if (crossfading) {
+        const int legacyChannels = ambisonicChannels(legacyOrder_);
+        for (int c = 0; c < legacyChannels; ++c)
+            std::fill(legacyPointers_[static_cast<std::size_t>(c)],
+                      legacyPointers_[static_cast<std::size_t>(c)] + n, 0.0f);
+        legacy.ambisonic = legacyPointers_.data();
+        legacy.ambisonicOrder = legacyOrder_;
+    }
+
+    for (auto& s : sources_) s->process(ctx, clock, n, bus, crossfading ? &legacy : nullptr);
     for (auto& g : ghosts_)
         if (!g->isSilent()) g->process(ctx, clock, n, bus);
 
-    // Ambisonic decode into the speaker bus: WP2d (AmbisonicDecoder).
+    // Ambisonic bus → decode → added to the speaker bus (SPEC §5.3).
+    if (ambisonicOrder_ > 0) decodeAmbisonics(n);
 
     for (int s = 0; s < numSpeakers; ++s) {
         float* sig = busPointers_[static_cast<std::size_t>(s)];
@@ -95,8 +119,67 @@ void Graph::process(const InputContext& ctx, const ClockState& clock, float* con
     }
 }
 
+void Graph::decodeAmbisonics(int n) noexcept {
+    SpeakerBus bus;
+    bus.speakers = busPointers_.data();
+    bus.numSpeakers = static_cast<int>(chains_.size());
+    bus.ambisonic = ambisonicPointers_.data();
+    bus.ambisonicOrder = ambisonicOrder_;
+    bus.numSamples = n;
+
+    if (xfadeRemaining_ <= 0) {
+        decoder_.decode(bus);
+        return;
+    }
+    // Crossfade: both decoders are linear, so ramping the two buses before
+    // decoding equals crossfading the decoded speaker signals.
+    const int done = xfadeTotal_ - xfadeRemaining_;
+    for (int i = 0; i < n; ++i)
+        ramp_[static_cast<std::size_t>(i)] =
+            std::min(1.0f, static_cast<float>(done + i + 1) / static_cast<float>(xfadeTotal_));
+    const int channels = ambisonicChannels(ambisonicOrder_);
+    for (int c = 0; c < channels; ++c) {
+        float* x = ambisonicPointers_[static_cast<std::size_t>(c)];
+        for (int i = 0; i < n; ++i) x[i] *= ramp_[static_cast<std::size_t>(i)];
+    }
+    const int legacyChannels = ambisonicChannels(legacyOrder_);
+    for (int c = 0; c < legacyChannels; ++c) {
+        float* x = legacyPointers_[static_cast<std::size_t>(c)];
+        for (int i = 0; i < n; ++i) x[i] *= 1.0f - ramp_[static_cast<std::size_t>(i)];
+    }
+    SpeakerBus legacy = bus;
+    legacy.ambisonic = legacyPointers_.data();
+    legacy.ambisonicOrder = legacyOrder_;
+    legacyDecoder_.decode(legacy);
+    decoder_.decode(bus);
+    xfadeRemaining_ = std::max(0, xfadeRemaining_ - n);
+}
+
+void Graph::beginAmbisonicCrossfade(Graph& old) noexcept {
+    xfadeRemaining_ = xfadeTotal_ = 0;
+    if (ambisonicOrder_ <= 0 || old.ambisonicOrder_ <= 0 || !decoder_.isPrepared() ||
+        !old.decoder_.isPrepared())
+        return;
+    // Same decoder (order, layout and matrix): nothing audible changes.
+    bool same =
+        decoder_.order() == old.decoder_.order() && decoder_.numSpeakers() == old.decoder_.numSpeakers();
+    for (int s = 0; same && s < decoder_.numSpeakers(); ++s)
+        for (int c = 0; same && c < decoder_.numChannels(); ++c)
+            same = juce::exactlyEqual(decoder_.coefficient(s, c), old.decoder_.coefficient(s, c));
+    if (same) return;
+
+    bool any = false;
+    for (auto& s : sources_)
+        if (SourceNode* o = old.findSource(s->id())) any = s->adoptLegacySpatializer(*o) || any;
+    if (!any) return;
+    legacyDecoder_ = old.decoder_;
+    legacyOrder_ = old.ambisonicOrder_;
+    xfadeTotal_ = xfadeRemaining_ = std::max(1, static_cast<int>(kAmbisonicCrossfadeSeconds * sampleRate_));
+}
+
 void Graph::takeStateFrom(Graph& old) noexcept {
     const bool sameLayout = specEqual(layout_, old.layout_);
+    beginAmbisonicCrossfade(old);
     for (auto& s : sources_)
         if (SourceNode* o = old.findSource(s->id())) s->takeStateFrom(*o, sameLayout);
 

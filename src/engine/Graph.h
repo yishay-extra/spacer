@@ -8,6 +8,7 @@
 #include "core/Clock.h"
 #include "core/Layout.h"
 #include "core/SceneDiff.h"
+#include "core/spatial/AmbisonicDecoder.h"
 #include "engine/SourceInput.h"
 #include "engine/SourceNode.h"
 #include "engine/SpeakerChain.h"
@@ -30,6 +31,15 @@ public:
     void addSource(std::unique_ptr<SourceNode> node);
     /// Speakers must be added in layout order (bus index = layout index).
     void addSpeaker(const SpeakerChainSettings& settings, int outputChannel);
+
+    /// Non-RT, before the graph is handed to the engine: the project's
+    /// ambisonic decoder (SPEC §6.3), built by GraphBuilder. Needs
+    /// ambisonicOrder() > 0 and a decoder of that order.
+    void setAmbisonicDecoder(const AmbisonicDecoder& decoder);
+    const AmbisonicDecoder& ambisonicDecoder() const noexcept { return decoder_; }
+    /// True while an order / layout change is crossfading old → new decode.
+    bool isAmbisonicCrossfading() const noexcept { return xfadeRemaining_ > 0; }
+    static constexpr double kAmbisonicCrossfadeSeconds = 0.05;  // SPEC §5.4 (delay crossfade)
 
     // ---- queries ----
     double sampleRate() const noexcept { return sampleRate_; }
@@ -102,6 +112,8 @@ public:
 
 private:
     void takeSpeakerStateFrom(Graph& old) noexcept;
+    void beginAmbisonicCrossfade(Graph& old) noexcept;
+    void decodeAmbisonics(int n) noexcept;
     void adoptGhost(Graph& old, int sourceId, int fadeSamples) noexcept;
 
     Layout layout_;
@@ -120,6 +132,18 @@ private:
     std::vector<float*> busPointers_;
     juce::AudioBuffer<float> ambisonicBus_;
     std::vector<float*> ambisonicPointers_;
+
+    // Ambisonic decode (SPEC §5.3). During an order / layout change the old
+    // decoder keeps decoding the old encoders' bus while the gains of the two
+    // paths ramp (xfade*), then the legacy path goes idle.
+    AmbisonicDecoder decoder_;
+    AmbisonicDecoder legacyDecoder_;
+    juce::AudioBuffer<float> legacyBus_;
+    std::vector<float*> legacyPointers_;
+    int legacyOrder_{0};
+    int xfadeRemaining_{0};
+    int xfadeTotal_{0};
+    std::vector<float> ramp_;
 
     std::unique_ptr<ClockSource> clock_;
     bool clockSet_{false};

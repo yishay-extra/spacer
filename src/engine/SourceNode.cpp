@@ -239,7 +239,15 @@ void SourceNode::evaluatePositions(const MotionContext& ctx, const ModulatorBank
     }
 }
 
-void SourceNode::process(const InputContext& ctx, const ClockState& clock, int n, SpeakerBus& bus) noexcept {
+bool SourceNode::adoptLegacySpatializer(SourceNode& old) noexcept {
+    if (kind_ != SpatializerKind::Ambisonic || old.kind_ != SpatializerKind::Ambisonic || !old.spatializer_)
+        return false;
+    std::swap(legacySpatializer_, old.spatializer_);
+    return legacySpatializer_ != nullptr;
+}
+
+void SourceNode::process(const InputContext& ctx, const ClockState& clock, int n, SpeakerBus& bus,
+                         SpeakerBus* legacyBus) noexcept {
     const int channels = numChannels();
     float* ch[2] = {buffer_.getWritePointer(0), buffer_.getWritePointer(1)};
 
@@ -291,6 +299,8 @@ void SourceNode::process(const InputContext& ctx, const ClockState& clock, int n
         for (int i = 0; i < n; ++i) p = std::max(p, std::abs(ch[c][i]));
         peak_[cs] = p;
         if (spatializer_) spatializer_->render(ch[c], n, prevEnd_[cs], end_[cs], spread, bus);
+        if (legacyBus != nullptr && legacySpatializer_)
+            legacySpatializer_->render(ch[c], n, prevEnd_[cs], end_[cs], spread, *legacyBus);
     }
     prevEnd_ = end_;
 }

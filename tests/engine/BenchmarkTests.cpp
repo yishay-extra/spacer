@@ -14,18 +14,21 @@ using namespace spacer;
 using namespace spacer::testing;
 
 // SPEC §17: 64 sources, 32 speakers, 128 frames at 48 kHz must process in
-// < 1.0 ms. The spec's mix includes 5th-order ambisonics, which does not
-// exist yet (WP2d); until then all 64 sources are VBAP with spread (MDAP,
-// the most expensive VBAP path), half of them stereo, with distance filters.
+// < 1.0 ms. The mix: half of the sources are VBAP with spread (MDAP, the most
+// expensive VBAP path), half are 5th-order ambisonic (decoded through an
+// AllRAD matrix for the 32-speaker ring); half of them stereo, all with
+// distance filters.
 TEST_CASE("Benchmark: 64 sources x 32 speakers, 128 frames at 48 kHz", "[benchmark]") {
     std::vector<Speaker> speakers;
     for (int i = 0; i < 32; ++i)
         speakers.push_back(makeSpeaker(i + 1, -180.0f + 11.25f * static_cast<float>(i) + 5.0f,
                                        2.0f + 0.05f * static_cast<float>(i % 5), i));
     Project p = makeProject(speakers);
+    p.ambisonics.order = 5;
     for (int i = 0; i < 64; ++i) {
         SourceSpec s = makeSource(i + 1, {static_cast<float>(i * 7 - 180), 0.0f, 3.0f});
         s.stereo = (i % 2) == 0;
+        if (i % 2 == 1) s.spatializer = SpatializerKind::Ambisonic;
         s.spread = 0.25f;
         s.distance.k = 1.0f;
         s.distance.q = 0.3f;
@@ -63,7 +66,10 @@ TEST_CASE("Benchmark: 64 sources x 32 speakers, 128 frames at 48 kHz", "[benchma
     }
     const double ms =
         std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count() / blocks;
-    std::printf("[benchmark] 64 sources x 32 speakers x 128 frames: %.3f ms per block (budget 1.0 ms)\n", ms);
+    std::printf(
+        "[benchmark] 64 sources (32 VBAP + 32 5th-order ambisonic) x 32 speakers x 128 frames: %.3f ms per "
+        "block (budget 1.0 ms)\n",
+        ms);
 
     CHECK(allocguard::violations() == 0);
 #ifdef NDEBUG
