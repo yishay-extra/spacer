@@ -7,6 +7,9 @@
 //   source.<id>.<ParameterPath>   e.g. source.3.gain, source.3.motion.radius
 //   <ParameterPath>               the UI-selected source (resolved by the dispatcher)
 //   speaker.<id>.trim | speaker.<id>.mute
+//   source.<id>.insert.<slot>.param.<index>    plugin parameter (SPEC §13), 0..1
+//   speaker.<id>.insert.<slot>.param.<index>
+//   insert.<slot>.param.<index>                 the UI-selected source's plugin
 //   master.gain
 //   clock.bpm
 //

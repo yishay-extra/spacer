@@ -30,6 +30,9 @@ public:
         int maxBlockSize{128};
         /// Inputs for sources a recall adds (same factory as the live graph).
         GraphBuilder::InputFactory inputFactory;
+        /// Plugin host of the live graph (null = no plugin hosting). Before
+        /// each recall the live plugin state is captured into the project.
+        PluginHost* pluginHost{nullptr};
         int numOutputChannels{-1};
         std::uint64_t randomSeed{1};
     };

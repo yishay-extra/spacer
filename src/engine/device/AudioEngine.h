@@ -67,6 +67,9 @@ public:
     void setInputFactory(GraphBuilder::InputFactory factory) { inputFactory_ = std::move(factory); }
     /// Base for project-relative file paths (the project file's directory).
     void setProjectDirectory(const juce::File& dir) { projectDirectory_ = dir; }
+    /// Plugin instances for insert slots (SPEC §13); null = inserts pass
+    /// through. Must outlive the engine. Its warnings join buildWarnings().
+    void setPluginHost(PluginHost* host) { pluginHost_ = host; }
     /// Non-fatal problems from the last graph build (e.g. missing files).
     const std::vector<std::string>& buildWarnings() const noexcept { return warnings_; }
 
@@ -114,6 +117,7 @@ private:
     VirtualDeviceReceiver virtual_;
     std::optional<Project> project_;
     GraphBuilder::InputFactory inputFactory_;
+    PluginHost* pluginHost_{nullptr};
     ClockSelector clockSelector_;
     juce::File projectDirectory_;
     mutable std::vector<std::string> warnings_;

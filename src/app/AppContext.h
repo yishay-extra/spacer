@@ -15,6 +15,7 @@
 #include "control/InstallationMode.h"
 #include "control/device/MidiInputService.h"
 #include "core/Project.h"
+#include "engine/PluginHost.h"
 #include "engine/device/AudioEngine.h"
 #include "ui/logic/FeedbackState.h"
 #include "ui/logic/ProjectHistory.h"
@@ -172,6 +173,7 @@ private:
 
     Project project_;
     ProjectHistory history_;
+    std::unique_ptr<PluginHost> plugins_;  // before engine_: outlives its graphs
     ClockInputs clockInputs_;  // before engine_: its clock factory refers to it
     AudioEngine engine_;
     std::unique_ptr<CueEngine> cues_;

@@ -1,5 +1,7 @@
 #include "app/AppContext.h"
 
+#include <juce_audio_processors/juce_audio_processors.h>
+
 #include <algorithm>
 
 #include "app/VirtualDeviceInstaller.h"
@@ -30,9 +32,15 @@ std::filesystem::path settingsDirectory() {
 
 }  // namespace
 
-AppContext::AppContext() : project_(defaultProject()) {
+AppContext::AppContext()
+    : project_(defaultProject()),
+      // GUI formats (not headless) so hosted plugins can open editors (WP11e).
+      plugins_(std::make_unique<PluginHost>(
+          PluginHost::Options::appDefaults(),
+          [](juce::AudioPluginFormatManager& f) { juce::addDefaultFormatsToManager(f); })) {
     installationSettingsPath_ = settingsDirectory() / "installation.json";
     loadInstallationSettings();
+    engine_.setPluginHost(plugins_.get());
     engine_.onFeedback = [this](const Feedback& f) { onFeedback(f); };
     // External clocks (SPEC §9) travel with the graph; AudioEngine asks for
     // one whenever project.clock changes.
@@ -84,6 +92,7 @@ void AppContext::resetCueEngine() {
     config.maxBlockSize =
         std::max(status.bufferSize > 0 ? status.bufferSize : project_.devices.bufferSize, 512);
     if (status.outputChannels > 0) config.numOutputChannels = status.outputChannels;
+    config.pluginHost = plugins_.get();
     if (midiIn_) midiIn_->close();
     control_.reset();
     cues_ = std::make_unique<CueEngine>(engine_.processor(), project_, std::move(config));
@@ -219,6 +228,7 @@ std::string AppContext::openProject(const std::filesystem::path& path) {
 std::string AppContext::saveProject(const std::filesystem::path& path) {
     const auto target = path.empty() ? projectPath_ : path;
     if (target.empty()) return "No file name";
+    plugins_->captureState(project_);  // edits made in plugin editors are saved too
     if (const auto err = projectfile::save(project_, target)) return err->message;
     projectPath_ = target;
     savedRevision_ = revision_;
@@ -323,6 +333,8 @@ void AppContext::timerCallback() {
     lastTick_ = now;
 
     if (rebuildPending_ && now - lastRebuild_ >= kGestureRebuildSeconds) rebuildGraph();
+    // A plugin changed its latency: rebuild so it is compensated (SPEC §5.6).
+    if (plugins_->takeLatencyChanged()) rebuildGraph();
 
     // OSC / MIDI. A cue fired from there changes the live model (SPEC §11).
     const int cueBefore = cues_->sequencer().current();
