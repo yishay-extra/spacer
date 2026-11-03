@@ -55,3 +55,29 @@ check, except check 7, which deliberately starves the disk.
   commands themselves are tested in CI (`Source files: transport commands`).
 - `playOnSceneRecall`: WP9 (scene recall).
 - UI: WP11.
+
+## Results — 2026-11-03 (MacBook Air, built-in speakers/mic, macOS 26.6.2)
+
+Test material: synthetic 30 s stereo file (L 440 Hz, R 660 Hz, both
+amplitude-modulated at 1 Hz, loud at both ends), converted with `afconvert`
+(44.1 k, 96 k, AIFF, AAC, ALAC) and `ffmpeg` (FLAC, Ogg Vorbis, MP3).
+
+**All file checks first failed with `file position 0.000 s` and silence:
+the tool's `FilePlay` is queued right after `setProject` and the engine
+drops it (#36, root cause confirmed in `EngineProcessor`).** The rows below
+were re-run with the tool sending `FilePlay` one tick later (experiment
+patch only, not committed).
+
+| # | Result | Notes |
+|---|--------|-------|
+| 1 | pass (objective) | Position 1 s/s (13.877 s at t=14), 440 + 660 Hz on the mic, xruns 0, underruns 0. L/R placement — **listener**. |
+| 2 | pass (objective) | 44.1 k and 96 k files at a 48 k device: position 1 s/s, underruns 0. Artefacts — **listener**. |
+| 3 | pass (objective) | Device at 44.1 k and 96 k: plays, underruns 0. Pitch — **listener** (file-mode capture not repeated at those rates). |
+| 4 | pass | WAV, AIFF, FLAC, Ogg, MP3, AAC, ALAC all play, no `cannot read` warning. |
+| 5 | pass | `--loop` 70 s: position wraps 29.87 → 0.88 at t≈30 and t≈60, underruns 0. Click at the loop point — **listener**. |
+| 6 | pass | `seek to 0` printed at t=5, position 4.86 → 0.96 next second. Cleanliness — **listener**. |
+| 7 | pass (weak) | File on a 20 MB DMG, `hdiutil detach -force` at t=10: playback continued to the end with underruns 0 and the status line kept updating (the 11 MB file was in the page cache, so the disk never actually stalled). A real USB stick / SMB share is still **open**. |
+| 8 | pass (objective) | sine 440 Hz on the mic; white noise flat, pink ~13 dB lower above 1 kHz (darker); impulse broadband. xruns 0. Sides — **listener**. |
+| 9 | pass (objective) | 12 s, pink noise, xruns 0, allocation guard silent. Smoothness — **listener**. |
+| 10 | pass (objective) | Via the Speakers+Microphone aggregate: channels 0, 1 and 63 run without error or warning, xruns 0 (volume 15 % against feedback). Audible side/cleanliness — **listener with headphones**. |
+| 11 | pass | `sample` during check 1: reads under `Spacer disk`; the `com.apple.audio.IOThread.client` stack has no reader frames. |

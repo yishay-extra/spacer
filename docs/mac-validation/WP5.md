@@ -59,3 +59,10 @@ Driver logs: `log stream --predicate 'subsystem == "org.spacer.driver"'`.
 | 12 | **coreaudiod restart.** With A and B running: `sudo killall coreaudiod`. | B stops (its device went away); A shows `not-responding` then `connected` again with a new session; after restarting B the tone returns. A never crashes. | Recovers |
 | 13 | **Driver removed while running.** With A running: `sudo rm -rf /Library/Audio/Plug-Ins/HAL/Spacer.driver && sudo killall coreaudiod`. | A goes to `absent` within ~5 s and keeps running; Spacer.app shows the warning and the Install button. | No crash |
 | 14 | **Incompatible driver (optional).** Not testable without a second protocol version; covered by `VirtualDevice: an incompatible protocol is refused and reported` in CI. | — | — |
+
+## Results — 2026-11-03 (MacBook Air, macOS 26.6.2)
+
+| # | Result | Notes |
+|---|--------|-------|
+| 1 | pass (text differs, #39) | Driver absent: app starts and runs, status bar ends with `Spacer virtual device not found (driver not installed or not loaded)` and a button labelled **Install...**; `check virtual --channel 6 --seconds 5` prints `driver=absent` every second and exits 0. |
+| 2–13 | **open** | Need the administrator password at the install prompt (and `sudo` for 12–13), then a listener / a DAW. Not run. |
