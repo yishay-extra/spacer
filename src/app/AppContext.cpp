@@ -69,8 +69,8 @@ void AppContext::loadInstallationSettings() {
 }
 
 void AppContext::start() {
+    bool usedAutosave = false;
     if (installation_.enabled && !installation_.lastProjectPath.empty()) {
-        bool usedAutosave = false;
         if (auto loaded = installation::autoload(installation_, &usedAutosave)) {
             project_ = loaded->project;
             projectPath_ = installation_.lastProjectPath;
@@ -89,7 +89,8 @@ void AppContext::start() {
             autosaver_ =
                 std::make_unique<Autosaver>(projectPath_, std::max(1, installation_.autosaveSeconds));
     }
-    modelChanged(Change::Loaded);
+    modelChanged(Change::Loaded,
+                 usedAutosave ? Saved::No : Saved::Yes);  // a recovered autosave is unsaved work
     lastTick_ = nowSeconds();
     startTimerHz(kTickHz);
 }
@@ -323,8 +324,7 @@ void AppContext::newProject(Project project) {
     if (deviceChanged) reopenDevice();
     resetCueEngine();  // a new project: fresh sequencer state
     feedback_.clearPositions();
-    savedRevision_ = revision_ + 1;  // a fresh project is not dirty
-    modelChanged(Change::Loaded);
+    modelChanged(Change::Loaded, Saved::Yes);
 }
 
 std::string AppContext::openProject(const std::filesystem::path& path) {
@@ -344,7 +344,7 @@ std::string AppContext::saveProject(const std::filesystem::path& path) {
     capturePluginState();  // edits made in plugin editors are saved too
     if (const auto err = projectfile::save(project_, target)) return err->message;
     projectPath_ = target;
-    savedRevision_ = revision_;
+    revision_.markSaved();
     rememberProjectPath();
     return {};
 }
@@ -358,7 +358,7 @@ int AppContext::capturePluginState() {
     };
     const auto before = snapshot(project_);
     const int n = plugins_->captureState(project_);
-    if (snapshot(project_) != before) ++revision_;  // the plug-in changed: the project is modified
+    if (snapshot(project_) != before) revision_.bump();  // the plug-in changed: the project is modified
     return n;
 }
 
@@ -375,8 +375,9 @@ void AppContext::selectSource(int sourceId) {
     notify(Change::Selection);
 }
 
-void AppContext::modelChanged(Change change) {
-    ++revision_;
+void AppContext::modelChanged(Change change, Saved saved) {
+    revision_.bump();
+    if (saved == Saved::Yes) revision_.markSaved();  // before notify(): listeners read isDirty()
     selection_.reconcile(project_);
     notify(change);
 }
@@ -512,7 +513,7 @@ void AppContext::timerCallback() {
     if (plugins_->takeLatencyChanged()) rebuildGraph();
     // An edit in a plugin editor modifies the project (dirty, autosave).
     if (plugins_->takeEdited()) {
-        ++revision_;
+        revision_.bump();
         notify(Change::PluginEdited);
     }
 
@@ -536,10 +537,10 @@ void AppContext::timerCallback() {
     if (!speakerTest_ && cues_->armed() && cues_->tick(cueTick())) modelChanged(Change::SceneRecalled);
 
     if (autosaver_) {
-        const bool dirty = revision_ != autosavedRevision_;
+        const bool dirty = revision_.value() != autosavedRevision_;
         // Live plugin state (editor edits) is part of the project (SPEC §13).
         if (autosaver_->tick(now, project_, dirty, [this](Project&) { capturePluginState(); }))
-            autosavedRevision_ = revision_;
+            autosavedRevision_ = revision_.value();
     }
 
     const auto copy = listeners_;
