@@ -81,7 +81,11 @@ void EngineProcessor::setGraphWhileStopped(std::unique_ptr<Graph> graph) {
     fadingOut_ = false;
     Graph* old = graph_;
     graph_ = graph.release();
-    if (graph_ && old) graph_->takeStateFrom(*old);
+    if (graph_ && old) {
+        graph_->takeStateFrom(*old);
+        graph_->inheritClockFrom(*old);
+    }
+    selectClock();
     delete old;
     if (graph_) adoptSampleRate(graph_->sampleRate());
     latency_.store(graph_ ? graph_->latencySamples() : 0, std::memory_order_relaxed);
@@ -91,9 +95,45 @@ void EngineProcessor::adoptSampleRate(double sampleRate) noexcept {
     if (juce::exactlyEqual(sampleRate, sampleRate_)) return;
     sampleRate_ = sampleRate;
     clock_.setSampleRate(sampleRate);
+    if (external_ != nullptr) external_->setSampleRate(sampleRate);
     const float current = master_.current();
     master_.prepare(sampleRate, current);  // GainRamp::prepare does not allocate
     master_.setTarget(masterTarget(masterGainDb_, panic_));
+}
+
+// ---- clock (SPEC §9) -----------------------------------------------------------
+
+void EngineProcessor::selectClock() noexcept {
+    // external_ may point into a graph that is already retired: it is only
+    // compared here, never dereferenced.
+    ClockSource* next = graph_ != nullptr ? graph_->clock() : nullptr;
+    if (next == external_) return;
+    if (next != nullptr) {
+        next->setSampleRate(sampleRate_ > 0.0 ? sampleRate_ : graph_->sampleRate());
+    } else {
+        // Back to the internal clock: continue from where the external one
+        // was, so motions and beat-triggered cues do not jump.
+        clock_.setBpm(clockState_.bpm);
+        clock_.setBeat(clockState_.beat);
+        if (clockState_.playing)
+            clock_.resume();
+        else
+            clock_.stop();
+    }
+    external_ = next;
+}
+
+ClockState EngineProcessor::advanceClock(int numSamples) noexcept {
+    // The internal clock always runs: it owns the engine timeline
+    // (timeSeconds, used by tap tempo and the cue engine).
+    ClockState s = clock_.advance(numSamples);
+    if (external_ != nullptr) {
+        const double engineTime = s.timeSeconds;
+        s = external_->advance(numSamples);
+        s.timeSeconds = engineTime;
+    }
+    clockState_ = s;
+    return s;
 }
 
 void EngineProcessor::applyCommands() noexcept {
@@ -109,6 +149,8 @@ void EngineProcessor::apply(const Command& command) noexcept {
                 // A newer graph supersedes one not yet applied. (The retire
                 // queue is emptied at 30 Hz and holds 32, so it is never full
                 // in practice; if it were, the newest graph is the one dropped.)
+                // A clock switch carried by the superseded graph is kept.
+                if (pending_ != nullptr && c.graph != nullptr) c.graph->inheritClockFrom(*pending_);
                 if (pending_ != nullptr && !retired_.push(pending_)) {
                     retired_.push(c.graph);
                     return;
@@ -197,11 +239,13 @@ bool EngineProcessor::applyPendingSwap() noexcept {
         // The old graph must be able to go back for deletion; otherwise wait.
         if (retired_.size() >= SpscQueue<Graph*, kRetireCapacity>::capacity()) return false;
         pending_->takeStateFrom(*graph_);
+        pending_->inheritClockFrom(*graph_);  // before the old graph can be deleted
         retired_.push(graph_);
     }
     graph_ = pending_;
     pending_ = nullptr;
     fadingOut_ = false;
+    selectClock();
     adoptSampleRate(graph_->sampleRate());
     latency_.store(graph_->latencySamples(), std::memory_order_relaxed);
     return true;
@@ -234,7 +278,7 @@ void EngineProcessor::process(const float* const* inputs, int numInputs, float* 
         }
     }
 
-    const ClockState clockAtStart = clock_.advance(numSamples);
+    const ClockState clockAtStart = advanceClock(numSamples);
     // Clock first (SPEC §9); each chunk's motions see the clock at its start.
 
     // A scheduled (AtBeat) recall fires at the exact sample where the transport
@@ -346,9 +390,11 @@ void EngineProcessor::applyRecall(RecallPlan* plan) noexcept {
         }
         if (graph_ != nullptr) {
             plan->graph->takeStateForRecall(*graph_, plan->diff, crossfadeSamples, transitionSamples);
+            plan->graph->inheritClockFrom(*graph_);
             retired_.push(graph_);
         }
         graph_ = plan->graph.release();
+        selectClock();
         adoptSampleRate(graph_->sampleRate());
         latency_.store(graph_->latencySamples(), std::memory_order_relaxed);
     }
@@ -495,7 +541,7 @@ void EngineProcessor::stepRamps(int numSamples) noexcept {
 }
 
 void EngineProcessor::publishFeedback() noexcept {
-    feedback_.push(fb::Clock{clock_.current()});
+    feedback_.push(fb::Clock{clockState_});
     if (xruns_ != xrunsReported_) {
         xrunsReported_ = xruns_;
         feedback_.push(fb::Xrun{xruns_});

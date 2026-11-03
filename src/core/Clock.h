@@ -25,9 +25,10 @@ struct ClockState {
     double secondsPerBeat() const { return 60.0 / bpm; }
 };
 
-/// Abstract clock. Implementations: InternalClock (WP6), LinkClock, MidiClock,
-/// MtcClock, OscClock (WP12). All methods are called on the audio thread and
-/// must be real-time safe.
+/// Abstract clock. Implementations: InternalClock (WP6, core), MidiClock,
+/// MtcClock, OscClock and LinkClock (WP12, src/control). All methods are
+/// called on the audio thread and must be real-time safe. Only one is active;
+/// the engine switches clocks through SwapGraph (SPEC §9, Graph::setClock).
 class ClockSource {
 public:
     virtual ~ClockSource() = default;
@@ -38,6 +39,11 @@ public:
 
     /// Last state returned by advance().
     virtual ClockState current() const = 0;
+
+    /// Called by the engine (audio thread, or while stopped) when the device
+    /// rate changes and when the clock becomes the active one. Addition to
+    /// SPEC §4 (WP12): external clocks need the rate to place `startOffset`.
+    virtual void setSampleRate(double sampleRate) = 0;
 };
 
 }  // namespace spacer

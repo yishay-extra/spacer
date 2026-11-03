@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "core/Project.h"
+#include "engine/ClockSelector.h"
 #include "engine/Command.h"
 #include "engine/DiskStreamer.h"
 #include "engine/EngineProcessor.h"
@@ -67,6 +68,12 @@ public:
     /// Non-fatal problems from the last graph build (e.g. missing files).
     const std::vector<std::string>& buildWarnings() const noexcept { return warnings_; }
 
+    /// Creates external clocks (SPEC §9; WP12). Graphs built after a change of
+    /// project.clock carry the new clock; null / unset = internal clock only.
+    void setClockFactory(ClockSelector::Factory factory) { clockSelector_.setFactory(std::move(factory)); }
+    /// Clock kind in use by the latest graph (Internal after a fallback).
+    ClockKind activeClockKind() const noexcept { return clockSelector_.activeKind(); }
+
     /// Parameter change, queued for the audio thread. False if dropped.
     bool send(const Command& command) { return processor_.push(command); }
 
@@ -88,13 +95,14 @@ private:
     void audioDeviceStopped() override;
     void timerCallback() override;
 
-    std::unique_ptr<Graph> buildGraph(double sampleRate, int blockSize, int numOutputs) const;
+    std::unique_ptr<Graph> buildGraph(double sampleRate, int blockSize, int numOutputs);
 
     juce::AudioDeviceManager deviceManager_;
     mutable DiskStreamer streamer_;  // before processor_: outlives the graphs' file players
     EngineProcessor processor_;
     std::optional<Project> project_;
     GraphBuilder::InputFactory inputFactory_;
+    ClockSelector clockSelector_;
     juce::File projectDirectory_;
     mutable std::vector<std::string> warnings_;
 
