@@ -10,6 +10,10 @@ set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0" CACHE STRING "Minimum macOS version")
 option(SPACER_BUILD_APP   "Build the JUCE desktop application (macOS only)" ON)
 option(SPACER_BUILD_TESTS "Build unit tests" ON)
 option(SPACER_BUILD_ENGINE_TESTS "Build the JUCE engine tests (fetches JUCE on every platform)" ON)
+# Ableton Link is GPLv2-or-later (or a proprietary licence by agreement with
+# Ableton). That is not compatible with shipping Spacer closed-source under a
+# commercial JUCE licence (docs/DESIGN.md §11.5), so LinkClock is opt-in.
+option(SPACER_WITH_LINK "Build LinkClock with Ableton Link (GPLv2+, see WP12 notes)" OFF)
 
 include(FetchContent)
 set(FETCHCONTENT_QUIET OFF)
@@ -79,6 +83,26 @@ if(SPACER_WITH_APP OR SPACER_WITH_ENGINE_TESTS)
     FetchContent_MakeAvailable(JUCE)
 endif()
 
+# ---------------------------------------------------------------------------
+# Ableton Link (optional, header-only + asio): only its CMake config is used,
+# Link's own examples / tests are not added to the build.
+# ---------------------------------------------------------------------------
+set(SPACER_LINK_SOURCES "")
+if(SPACER_WITH_LINK)
+    FetchContent_Declare(link
+        GIT_REPOSITORY https://github.com/Ableton/link.git
+        GIT_TAG        Link-3.1.5
+        GIT_SHALLOW    TRUE
+        GIT_SUBMODULES modules/asio-standalone
+        SOURCE_SUBDIR  spacer-do-not-add
+        SYSTEM)
+    FetchContent_MakeAvailable(link)
+    include(${link_SOURCE_DIR}/AbletonLinkConfig.cmake)
+    file(GLOB SPACER_LINK_SOURCES CONFIGURE_DEPENDS
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/control/link/*.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/control/link/*.h)
+endif()
+
 # Engine sources. src/engine/*.cpp is portable JUCE code (no device I/O) and
 # is also built into the engine tests; src/engine/device/ needs
 # juce_audio_devices / CoreAudio and is built into the app only.
@@ -117,9 +141,15 @@ if(SPACER_WITH_APP)
         ${CMAKE_CURRENT_SOURCE_DIR}/src/ui/*.h
         ${CMAKE_CURRENT_SOURCE_DIR}/src/app/*.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/app/*.h)
-    # src/ui/logic is the separate spacer_ui_logic library.
+    # src/ui/logic is the separate spacer_ui_logic library; src/control/link
+    # is only built with SPACER_WITH_LINK.
     list(FILTER SPACER_APP_SOURCES EXCLUDE REGEX "/src/ui/logic/")
-    target_sources(Spacer PRIVATE ${SPACER_APP_SOURCES})
+    list(FILTER SPACER_APP_SOURCES EXCLUDE REGEX "/src/control/link/")
+    target_sources(Spacer PRIVATE ${SPACER_APP_SOURCES} ${SPACER_LINK_SOURCES})
+    if(SPACER_WITH_LINK)
+        target_compile_definitions(Spacer PRIVATE SPACER_WITH_LINK=1)
+        target_link_libraries(Spacer PRIVATE Ableton::Link)
+    endif()
 
     target_compile_definitions(Spacer PRIVATE
         ${SPACER_ENGINE_JUCE_DEFINITIONS}
