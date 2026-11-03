@@ -15,4 +15,8 @@ bool specEqual(const Layout& a, const Layout& b) {
     return a == b;
 }
 
+bool specEqual(const ClockConfig& a, const ClockConfig& b) {
+    return a == b;
+}
+
 }  // namespace spacer
