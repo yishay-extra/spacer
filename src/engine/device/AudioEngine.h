@@ -10,6 +10,7 @@
 #include <optional>
 
 #include "core/Project.h"
+#include "engine/ClockSelector.h"
 #include "engine/Command.h"
 #include "engine/EngineProcessor.h"
 #include "engine/Feedback.h"
@@ -60,6 +61,12 @@ public:
     /// WP4/WP5 provide live inputs this is how tools feed test signals.
     void setInputFactory(GraphBuilder::InputFactory factory) { inputFactory_ = std::move(factory); }
 
+    /// Creates external clocks (SPEC §9; WP12). Graphs built after a change of
+    /// project.clock carry the new clock; null / unset = internal clock only.
+    void setClockFactory(ClockSelector::Factory factory) { clockSelector_.setFactory(std::move(factory)); }
+    /// Clock kind in use by the latest graph (Internal after a fallback).
+    ClockKind activeClockKind() const noexcept { return clockSelector_.activeKind(); }
+
     /// Parameter change, queued for the audio thread. False if dropped.
     bool send(const Command& command) { return processor_.push(command); }
 
@@ -81,12 +88,13 @@ private:
     void audioDeviceStopped() override;
     void timerCallback() override;
 
-    std::unique_ptr<Graph> buildGraph(double sampleRate, int blockSize, int numOutputs) const;
+    std::unique_ptr<Graph> buildGraph(double sampleRate, int blockSize, int numOutputs);
 
     juce::AudioDeviceManager deviceManager_;
     EngineProcessor processor_;
     std::optional<Project> project_;
     GraphBuilder::InputFactory inputFactory_;
+    ClockSelector clockSelector_;
 
     // Written in audioDeviceAboutToStart (callback not running), read by the callback.
     juce::AudioIODevice* device_{nullptr};

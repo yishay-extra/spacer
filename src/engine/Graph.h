@@ -5,6 +5,7 @@
 #include <memory>
 #include <vector>
 
+#include "core/Clock.h"
 #include "core/Layout.h"
 #include "core/SceneDiff.h"
 #include "engine/SourceInput.h"
@@ -75,6 +76,28 @@ public:
     /// Returns how many sources are fading.
     int fadeOutSourcesMissingFrom(Graph& next, int numSamples) noexcept;
 
+    // ---- clock (SPEC §9: only one clock is active; switching happens
+    // through SwapGraph) ----
+    /// Non-RT, before the graph is handed to the engine. Selects the clock
+    /// this graph runs on: an external ClockSource (owned by the graph, so a
+    /// replaced clock is deleted with the retired graph on the message
+    /// thread) or, with null, the engine's internal clock. A graph whose
+    /// clock was never set keeps whatever clock the graph it replaces uses.
+    void setClock(std::unique_ptr<ClockSource> clock) {
+        clock_ = std::move(clock);
+        clockSet_ = true;
+    }
+    bool clockSet() const noexcept { return clockSet_; }
+    /// The external clock, or null for the internal one.
+    ClockSource* clock() noexcept { return clock_.get(); }
+    /// If this graph's clock was never set, take over `old`'s selection (and
+    /// its ClockSource, with all its state). RT-safe: moves a pointer.
+    void inheritClockFrom(Graph& old) noexcept {
+        if (clockSet_ || !old.clockSet_) return;
+        clock_ = std::move(old.clock_);
+        clockSet_ = true;
+    }
+
 private:
     void takeSpeakerStateFrom(Graph& old) noexcept;
     void adoptGhost(Graph& old, int sourceId, int fadeSamples) noexcept;
@@ -95,6 +118,9 @@ private:
     std::vector<float*> busPointers_;
     juce::AudioBuffer<float> ambisonicBus_;
     std::vector<float*> ambisonicPointers_;
+
+    std::unique_ptr<ClockSource> clock_;
+    bool clockSet_{false};
 };
 
 }  // namespace spacer

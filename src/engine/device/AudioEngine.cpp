@@ -41,20 +41,24 @@ void AudioEngine::closeDevice() {
     deviceManager_.closeAudioDevice();
 }
 
-std::unique_ptr<Graph> AudioEngine::buildGraph(double sampleRate, int blockSize, int numOutputs) const {
+std::unique_ptr<Graph> AudioEngine::buildGraph(double sampleRate, int blockSize, int numOutputs) {
     if (!project_ || sampleRate <= 0.0 || blockSize <= 0) return nullptr;
     GraphBuilder builder(*project_);
     // Live source inputs (hardware, file, generator, virtual device) are WP4 / WP5.
     if (inputFactory_) builder.setInputFactory(inputFactory_);
     builder.setNumOutputChannels(numOutputs);
-    return builder.build(sampleRate, blockSize);
+    auto graph = builder.build(sampleRate, blockSize);
+    if (graph) clockSelector_.apply(*graph, project_->clock);
+    return graph;
 }
 
 void AudioEngine::setProject(const Project& project) {
     project_ = project;
     if (running_) {
-        if (auto graph = buildGraph(sampleRate_.load(), blockSize_.load(), numOutputs_.load()))
-            processor_.swapGraph(std::move(graph));
+        if (auto graph = buildGraph(sampleRate_.load(), blockSize_.load(), numOutputs_.load())) {
+            // A dropped swap may have carried a clock change: set it explicitly next time.
+            if (!processor_.swapGraph(std::move(graph))) clockSelector_.invalidate();
+        }
         processor_.push(cmd::ClockSetBpm{project.clock.bpm});
     } else {
         processor_.configureClock(project.clock);
