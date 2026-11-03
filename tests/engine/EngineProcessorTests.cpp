@@ -404,3 +404,47 @@ TEST_CASE("EngineProcessor: setGraphWhileStopped drains everything queued before
     CHECK(rig.proc.currentGraph()->sampleRate() == 44100.0);
     CHECK(rig.proc.droppedCommands() == 0);
 }
+
+namespace {
+
+/// Frequency from positive-going zero crossings (linearly interpolated).
+double zeroCrossingHz(const std::vector<float>& x, double sampleRate) {
+    double first = -1.0, last = -1.0;
+    int crossings = 0;
+    for (std::size_t i = 1; i < x.size(); ++i) {
+        if (x[i - 1] >= 0.0f || x[i] < 0.0f) continue;
+        const double t = static_cast<double>(i - 1) + x[i - 1] / (x[i - 1] - x[i]);
+        if (first < 0.0) first = t;
+        last = t;
+        ++crossings;
+    }
+    return crossings > 1 ? (crossings - 1) * sampleRate / (last - first) : 0.0;
+}
+
+}  // namespace
+
+TEST_CASE("EngineProcessor: a generator keeps its pitch and level across restarts at new device rates") {
+    // The sequence AudioEngine::audioDeviceAboutToStart runs on a live rate
+    // change: a graph built at the new rate replaces the old one while stopped.
+    Project p = twoChannelProject({1});
+    p.sources[0].gainDb = -20.0f;
+    const float expectedRms = juce::Decibels::decibelsToGain(-20.0f) / std::sqrt(2.0f);
+    constexpr int kDeviceBlock = 512;
+    EngineProcessor proc;
+    juce::AudioBuffer<float> out(2, kDeviceBlock);
+    float* ptrs[] = {out.getWritePointer(0), out.getWritePointer(1)};
+    for (const double sr : {48000.0, 44100.0, 96000.0, 48000.0}) {
+        INFO("device rate " << sr);
+        proc.setGraphWhileStopped(GraphBuilder(p).build(sr, kDeviceBlock));
+        const int total = static_cast<int>(sr) / kDeviceBlock * kDeviceBlock;  // about 1 s
+        std::vector<float> left;
+        left.reserve(static_cast<std::size_t>(total));
+        for (int done = 0; done < total; done += kDeviceBlock) {
+            proc.process(nullptr, 0, ptrs, 2, kDeviceBlock);
+            left.insert(left.end(), out.getReadPointer(0), out.getReadPointer(0) + kDeviceBlock);
+        }
+        const std::vector<float> settled(left.begin() + total / 2, left.end());
+        CHECK(zeroCrossingHz(settled, sr) == Approx(440.0).margin(0.5));
+        CHECK(rms(settled.data(), static_cast<int>(settled.size())) == Approx(expectedRms).margin(1e-3));
+    }
+}
