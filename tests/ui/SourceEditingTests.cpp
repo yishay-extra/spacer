@@ -359,7 +359,9 @@ TEST_CASE("A modulator with a stale target still shows it", "[ui][sources]") {
     ModulatorSpec m;
     m.target = "motion.radius";  // not a Manual parameter
     s.modulators.push_back(m);
-    const auto* target = find(sourceFields(s, p.layout, SourceSection::Modulators), "mod.0.target");
+    const auto fields =
+        sourceFields(s, p.layout, SourceSection::Modulators);  // keep alive: find() points into it
+    const auto* target = find(fields, "mod.0.target");
     REQUIRE(target);
     REQUIRE(target->text == "motion.radius");
 }
