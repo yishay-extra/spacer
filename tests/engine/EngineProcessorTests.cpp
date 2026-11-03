@@ -1,12 +1,17 @@
+#include <algorithm>
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <memory>
+#include <string>
 #include <vector>
 
 #include "EngineTestUtils.h"
+#include "TestReaders.h"
 #include "engine/AllocationGuard.h"
 #include "engine/BufferInput.h"
+#include "engine/DiskStreamer.h"
 #include "engine/EngineProcessor.h"
+#include "engine/FilePlayer.h"
 #include "engine/GraphBuilder.h"
 
 using Catch::Approx;
@@ -57,6 +62,42 @@ struct Rig {
         for (int i = 0; i < blocks; ++i) run();
     }
     float last(int ch, int n = kBlock) const { return out.getSample(ch, n - 1); }
+};
+
+/// Graphs built on demand, driven like the offline renderer (streamer
+/// serviced before each block). Sources in `fileIds` play a RampReader file
+/// (stopped until FilePlay, same identity in every graph); the rest are DC.
+struct SwapRig {
+    DiskStreamer streamer;
+    EngineProcessor proc;
+    juce::AudioBuffer<float> out{2, kBlock};
+    fb::FileTransport lastTransport{};
+
+    std::unique_ptr<Graph> build(std::vector<int> ids, std::vector<int> fileIds = {}, double sr = kSr) {
+        GraphBuilder b(twoChannelProject(std::move(ids)));
+        auto dc = dcInputs();
+        b.setInputFactory([this, dc, fileIds](const SourceSpec& s) -> std::unique_ptr<SourceInput> {
+            if (std::find(fileIds.begin(), fileIds.end(), s.id) == fileIds.end()) return dc(s);
+            return std::make_unique<FilePlayer>(FileInputSpec{}, 1, std::make_unique<RampReader>(kSr, 480000),
+                                                &streamer, "file" + std::to_string(s.id));
+        });
+        return b.build(sr, kBlock);
+    }
+    void run(int blocks = 1) {
+        for (int i = 0; i < blocks; ++i) {
+            streamer.serviceAll();
+            float* ptrs[] = {out.getWritePointer(0), out.getWritePointer(1)};
+            proc.process(nullptr, 0, ptrs, 2, kBlock);
+            Feedback f;
+            while (proc.popFeedback(f))
+                if (auto* t = std::get_if<fb::FileTransport>(&f)) lastTransport = *t;
+        }
+    }
+    bool filePlaying(int id) {
+        TransportState t;
+        SourceNode* s = proc.currentGraph()->findSource(id);
+        return s != nullptr && s->input() != nullptr && s->input()->transportState(t) && t.playing;
+    }
 };
 
 }  // namespace
@@ -262,4 +303,104 @@ TEST_CASE("EngineProcessor: stereo sources render at centre ± width/2") {
     for (int i = 0; i < 10; ++i) proc.process(nullptr, 0, ptrs, 2, kBlock);
     CHECK(out.getSample(0, kBlock - 1) == Approx(0.25f).margin(1e-4));
     CHECK(out.getSample(1, kBlock - 1) == Approx(-0.5f).margin(1e-4));
+}
+
+TEST_CASE("EngineProcessor: SwapGraph then FilePlay in one drain starts the file") {
+    SwapRig rig;
+    rig.proc.configureClock(ClockConfig{});
+    REQUIRE(rig.proc.swapGraph(rig.build({1}, {1})));
+    REQUIRE(rig.proc.push(cmd::FilePlay{1}));
+    rig.run();
+    CHECK(rig.lastTransport.sourceId == 1);
+    CHECK(rig.lastTransport.playing);
+    CHECK(rig.lastTransport.positionSeconds == Approx(kBlock / kSr));
+    rig.run();
+    CHECK(peakAbs(rig.out.getReadPointer(0), kBlock) > 0.0f);
+    CHECK(rig.proc.droppedCommands() == 0);
+}
+
+TEST_CASE("EngineProcessor: commands for a source only the new graph has survive a fade-out swap") {
+    SwapRig rig;
+    rig.proc.setGraphWhileStopped(rig.build({1, 2}));
+    rig.run(10);
+    REQUIRE(rig.proc.swapGraph(rig.build({1, 3})));
+    REQUIRE(rig.proc.push(cmd::SetSourceMute{3, true, 0.0f}));
+    rig.run();  // source 2 fades out in the old graph; the swap lands after the block
+    REQUIRE(rig.proc.currentGraph()->findSource(3) != nullptr);
+    rig.run();
+    CHECK(rig.proc.currentGraph()->findSource(3)->currentGain() == 0.0f);
+    rig.run(10);
+    CHECK(rig.out.getSample(1, kBlock - 1) == 0.0f);
+    CHECK(rig.proc.droppedCommands() == 0);
+}
+
+TEST_CASE("EngineProcessor: a timed command due during a pending swap is applied after it") {
+    SwapRig rig;
+    rig.proc.setGraphWhileStopped(rig.build({1, 2}));
+    rig.run(10);
+    const std::int64_t block1Start = rig.proc.snapshot().blockStartSample + kBlock;
+    REQUIRE(rig.proc.swapGraph(rig.build({1, 3})));
+    REQUIRE(rig.proc.pushAt(cmd::SetSourceMute{3, true, 0.0f}, block1Start + kBlock / 2));
+    rig.run();
+    REQUIRE(rig.proc.currentGraph()->findSource(3) != nullptr);
+    rig.run();
+    CHECK(rig.proc.currentGraph()->findSource(3)->currentGain() == 0.0f);
+    rig.run(10);
+    CHECK(rig.out.getSample(1, kBlock - 1) == 0.0f);
+    CHECK(rig.proc.droppedCommands() == 0);
+}
+
+TEST_CASE(
+    "EngineProcessor: a SwapGraph behind a held command lands after the pending one and the held command "
+    "survives") {
+    SwapRig rig;
+    rig.proc.setGraphWhileStopped(rig.build({1, 2}));
+    rig.run(10);
+    REQUIRE(rig.proc.swapGraph(rig.build({1, 3}, {3})));
+    // Source gain is not carried across a swap (the new graph's spec wins), so
+    // the held command is a file transport command, which is carried.
+    REQUIRE(rig.proc.push(cmd::FilePlay{3}));
+    auto b = rig.build({1, 3}, {3});
+    const Graph* graphB = b.get();
+    REQUIRE(rig.proc.swapGraph(std::move(b)));
+    rig.run(3);
+    CHECK(rig.proc.currentGraph() == graphB);
+    CHECK(rig.filePlaying(3));
+    CHECK(rig.proc.droppedCommands() == 0);
+}
+
+TEST_CASE("EngineProcessor: a newer SwapGraph supersedes a pending one in the same drain") {
+    SwapRig rig;
+    rig.proc.setGraphWhileStopped(rig.build({1, 2}));
+    rig.run(10);
+    auto a = rig.build({1});
+    const Graph* graphA = a.get();
+    auto b = rig.build({1, 3});
+    const Graph* graphB = b.get();
+    REQUIRE(rig.proc.swapGraph(std::move(a)));
+    REQUIRE(rig.proc.swapGraph(std::move(b)));
+    bool aWasLive = false;
+    for (int i = 0; i < 4; ++i) {
+        rig.run();
+        aWasLive = aWasLive || rig.proc.currentGraph() == graphA;
+    }
+    CHECK_FALSE(aWasLive);
+    CHECK(rig.proc.currentGraph() == graphB);
+    CHECK(rig.proc.droppedCommands() == 0);
+}
+
+TEST_CASE("EngineProcessor: setGraphWhileStopped drains everything queued before it") {
+    SwapRig rig;
+    rig.proc.setGraphWhileStopped(rig.build({1, 2}));
+    rig.run(10);
+    REQUIRE(rig.proc.swapGraph(rig.build({1})));
+    REQUIRE(rig.proc.push(cmd::SetSourceGain{1, -6.0f, 0.0f}));
+    REQUIRE(rig.proc.swapGraph(rig.build({1, 3})));
+    auto device = rig.build({1, 2}, {}, 44100.0);
+    const Graph* deviceGraph = device.get();
+    rig.proc.setGraphWhileStopped(std::move(device));
+    rig.run(2);
+    CHECK(rig.proc.currentGraph() == deviceGraph);
+    CHECK(rig.proc.currentGraph()->sampleRate() == 44100.0);
+    CHECK(rig.proc.droppedCommands() == 0);
 }
