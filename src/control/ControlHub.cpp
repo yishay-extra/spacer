@@ -62,6 +62,8 @@ void ControlHub::pump(double nowEpochSeconds, double monotonicSeconds) {
     midiScratch_.clear();
     midiInbox_.drainTo(midiScratch_);
     for (const auto& m : midiScratch_) {
+        // `midi{cc}` modulator sources take every CC value (also 0).
+        if (m.isController()) dispatcher_.modulatorCc(m.getControllerNumber(), m.getControllerValue());
         events_.clear();
         mapper_.handle(m, events_);
         for (const auto& e : events_) dispatcher_.dispatch(e);

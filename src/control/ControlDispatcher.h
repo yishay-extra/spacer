@@ -56,6 +56,10 @@ public:
     /// scene events ignore it (the caller delivers those when due).
     void dispatch(const ControlEvent& event, double dueEpochSeconds = 0.0);
 
+    /// A MIDI CC (any channel) for `midi{cc}` modulator sources (SPEC §10):
+    /// every modulator listening to `cc` gets value / 127. True if any did.
+    bool modulatorCc(int cc, int value);
+
     /// Latest rendered position of a source (from fb::SourcePosition), used
     /// for single-component moves (`/az`, `/el`, `/dist`) of non-manual sources.
     void observePosition(int sourceId, const Position& position);
@@ -68,6 +72,8 @@ private:
     int resolveSpeaker(const EntityRef& ref);
     bool setSourceParam(const EntityRef& ref, const std::string& path, float value);
     bool setPosition(int sourceId, const Position& p);
+    /// `osc{address}` modulator sources: SetModulatorValue for each match.
+    bool modulatorOsc(const std::string& address, float value);
     Position currentPosition(int sourceId);
     void invalidateState();
     CueTick tick() const;

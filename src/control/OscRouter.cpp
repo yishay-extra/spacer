@@ -139,6 +139,21 @@ R routeSpeaker(const EntityRef& ref, const Tokens& t, const juce::OSCMessage& m,
 }  // namespace
 
 OscRouter::Result OscRouter::route(const juce::OSCMessage& m) {
+    Result r = routeAddress(m);
+    // Unknown addresses carry their first number for `osc{address}`
+    // modulator sources (SPEC §10).
+    if (r.event)
+        if (auto* trig = std::get_if<ev::OscTrigger>(&*r.event); trig && m.size() >= 1) {
+            const float v = number(m[0]);
+            if (std::isfinite(v)) {
+                trig->value = v;
+                trig->hasValue = true;
+            }
+        }
+    return r;
+}
+
+OscRouter::Result OscRouter::routeAddress(const juce::OSCMessage& m) {
     const std::string address = m.getAddressPattern().toString().toStdString();
     const Tokens t = split(address);
     float v[2];

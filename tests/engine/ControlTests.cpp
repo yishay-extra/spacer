@@ -980,3 +980,30 @@ TEST_CASE("ControlDispatcher: motionRight.* and insert.* parameter paths (WP14)"
     CHECK(i.index == 4);
     CHECK(i.value == 1.0f);
 }
+
+TEST_CASE("Control: osc{address} and midi{cc} modulator sources get their values (WP14)") {
+    Project project = testProject();
+    project.sources[0].modulators = {ModulatorSpec{OscSource{"/lfo/x"}, "spread", 1.0f, 0.0f},
+                                     ModulatorSpec{MidiCcSource{20}, "gain", 1.0f, 0.0f}};
+    EngineProcessor engine;
+    std::vector<Command> sent;
+    ControlDispatcher::Config cfg;
+    cfg.push = [&](const Command& c) {
+        sent.push_back(c);
+        return true;
+    };
+    ControlHub hub(project, engine, nullptr, cfg);
+    hub.osc().handleMessage(msg("/lfo/x", 0.25f));
+    hub.submitMidi(MidiMessage::controllerEvent(3, 20, 127));
+    hub.submitMidi(MidiMessage::controllerEvent(1, 20, 0));  // 0 counts too
+    hub.pump(1.0, 1.0);
+    REQUIRE(sent.size() == 3);
+    const auto& osc = std::get<cmd::SetModulatorValue>(sent[0]);
+    CHECK(osc.sourceId == 1);
+    CHECK(osc.index == 0);
+    CHECK(osc.value == 0.25f);
+    CHECK(std::get<cmd::SetModulatorValue>(sent[1]).index == 1);
+    CHECK(std::get<cmd::SetModulatorValue>(sent[1]).value == Approx(1.0f));
+    CHECK(std::get<cmd::SetModulatorValue>(sent[2]).value == 0.0f);
+    CHECK(hub.dispatcher().stats().unknownAddress == 0);  // consumed by the modulator
+}

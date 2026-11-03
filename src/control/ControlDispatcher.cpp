@@ -72,6 +72,31 @@ bool ControlDispatcher::setPosition(int sourceId, const Position& p) {
     return send(cmd::SetSourcePosition{sourceId, -1, n, -1.0f});
 }
 
+bool ControlDispatcher::modulatorOsc(const std::string& address, float value) {
+    bool any = false;
+    for (const auto& s : project_.sources)
+        for (std::size_t i = 0; i < s.modulators.size(); ++i)
+            if (const auto* osc = std::get_if<OscSource>(&s.modulators[i].source);
+                osc && osc->address == address) {
+                send(cmd::SetModulatorValue{s.id, static_cast<int>(i), value});
+                any = true;
+            }
+    return any;
+}
+
+bool ControlDispatcher::modulatorCc(int cc, int value) {
+    bool any = false;
+    const float v = static_cast<float>(std::clamp(value, 0, 127)) / 127.0f;
+    for (const auto& s : project_.sources)
+        for (std::size_t i = 0; i < s.modulators.size(); ++i)
+            if (const auto* midi = std::get_if<MidiCcSource>(&s.modulators[i].source);
+                midi && midi->cc == cc) {
+                send(cmd::SetModulatorValue{s.id, static_cast<int>(i), v});
+                any = true;
+            }
+    return any;
+}
+
 void ControlDispatcher::invalidateState() {
     // A recall rewrites the live project; forget what we cached from it.
     positions_.clear();
@@ -244,12 +269,13 @@ struct ControlDispatcher::Visitor {
     bool operator()(const ev::ClockBeat& e) const { return d.send(cmd::ClockSetBeat{e.beat}); }
 
     bool operator()(const ev::OscTrigger& e) const {
+        const bool modulated = e.hasValue && d.modulatorOsc(e.address, e.value);
         const bool fired = d.cues_ != nullptr && d.cues_->onOsc(e.address, d.tick());
         if (fired)
             d.invalidateState();
-        else
+        else if (!modulated)
             ++d.stats_.unknownAddress;
-        return fired;
+        return fired || modulated;
     }
     bool operator()(const ev::MidiTrigger& e) const {
         if (d.cues_ == nullptr) return false;
