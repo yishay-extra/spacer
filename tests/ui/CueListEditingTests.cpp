@@ -43,7 +43,8 @@ TEST_CASE("CueListEditing: add, remove, duplicate and move cues", "[ui]") {
     CHECK(ce::addCue(l, fresh, 0) == 1);  // after the first
     CHECK(names(l) == std::vector<std::string>{"one", "Cue 4", "two", "three"});
     CHECK(ce::addCue(l, ce::makeCue(p, l), -1) == 0);
-    CHECK(ce::addCue(l, ce::makeCue(p, l), 99) == static_cast<int>(l.cues.size()));
+    const int sizeBefore = static_cast<int>(l.cues.size());  // operand order of == is unspecified
+    CHECK(ce::addCue(l, ce::makeCue(p, l), 99) == sizeBefore);
 
     CHECK(ce::removeCue(l, 0));
     CHECK_FALSE(ce::removeCue(l, 99));
