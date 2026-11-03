@@ -3,6 +3,7 @@
 #include <algorithm>
 
 #include "engine/GraphBuilder.h"
+#include "engine/PluginHost.h"
 
 namespace spacer {
 
@@ -50,8 +51,12 @@ std::unique_ptr<Graph> AudioEngine::buildGraph(double sampleRate, int blockSize,
     builder.setDiskStreamer(&streamer_);
     builder.setProjectDirectory(projectDirectory_);
     builder.setNumOutputChannels(numOutputs);
+    builder.setPluginHost(pluginHost_);
     warnings_.clear();
-    return builder.build(sampleRate, blockSize, &warnings_);
+    auto graph = builder.build(sampleRate, blockSize, &warnings_);
+    if (pluginHost_ != nullptr)
+        for (auto& w : pluginHost_->takeWarnings()) warnings_.push_back(std::move(w));
+    return graph;
 }
 
 void AudioEngine::setProject(const Project& project) {
