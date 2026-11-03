@@ -52,4 +52,22 @@ ProjectEdit setSource(const Project& project, SourceSpec after, std::string name
     return e;
 }
 
+ProjectEdit editShow(const Project& project, const std::function<bool(Project&)>& modify, std::string name) {
+    ProjectEdit e;
+    e.name = std::move(name);
+    Project copy = project;
+    if (!modify(copy)) return e;
+    if (copy.scenes == project.scenes && copy.cueLists == project.cueLists) return e;
+    e.apply = [scenes = std::move(copy.scenes), lists = std::move(copy.cueLists)](Project& p) {
+        p.scenes = scenes;
+        p.cueLists = lists;
+    };
+    e.revert = [scenes = project.scenes, lists = project.cueLists](Project& p) {
+        p.scenes = scenes;
+        p.cueLists = lists;
+    };
+    e.effect = EngineEffect::none();
+    return e;
+}
+
 }  // namespace spacer::edits
