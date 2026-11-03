@@ -8,6 +8,10 @@ namespace spacer {
 struct InputContext {
     const float* const* deviceInputs{nullptr};
     int numDeviceInputs{0};
+    /// Spacer.driver channels for this block (VirtualDeviceReceiver), null if
+    /// none (driver absent, offline render): VirtualInput sources read silence.
+    const float* const* virtualInputs{nullptr};
+    int numVirtualInputs{0};
 };
 
 /// Transport state of an input that has one (file players).

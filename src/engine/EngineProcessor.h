@@ -66,8 +66,11 @@ public:
 
     // ---- audio thread ----
     /// Renders `numSamples` into `outputs` (every channel is overwritten).
+    /// `virtualInputs` (optional) are the Spacer.driver channels for this
+    /// block (VirtualDeviceReceiver::channels()), read by VirtualInput sources.
     void process(const float* const* inputs, int numInputs, float* const* outputs, int numOutputs,
-                 int numSamples) noexcept;
+                 int numSamples, const float* const* virtualInputs = nullptr,
+                 int numVirtualInputs = 0) noexcept;
     /// Device overload count, forwarded as feedback when it changes.
     void reportXruns(int total) noexcept { xruns_ = total; }
     /// The graph in use (audio thread, or while stopped).
@@ -124,6 +127,7 @@ private:
     bool panic_{false};
     std::array<float, kMaxChunk> masterRamp_{};
     std::array<const float*, kMaxIoChannels> inputChunk_{};
+    std::array<const float*, kMaxIoChannels> virtualChunk_{};
     std::array<float*, kMaxIoChannels> outputChunk_{};
     long long samplesToFeedback_{0};
     int xruns_{0}, xrunsReported_{0};

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 
+#include "app/VirtualDeviceInstaller.h"
 #include "core/LayoutPresets.h"
 #include "core/ProjectFile.h"
 #include "ui/logic/EngineSync.h"
@@ -109,6 +110,29 @@ void AppContext::resetControl() {
             control_->submitMidi(m);
         });
     midiIn_->openAll();
+}
+
+// ---- virtual device -------------------------------------------------------------
+
+std::string AppContext::virtualDeviceWarning() const {
+    const auto status = engine_.virtualDeviceStatus();
+    if (status.state == VirtualDeviceReceiver::State::Connected) return {};
+    int users = 0;
+    for (const auto& source : project_.sources)
+        if (source.input.kind() == SourceKind::VirtualInput) ++users;
+    std::string warning = status.message;
+    if (users > 0) warning += " - " + std::to_string(users) + " virtual-input source(s) silent";
+    return warning;
+}
+
+std::string AppContext::installedDriverVersion() const {
+    return VirtualDeviceInstaller::bundleVersion(VirtualDeviceInstaller::installedDriver()).toStdString();
+}
+
+void AppContext::installVirtualDevice(std::function<void(std::string error)> done) {
+    VirtualDeviceInstaller::install([callback = std::move(done)](juce::String error) {
+        if (callback) callback(error.toStdString());
+    });
 }
 
 // ---- model --------------------------------------------------------------------
