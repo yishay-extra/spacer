@@ -394,18 +394,7 @@ std::vector<std::string> modulatorTargets(const SourceSpec& s) {
 }
 
 std::vector<InsertRow> insertRows(const SourceSpec& s) {
-    std::vector<InsertRow> out;
-    for (const auto& slot : s.inserts) {
-        std::string name = slot.pluginId;
-        if (name.empty()) {
-            name = "(empty)";
-        } else if (const auto cut = name.find_last_of("/:");
-                   cut != std::string::npos && cut + 1 < name.size()) {
-            name = name.substr(cut + 1);  // "AudioUnit:Effects/aufx,dely,appl" -> "aufx,dely,appl"
-        }
-        out.push_back({name, slot.bypassed});
-    }
-    return out;
+    return insertedit::rows(s.inserts);
 }
 
 // ---- field tables ---------------------------------------------------------------

@@ -18,6 +18,7 @@
 #include <vector>
 
 #include "core/Project.h"
+#include "ui/logic/InsertEditing.h"
 #include "ui/logic/MotionFields.h"
 #include "ui/logic/ProjectEdit.h"
 
@@ -63,11 +64,8 @@ bool removeModulator(SourceSpec& source, int index);
 std::vector<std::string> modulatorTargets(const SourceSpec& source);
 
 /// One row per insert slot of the strip (SPEC §13): a readable name and the
-/// bypass flag. Editor windows are WP11e.
-struct InsertRow {
-    std::string name;  // last path component / identifier of the plug-in, or "(empty)"
-    bool bypassed{false};
-};
+/// bypass flag (shared with the speaker-chain inspector, see InsertEditing.h).
+using InsertRow = insertedit::InsertRow;
 std::vector<InsertRow> insertRows(const SourceSpec& source);
 
 // ---- field tables -----------------------------------------------------------

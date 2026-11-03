@@ -72,8 +72,22 @@ public:
     PluginScanner& scanner() noexcept { return *scanner_; }
     bool scansOutOfProcess() const noexcept { return outOfProcess_; }
 
-    /// Scan every format's candidates (see PluginScanner::scanAll).
-    PluginScanner::Report scanAll(bool rescanAll = false, const PluginScanner::Progress& progress = {});
+    /// Scan every format's candidates (see PluginScanner::scanAll), on the
+    /// calling thread. The UI runs this through PluginScanJob instead (SPEC
+    /// §13: full scans run off the message thread).
+    PluginScanner::Report scanAll(bool rescanAll = false, const PluginScanner::Progress& progress = {},
+                                  const PluginScanner::ShouldCancel& cancel = {});
+
+    /// The worker every scan goes through (child process or in process).
+    PluginScanWorker& scanWorker() noexcept { return *worker_; }
+    /// PluginScanJob brackets its background scan with this. While set,
+    /// resolve() does not scan on demand (the job owns the pedal file and a
+    /// private copy of the cache); it still answers from the cache.
+    void setBackgroundScanActive(bool active) noexcept { backgroundScan_.store(active); }
+    bool backgroundScanActive() const noexcept { return backgroundScan_.load(); }
+    /// Replaces the cache with the result of a background scan (the job's
+    /// private copy, started from this cache). Message thread.
+    void adoptScanCache(PluginScanCache&& scanned);
 
     /// The description for a slot's pluginId: from the cache, or (option
     /// scanUnknownOnDemand) by scanning just that identifier. nullopt if no
@@ -130,6 +144,7 @@ private:
     std::unique_ptr<PluginScanWorker> worker_;
     std::unique_ptr<PluginScanner> scanner_;
     bool outOfProcess_{false};
+    std::atomic<bool> backgroundScan_{false};
     std::vector<Entry> entries_;
     std::vector<std::string> warnings_;
     std::shared_ptr<std::atomic<bool>> latencyFlag_;

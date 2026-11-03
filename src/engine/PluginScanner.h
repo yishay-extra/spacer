@@ -4,6 +4,7 @@
 
 #include <functional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "engine/PluginScanCache.h"
@@ -54,7 +55,8 @@ private:
 };
 
 /// Drives a scan over the formats of a format manager, recording results and
-/// failures in a PluginScanCache. Message thread only.
+/// failures in a PluginScanCache. One thread at a time (the message thread, or
+/// the PluginScanJob worker with its own staging cache).
 class PluginScanner {
 public:
     struct Report {
@@ -62,9 +64,15 @@ public:
         int skipped{0};                         // cached and up to date, or blacklisted
         int added{0};                           // descriptions added or refreshed
         std::vector<juce::String> blacklisted;  // newly blacklisted this run
+        bool cancelled{false};                  // stopped early by ShouldCancel
     };
     /// Called before each identifier is scanned (index, total, identifier).
+    /// For scanAll, index / total run over all formats together.
     using Progress = std::function<void(int, int, const juce::String&)>;
+    /// Polled between identifiers (never mid-scan: a plugin that is being
+    /// scanned finishes or times out first). Return true to stop; what has
+    /// been scanned so far is kept and saved.
+    using ShouldCancel = std::function<bool()>;
 
     PluginScanner(juce::AudioPluginFormatManager& formats, PluginScanCache& cache, PluginScanWorker& worker);
 
@@ -74,15 +82,19 @@ public:
 
     /// Scan every candidate of every format. Up-to-date cache entries and
     /// blacklisted identifiers are skipped unless `rescanAll`. Saves the cache.
-    Report scanAll(bool rescanAll = false, const Progress& progress = {});
+    Report scanAll(bool rescanAll = false, const Progress& progress = {}, const ShouldCancel& cancel = {});
     /// Scan the given identifiers of one format (same rules, saves the cache).
     Report scanIdentifiers(const juce::String& formatName, const std::vector<juce::String>& identifiers,
-                           bool rescanAll = false, const Progress& progress = {});
+                           bool rescanAll = false, const Progress& progress = {},
+                           const ShouldCancel& cancel = {});
 
     /// The format that claims `pluginId` (fileMightContainThisPluginType), or null.
     juce::AudioPluginFormat* formatFor(const juce::String& pluginId) const;
 
 private:
+    Report scanList(const juce::String& formatName, const std::vector<juce::String>& identifiers,
+                    bool rescanAll, const Progress& progress, const ShouldCancel& cancel, int indexOffset,
+                    int grandTotal);
     bool needsScan(juce::AudioPluginFormat& format, const juce::String& id, bool rescanAll) const;
     void scanOne(const juce::String& formatName, const juce::String& id, Report& report);
 

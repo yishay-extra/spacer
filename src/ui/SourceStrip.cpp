@@ -44,7 +44,17 @@ void LevelMeter::paint(juce::Graphics& g) {
     g.fillRoundedRectangle(r.withWidth(r.getWidth() * fraction), 2.0f);
 }
 
-SourceStrip::SourceStrip(AppContext& context) : context_(context) {
+SourceStrip::SourceStrip(AppContext& context)
+    : context_(context),
+      inserts_(
+          context,
+          {[this](const std::string& pluginId) {
+               return sourceedit::editAddInsert(context_.project(), sourceId_, pluginId);
+           },
+           [this](int slot) { return sourceedit::editRemoveInsert(context_.project(), sourceId_, slot); },
+           [this](int slot, bool bypassed) {
+               return sourceedit::editInsertBypass(context_.project(), sourceId_, slot, bypassed);
+           }}) {
     styleTitle(title_, "");
     title_.setFont(juce::FontOptions(15.0f, juce::Font::bold));
     addAndMakeVisible(title_);
@@ -56,9 +66,7 @@ SourceStrip::SourceStrip(AppContext& context) : context_(context) {
     styleTitle(spatialTitle_, "Spatializer");
     styleTitle(motionTitle_, "Motion");
     styleTitle(modulatorTitle_, "Modulators");
-    styleTitle(insertTitle_, "Inserts");
-    for (auto* l :
-         {&inputTitle_, &levelTitle_, &spatialTitle_, &motionTitle_, &modulatorTitle_, &insertTitle_})
+    for (auto* l : {&inputTitle_, &levelTitle_, &spatialTitle_, &motionTitle_, &modulatorTitle_})
         addAndMakeVisible(l);
 
     // Field lists: every edit is a ProjectEdit; a drag is one undo step.
@@ -125,24 +133,7 @@ SourceStrip::SourceStrip(AppContext& context) : context_(context) {
     addModulator_.onClick = [this] { apply(sourceedit::editAddModulator(context_.project(), sourceId_)); };
     addAndMakeVisible(addModulator_);
 
-    insertList_.onEdit = [this](const std::string& id, const std::string& text) {
-        // ids are "insert.<slot>.bypass"; the toggle sends 1 / 0
-        const auto first = id.find('.') + 1;
-        const int slot = std::stoi(id.substr(first, id.find('.', first) - first));
-        return apply(sourceedit::editInsertBypass(context_.project(), sourceId_, slot, text == "1"));
-    };
-    insertList_.onRemoveItem = [this](int slot) {
-        apply(sourceedit::editRemoveInsert(context_.project(), sourceId_, slot));
-    };
-    addAndMakeVisible(insertList_);
-    addInsert_.setButtonText("Add insert...");
-    addInsert_.setWantsKeyboardFocus(false);
-    addInsert_.onClick = [this] { showInsertMenu(); };
-    addAndMakeVisible(addInsert_);
-    insertsHint_.setColour(juce::Label::textColourId, juce::Colour(0xffa0a7b0));
-    insertsHint_.setFont(juce::FontOptions(12.0f));
-    insertsHint_.setText("No inserts.", juce::dontSendNotification);
-    addAndMakeVisible(insertsHint_);
+    addAndMakeVisible(inserts_);
 }
 
 SourceStrip::~SourceStrip() = default;
@@ -181,31 +172,14 @@ void SourceStrip::browseForFile(const std::string& fieldId) {
                           });
 }
 
-void SourceStrip::showInsertMenu() {
-    juce::PopupMenu menu;
-    std::vector<juce::String> ids;
-    for (const auto& d : context_.plugins().cache().known()) {
-        if (d.isInstrument) continue;  // inserts are effects (SPEC §13)
-        ids.push_back(d.fileOrIdentifier);
-        menu.addItem(static_cast<int>(ids.size()), d.name + "  (" + d.manufacturerName + ")");
-    }
-    if (ids.empty()) menu.addItem(-1, "No scanned plug-ins yet", false, false);
-    menu.showMenuAsync(
-        juce::PopupMenu::Options().withTargetComponent(&addInsert_), [this, ids, id = sourceId_](int result) {
-            if (result < 1 || result > static_cast<int>(ids.size())) return;
-            apply(sourceedit::editAddInsert(context_.project(), id,
-                                            ids[static_cast<std::size_t>(result - 1)].toStdString()));
-        });
-}
-
 void SourceStrip::refresh() {
     const juce::ScopedValueSetter<bool> guard(refreshing_, true);
     const SourceSpec* s = source();
     const bool has = s != nullptr;
     for (auto* c : std::initializer_list<juce::Component*>{
              &title_, &meter_, &inputTitle_, &levelTitle_, &spatialTitle_, &motionTitle_, &modulatorTitle_,
-             &insertTitle_, &inputList_, &levelList_, &spatialList_, &motionList_, &modulatorList_,
-             &motionKind_, &addModulator_, &insertList_, &addInsert_, &insertsHint_})
+             &inputList_, &levelList_, &spatialList_, &motionList_, &modulatorList_, &motionKind_,
+             &addModulator_, &inserts_})
         c->setVisible(has);
     if (!has) {
         channelLeft_.setVisible(false);
@@ -237,29 +211,16 @@ void SourceStrip::refresh() {
     addItem_.setVisible(!itemName.empty());
     addItem_.setButtonText("Add " + toJuce(itemName));
 
-    std::vector<MotionField> insertFields;
-    const auto rows = sourceedit::insertRows(*s);
-    for (std::size_t i = 0; i < rows.size(); ++i) {
-        MotionField f;
-        f.id = "insert." + std::to_string(i) + ".bypass";
-        f.label = "Bypass";
-        f.group = rows[i].name;  // heading = the plug-in; the remove button sits on its first row
-        f.type = FieldType::Toggle;
-        f.on = rows[i].bypassed;
-        f.text = f.on ? "on" : "off";
-        f.item = static_cast<int>(i);
-        insertFields.push_back(std::move(f));
-    }
-    insertList_.setFields(std::move(insertFields));
-    insertsHint_.setVisible(rows.empty());
-    addInsert_.setEnabled(static_cast<int>(rows.size()) < kMaxInserts);
+    inserts_.setOwner(InsertOwner::Source, sourceId_);
 
     resized();
     repaint();
 }
 
 void SourceStrip::tick() {
-    if (source() != nullptr) meter_.repaint();
+    if (source() == nullptr) return;
+    meter_.repaint();
+    inserts_.tick();  // plug-ins that finished loading
 }
 
 int SourceStrip::idealHeight(int width) {
@@ -330,11 +291,7 @@ void SourceStrip::layoutContent(int width, bool place) {
     put(addModulator_, kButtonHeight, kMargin, std::min(inner, 140));
     gap();
 
-    put(insertTitle_, kTitleHeight);
-    if (insertsHint_.isVisible()) put(insertsHint_, 20);
-    if (place) insertList_.setBounds(kMargin, y, inner, insertList_.idealHeight());
-    y += insertList_.idealHeight();
-    put(addInsert_, kButtonHeight, kMargin, std::min(inner, 140));
+    put(inserts_, inserts_.idealHeight());
     contentHeight_ = y + kMargin;
 }
 

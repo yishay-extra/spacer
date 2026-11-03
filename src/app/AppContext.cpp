@@ -7,7 +7,9 @@
 #include "app/VirtualDeviceInstaller.h"
 #include "core/LayoutPresets.h"
 #include "core/ProjectFile.h"
+#include "ui/PluginUi.h"
 #include "ui/logic/EngineSync.h"
+#include "ui/logic/SceneCapture.h"
 #include "ui/logic/SpeakerTest.h"
 
 namespace spacer {
@@ -47,11 +49,13 @@ AppContext::AppContext()
     engine_.setClockFactory([this](const ClockConfig& c) { return clockInputs_.makeClock(c); });
     engine_.setProject(project_);
     resetCueEngine();
+    pluginUi_ = std::make_unique<PluginUi>(*this);
 }
 
 AppContext::~AppContext() {
     stopTimer();
-    midiIn_.reset();  // no MIDI callbacks into a dying hub
+    pluginUi_.reset();  // editor windows and the scan thread go before the engine and the plug-in host
+    midiIn_.reset();    // no MIDI callbacks into a dying hub
     engine_.onFeedback = nullptr;
 }
 
@@ -231,12 +235,25 @@ std::string AppContext::openProject(const std::filesystem::path& path) {
 std::string AppContext::saveProject(const std::filesystem::path& path) {
     const auto target = path.empty() ? projectPath_ : path;
     if (target.empty()) return "No file name";
-    plugins_->captureState(project_);  // edits made in plugin editors are saved too
+    capturePluginState();  // edits made in plugin editors are saved too
     if (const auto err = projectfile::save(project_, target)) return err->message;
     projectPath_ = target;
     savedRevision_ = revision_;
     rememberProjectPath();
     return {};
+}
+
+int AppContext::capturePluginState() {
+    const auto snapshot = [](const Project& p) {
+        std::vector<PluginSlot> all;
+        for (const auto& s : p.sources) all.insert(all.end(), s.inserts.begin(), s.inserts.end());
+        for (const auto& c : p.speakerChains) all.insert(all.end(), c.inserts.begin(), c.inserts.end());
+        return all;
+    };
+    const auto before = snapshot(project_);
+    const int n = plugins_->captureState(project_);
+    if (snapshot(project_) != before) ++revision_;  // the plug-in changed: the project is modified
+    return n;
 }
 
 void AppContext::rememberProjectPath() {
@@ -354,6 +371,16 @@ bool AppContext::recallScene(const std::string& name, float transitionSeconds, b
     if (!cues_->recallScene(name, transitionSeconds, restartMotionPhase)) return false;
     modelChanged(Change::SceneRecalled);
     return true;
+}
+
+bool AppContext::updateScene(const std::string& name) {
+    return perform(
+        scenecapture::updateScene(project_, name, [this](Project& p) { return plugins_->captureState(p); }));
+}
+
+bool AppContext::newScene(const std::string& name) {
+    return perform(
+        scenecapture::newScene(project_, name, [this](Project& p) { return plugins_->captureState(p); }));
 }
 
 // ---- observers ----------------------------------------------------------------

@@ -20,13 +20,14 @@ namespace spacer {
 /// What the engine must do after an edit (or its undo / redo) was applied.
 struct EngineEffect {
     enum class Kind {
-        None,          // model only (e.g. names)
-        Structural,    // rebuild the graph and SwapGraph (SPEC §5.2)
-        Source,        // parameters of source `id` changed
-        Speaker,       // chain parameters of speaker `id` changed
-        Master,        // master gain changed
-        MotionParam,   // one live motion parameter of source `id` (see below)
-        InsertBypass,  // bypass flag of insert slot `channel` of source `id`
+        None,                 // model only (e.g. names)
+        Structural,           // rebuild the graph and SwapGraph (SPEC §5.2)
+        Source,               // parameters of source `id` changed
+        Speaker,              // chain parameters of speaker `id` changed
+        Master,               // master gain changed
+        MotionParam,          // one live motion parameter of source `id` (see below)
+        InsertBypass,         // bypass flag of insert slot `channel` of source `id`
+        SpeakerInsertBypass,  // bypass flag of insert slot `channel` of speaker `id`
     };
     Kind kind{Kind::None};
     int id{0};
@@ -46,6 +47,9 @@ struct EngineEffect {
     static EngineEffect insertBypass(int sourceId, int slot) {
         return {Kind::InsertBypass, sourceId, slot, spacer::MotionParam::Radius};
     }
+    static EngineEffect speakerInsertBypass(int speakerId, int slot) {
+        return {Kind::SpeakerInsertBypass, speakerId, slot, spacer::MotionParam::Radius};
+    }
     static EngineEffect motionParam(int sourceId, int channel, spacer::MotionParam param) {
         return {Kind::MotionParam, sourceId, channel, param};
     }
@@ -63,7 +67,10 @@ struct ProjectEdit {
 
 namespace edits {
 
-/// Replace the layout. `before` is captured from `project` now.
+/// Replace the layout. `before` is captured from `project` now. Speaker chains
+/// (per-speaker trim / EQ / inserts) of speakers the new layout no longer has
+/// are dropped with it (a chain of an unknown speaker is invalid, SPEC §15);
+/// undo brings them back.
 ProjectEdit setLayout(const Project& project, Layout after, std::string name = "Edit Layout");
 
 /// Replace the source with `after.id`. nullopt-like empty edit (apply / revert

@@ -201,10 +201,8 @@ void SceneManager::revert() {
 void SceneManager::updateSelected() {
     const std::string name = selected_;
     if (name.empty()) return;
-    auto edit = edits::editShow(
-        context_.project(), [name](Project& p) { return sceneedit::update(p, name); },
-        "Update Scene " + name);
-    if (!context_.perform(std::move(edit))) return;
+    // Captures the live plug-in state first (SPEC §13), then stores the live state.
+    if (!context_.updateScene(name)) return;
     liveScene_ = name;  // the live state now is exactly this scene
     refresh();
 }
@@ -214,10 +212,7 @@ void SceneManager::createScene() {
     promptForText("New scene", "Store the live state as a scene named:", juce::String(suggestion),
                   [this](const juce::String& text) {
                       const std::string name = text.toStdString();
-                      auto edit = edits::editShow(
-                          context_.project(), [name](Project& p) { return sceneedit::captureNew(p, name); },
-                          "New Scene " + name);
-                      if (!context_.perform(std::move(edit))) {
+                      if (!context_.newScene(name)) {
                           juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::WarningIcon,
                                                                  "Could not create scene",
                                                                  "The name is empty or already used.");
