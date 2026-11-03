@@ -13,6 +13,7 @@
 #include "engine/GraphBuilder.h"
 #include "engine/OfflineRenderer.h"
 #include "engine/RecallPlanner.h"
+#include "engine/SourceInputFactory.h"
 
 using Catch::Approx;
 using namespace spacer;
@@ -540,4 +541,60 @@ TEST_CASE("Source motion: a scene recall ramps orbit parameters without restarti
     CHECK(std::abs(Position::wrapAzimuth(rig.pos().azimuth - wrapDeg(3.6 * 75))) < 0.5f);
     rig.run(60);
     CHECK(rig.pos().distance == Approx(4.0f).margin(1e-3));
+}
+
+TEST_CASE("Engine: WP14 audio-thread paths do not allocate (timed commands, SetModulator, recalls)") {
+    const auto dir = juce::File::createTempFile("spacer-alloc-wp14");
+    REQUIRE(dir.createDirectory());
+    const auto wav = dir.getChildFile("a.wav");
+    OfflineRenderer::Result tone;
+    tone.sampleRate = kSr;
+    tone.audio = sine(kSr, 440.0, 0.5f, 48000);
+    REQUIRE_FALSE(OfflineRenderer::writeWav(tone, wav).has_value());
+    {
+        Project p = quad();
+        SourceSpec orb = orbitSource(Period::seconds(2.0));
+        orb.modulators = {
+            ModulatorSpec{LfoSource{LfoShape::Sine, Period::seconds(1.0)}, "motion.radius", 0.5f, 0.0f}};
+        SourceSpec file = makeSource(2, {45.0f, 0.0f, 2.0f});
+        FileInputSpec f;
+        f.path = wav.getFullPathName().toStdString();
+        f.loop = true;
+        file.input.value = f;
+        p.sources = {orb, file};
+        Rig rig(p);
+        rig.proc.push(cmd::FilePlay{2});
+        rig.run(5);
+
+        // Recall plans are built here (message thread); only their application is measured.
+        Scene moved = captureScene(p, "moved");
+        std::get<OrbitMotion>(moved.sources[0].motion.value).radius = 3.0f;  // motion-param ramp
+        moved.sources[1].spatializer = SpatializerKind::Dbap;                // file source replaced
+        RecallRequest r;
+        r.project = &p;
+        r.target = &moved;
+        r.transitionSeconds = 0.5f;
+        r.sampleRate = kSr;
+        r.maxBlockSize = kBlock;
+        auto factory = std::make_shared<SourceInputFactory>();
+        factory->setDiskStreamer(&rig.streamer);
+        r.inputFactory = [factory](const SourceSpec& s) { return factory->create(s); };
+        auto plan = buildRecallPlan(r);
+        REQUIRE(plan);
+        ModulatorBank::Live live = ModulatorBank::Live::fromSpec(orb.modulators[0]);
+        live.period = Period::seconds(3.0);
+
+        allocguard::setMode(allocguard::Mode::Count);
+        allocguard::resetViolations();
+        for (int i = 0; i < 200; ++i) {
+            const std::int64_t next = rig.proc.snapshot().blockStartSample + kBlock;
+            if (i == 20) rig.proc.pushAt(cmd::SetSourceGain{1, -6.0f, -1.0f}, next + 100);
+            if (i == 30) rig.proc.push(cmd::SetModulator{1, 0, 1, live});
+            if (i == 40) rig.proc.push(cmd::RecallScene{plan.release()});
+            rig.run();
+        }
+        CHECK(allocguard::violations() == 0);
+        allocguard::setMode(allocguard::Mode::Assert);
+    }
+    dir.deleteRecursively();
 }
