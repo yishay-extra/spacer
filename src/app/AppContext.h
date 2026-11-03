@@ -3,6 +3,7 @@
 #include <juce_events/juce_events.h>
 
 #include <filesystem>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -113,6 +114,18 @@ public:
     bool send(const Command& command) { return engine_.send(command); }
     const FeedbackState& feedback() const noexcept { return feedback_; }
     const std::string& deviceError() const noexcept { return deviceError_; }
+
+    /// Spacer.driver (SPEC §14). Without it the app runs normally; the status
+    /// bar shows virtualDeviceWarning() and VirtualInput sources are silent.
+    VirtualDeviceReceiver::Status virtualDeviceStatus() const { return engine_.virtualDeviceStatus(); }
+    /// Non-empty when the driver is not connected; mentions the affected
+    /// sources when the project has VirtualInput sources.
+    std::string virtualDeviceWarning() const;
+    /// Version of the driver installed in /Library/Audio/Plug-Ins/HAL ("" if none).
+    std::string installedDriverVersion() const;
+    /// "Install virtual device…": admin prompt, copy, coreaudiod restart.
+    /// `done(error)` on the message thread, error empty on success.
+    void installVirtualDevice(std::function<void(std::string error)> done);
 
     void setPanic(bool engaged);
     bool panic() const noexcept { return panic_; }

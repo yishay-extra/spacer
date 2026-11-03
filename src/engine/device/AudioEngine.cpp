@@ -2,6 +2,7 @@
 
 #include <algorithm>
 
+#include "engine/AllocationGuard.h"
 #include "engine/GraphBuilder.h"
 
 namespace spacer {
@@ -77,6 +78,8 @@ void AudioEngine::audioDeviceAboutToStart(juce::AudioIODevice* device) {
     // Allow for hosts that deliver more than the nominal buffer size.
     if (auto graph = buildGraph(sr, std::max(block, 512), outputs))
         processor_.setGraphWhileStopped(std::move(graph));
+    // Also asks the driver to follow this rate (SPEC §14).
+    virtual_.prepare(sr, std::max(block, EngineProcessor::kMaxChunk));
     running_ = true;
 }
 
@@ -93,7 +96,14 @@ void AudioEngine::audioDeviceIOCallbackWithContext(const float* const* in, int n
         processor_.reportXruns(x);
         xruns_.store(x, std::memory_order_relaxed);
     }
-    processor_.process(in, numIn, out, numOut, numSamples);
+    // Spacer.driver channels for this callback (silence without the driver).
+    const bool haveVirtual = numSamples <= virtual_.maxBlockSize();
+    if (haveVirtual) {
+        allocguard::ScopedAudioThread audioThread;
+        virtual_.pull(numSamples);
+    }
+    processor_.process(in, numIn, out, numOut, numSamples, haveVirtual ? virtual_.channels() : nullptr,
+                       haveVirtual ? VirtualDeviceReceiver::kNumChannels : 0);
 }
 
 void AudioEngine::timerCallback() {
@@ -101,6 +111,7 @@ void AudioEngine::timerCallback() {
     while (processor_.popFeedback(f))
         if (onFeedback) onFeedback(f);
     processor_.collectGarbage();
+    if (virtual_.poll() && onVirtualDeviceChanged) onVirtualDeviceChanged(virtual_.status());
 }
 
 AudioEngine::Status AudioEngine::status() const {
@@ -113,6 +124,8 @@ AudioEngine::Status AudioEngine::status() const {
         s.deviceLatencySamples = d->getInputLatencyInSamples() + d->getOutputLatencyInSamples();
     }
     s.graphLatencySamples = processor_.latencySamples();
+    if (const auto v = virtual_.status(); v.state == VirtualDeviceReceiver::State::Connected)
+        s.virtualDeviceLatencySamples = v.latencyFrames;
     s.xruns = xruns_.load(std::memory_order_relaxed);
     s.cpuLoad = deviceManager_.getCpuUsage();
     s.droppedCommands = processor_.droppedCommands();

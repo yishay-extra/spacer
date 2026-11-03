@@ -34,6 +34,10 @@ catch_discover_tests(spacer_tests)
 # ---------------------------------------------------------------------------
 if(SPACER_WITH_ENGINE_TESTS)
     file(GLOB SPACER_ENGINE_TEST_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/engine/*.cpp)
+    # macOS: Spacer.driver loaded in-process with a fake HAL host.
+    if(APPLE AND TARGET SpacerDriver)
+        list(APPEND SPACER_ENGINE_TEST_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/driver/DriverHarnessTests.cpp)
+    endif()
 
     add_executable(spacer_engine_tests ${SPACER_ENGINE_TEST_SOURCES} ${SPACER_ENGINE_SOURCES}
         ${SPACER_CONTROL_SOURCES})
@@ -55,6 +59,14 @@ if(SPACER_WITH_ENGINE_TESTS)
             juce::juce_osc
             juce::juce_recommended_config_flags
             juce::juce_recommended_warning_flags)
+    if(APPLE AND TARGET SpacerDriver)
+        add_dependencies(spacer_engine_tests SpacerDriver)
+        target_compile_definitions(spacer_engine_tests PRIVATE
+            SPACER_DRIVER_BINARY="$<TARGET_FILE:SpacerDriver>"
+            SPACER_DRIVER_BUNDLE="$<TARGET_BUNDLE_DIR:SpacerDriver>"
+            SPACER_VERSION="${PROJECT_VERSION}")
+        target_link_libraries(spacer_engine_tests PRIVATE "-framework CoreAudio" "-framework CoreFoundation")
+    endif()
     # JUCE's warning set applies to the engine sources; tests compare floats
     # exactly on purpose.
     set_source_files_properties(${SPACER_ENGINE_TEST_SOURCES} PROPERTIES COMPILE_OPTIONS
