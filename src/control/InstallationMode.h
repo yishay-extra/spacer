@@ -5,6 +5,7 @@
 // autosave while running. (Relaunch after a crash is a LaunchAgent: WP13.)
 
 #include <filesystem>
+#include <functional>
 #include <optional>
 #include <string>
 
@@ -54,10 +55,17 @@ public:
 
     /// Returns true if a file was written. `lastError()` holds the reason otherwise.
     bool tick(double nowSeconds, const Project& project, bool dirty);
+    /// As above; `beforeSave` runs only when a file is about to be written and
+    /// may update `project` first (the app captures live plugin state, SPEC §13).
+    bool tick(double nowSeconds, Project& project, bool dirty,
+              const std::function<void(Project&)>& beforeSave);
     const std::filesystem::path& path() const { return path_; }
     const std::string& lastError() const { return lastError_; }
 
 private:
+    bool due(double nowSeconds, bool dirty);
+    bool write(const Project& project);
+
     std::filesystem::path path_;
     double interval_;
     double lastSave_{0.0};

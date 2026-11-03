@@ -114,6 +114,10 @@ public:
     std::vector<std::string> takeWarnings();
     /// True (once) if any instance reported a latency change since the last call.
     bool takeLatencyChanged() noexcept { return latencyFlag_->exchange(false, std::memory_order_acq_rel); }
+    /// True (once) if a plugin was edited by the user since the last call:
+    /// an editor gesture, or a program / state change. The app marks the
+    /// project modified (WP14).
+    bool takeEdited() noexcept { return editedFlag_->exchange(false, std::memory_order_acq_rel); }
 
 private:
     struct Entry {
@@ -148,6 +152,7 @@ private:
     std::vector<Entry> entries_;
     std::vector<std::string> warnings_;
     std::shared_ptr<std::atomic<bool>> latencyFlag_;
+    std::shared_ptr<std::atomic<bool>> editedFlag_ = std::make_shared<std::atomic<bool>>(false);
 };
 
 }  // namespace spacer

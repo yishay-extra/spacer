@@ -364,3 +364,26 @@ TEST_CASE("CueEngine: onLiveChanged sees every recall's live model (WP14)") {
     show.run(2.5);                             // AtBeat cue fired in the engine: B
     CHECK(seen == std::vector<float>{-24.0f, 0.0f, -12.0f});
 }
+
+TEST_CASE("Installation mode: autosave runs beforeSave (plugin state capture) only when it writes (WP14)") {
+    const auto dir = std::filesystem::temp_directory_path() / "spacer_wp14_autosave";
+    std::filesystem::create_directories(dir);
+    const auto projectPath = dir / "show.spacer";
+    std::filesystem::remove(installation::autosavePath(projectPath));
+    Show show({cue("a", "B", 0.0f)});
+    Autosaver saver(projectPath, 60.0);
+    int calls = 0;
+    const auto capture = [&calls](Project& p) {
+        ++calls;
+        p.name = "captured";
+    };
+    CHECK_FALSE(saver.tick(0.0, show.project, true, capture));
+    CHECK_FALSE(saver.tick(61.0, show.project, false, capture));
+    CHECK(calls == 0);
+    CHECK(saver.tick(62.0, show.project, true, capture));
+    CHECK(calls == 1);
+    const auto loaded = projectfile::load(saver.path());
+    REQUIRE(loaded);
+    CHECK(loaded->project.name == "captured");
+    std::filesystem::remove_all(dir);
+}

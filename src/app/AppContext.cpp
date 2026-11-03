@@ -508,6 +508,11 @@ void AppContext::timerCallback() {
     if (rebuildPending_ && now - lastRebuild_ >= kGestureRebuildSeconds) rebuildGraph();
     // A plugin changed its latency: rebuild so it is compensated (SPEC §5.6).
     if (plugins_->takeLatencyChanged()) rebuildGraph();
+    // An edit in a plugin editor modifies the project (dirty, autosave).
+    if (plugins_->takeEdited()) {
+        ++revision_;
+        notify(Change::PluginEdited);
+    }
 
     // External clocks report the beat at the time a block is heard (WP14).
     {
@@ -530,7 +535,9 @@ void AppContext::timerCallback() {
 
     if (autosaver_) {
         const bool dirty = revision_ != autosavedRevision_;
-        if (autosaver_->tick(now, project_, dirty)) autosavedRevision_ = revision_;
+        // Live plugin state (editor edits) is part of the project (SPEC §13).
+        if (autosaver_->tick(now, project_, dirty, [this](Project&) { capturePluginState(); }))
+            autosavedRevision_ = revision_;
     }
 
     const auto copy = listeners_;

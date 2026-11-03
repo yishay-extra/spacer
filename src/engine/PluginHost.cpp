@@ -139,6 +139,7 @@ std::shared_ptr<HostedPlugin> PluginHost::load(InsertOwner owner, int ownerId, i
         warn(where + ": " + stateError + "; plugin defaults used");
     auto plugin = std::make_shared<HostedPlugin>(std::move(instance), spec.pluginId, numChannels, sampleRate,
                                                  maxBlockSize, latencyFlag_);
+    plugin->setEditedFlag(editedFlag_);
     Entry e;
     e.owner = owner;
     e.ownerId = ownerId;

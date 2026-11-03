@@ -29,6 +29,11 @@ public:
     HostedPlugin(const HostedPlugin&) = delete;
     HostedPlugin& operator=(const HostedPlugin&) = delete;
 
+    /// Set when the user edits the plugin (editor gesture end, program or
+    /// non-parameter state change) — not by host parameter changes
+    /// (commands, ramps, modulators). Message thread, before use.
+    void setEditedFlag(std::shared_ptr<std::atomic<bool>> flag) { editedFlag_ = std::move(flag); }
+
     juce::AudioPluginInstance& instance() noexcept { return *instance_; }
     const std::string& pluginId() const noexcept { return pluginId_; }
     int numChannels() const noexcept { return numChannels_; }
@@ -49,6 +54,7 @@ public:
 
 private:
     void audioProcessorParameterChanged(juce::AudioProcessor*, int, float) override {}
+    void audioProcessorParameterChangeGestureEnd(juce::AudioProcessor*, int) override;
     void audioProcessorChanged(juce::AudioProcessor*, const ChangeDetails& details) override;
 
     std::unique_ptr<juce::AudioPluginInstance> instance_;
@@ -59,6 +65,7 @@ private:
     int bufferChannels_{1};
     int latency_{0};
     std::shared_ptr<std::atomic<bool>> latencyFlag_;
+    std::shared_ptr<std::atomic<bool>> editedFlag_;
     std::uint64_t owner_{0};
 };
 
