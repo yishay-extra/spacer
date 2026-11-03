@@ -5,7 +5,8 @@
 
 namespace spacer {
 
-MainComponent::MainComponent(AppContext& context) : context_(context), sources_(context) {
+MainComponent::MainComponent(AppContext& context)
+    : context_(context), statusBar_(context), sources_(context) {
     openButton_.onClick = [this] { openProject(); };
     saveButton_.onClick = [this] { saveProject(false); };
     saveAsButton_.onClick = [this] { saveProject(true); };
@@ -25,15 +26,13 @@ MainComponent::MainComponent(AppContext& context) : context_(context), sources_(
     goButton_.setTooltip("Go (space)");
     panicButton_.setTooltip("Panic: silence all outputs (Esc)");
 
-    installDriverButton_.onClick = [this] { installVirtualDevice(); };
-    installDriverButton_.setTooltip(
-        "Install Spacer.driver, the 64-channel virtual output device (admin password)");
-    installDriverButton_.setWantsKeyboardFocus(false);
-    addChildComponent(installDriverButton_);
+    settingsButton_.onClick = [this] { SettingsPanel::show(context_); };
+    settingsButton_.setWantsKeyboardFocus(false);
+    addAndMakeVisible(settingsButton_);
 
-    statusLabel_.setColour(juce::Label::textColourId, juce::Colour(0xffa0a7b0));
-    statusLabel_.setFont(juce::FontOptions(12.0f));
-    addAndMakeVisible(statusLabel_);
+    // The status bar owns the driver status and its install offer (SPEC §16.6).
+    statusBar_.onInstallDriver = [this] { installVirtualDevice(); };
+    addAndMakeVisible(statusBar_);
 
     const auto tabColour = juce::Colour(0xff1e2126);
     tabs_.addTab("Stage", tabColour, new StageView(context_, StageView::Mode::Perform), true);
@@ -50,6 +49,7 @@ MainComponent::MainComponent(AppContext& context) : context_(context), sources_(
 }
 
 MainComponent::~MainComponent() {
+    SettingsPanel::close();  // the dialog listens to the context
     context_.removeListener(this);
 }
 
@@ -75,11 +75,9 @@ void MainComponent::resized() {
     bar.removeFromRight(4);
     backButton_.setBounds(bar.removeFromRight(64));
     bar.removeFromRight(12);
-    if (installDriverButton_.isVisible()) {
-        installDriverButton_.setBounds(bar.removeFromRight(170));
-        bar.removeFromRight(8);
-    }
-    statusLabel_.setBounds(bar.withTrimmedLeft(12));
+    bar.removeFromLeft(12);
+    settingsButton_.setBounds(bar.removeFromLeft(100));
+    statusBar_.setBounds(area.removeFromBottom(StatusBar::kHeight));
     sources_.setBounds(area.removeFromLeft(kSourcePanelWidth));
     cuesPanel_.setBounds(area.removeFromRight(CuesPanel::kPreferredWidth));
     tabs_.setBounds(area);
@@ -107,52 +105,6 @@ bool MainComponent::keyPressed(const juce::KeyPress& key) {
 
 void MainComponent::projectChanged(AppContext::Change) {
     updateButtons();
-}
-
-void MainComponent::feedbackUpdated() {
-    // Status at ~4 Hz is plenty.
-    if (--statusCountdown_ > 0) return;
-    statusCountdown_ = AppContext::kTickHz / 4;
-    const auto s = context_.engine().status();
-    juce::String text;
-    if (!context_.deviceError().empty())
-        text << "Audio device error: " << juce::String(context_.deviceError());
-    else
-        text << s.deviceName << "  " << juce::String(s.sampleRate, 0) << " Hz / " << s.bufferSize << "  CPU "
-             << juce::String(s.cpuLoad * 100.0, 1) << " %  xruns " << s.xruns;
-    const auto& clock = context_.feedback().clock();
-    if (context_.feedback().hasClock()) {
-        const int bar = static_cast<int>(std::floor(clock.beat / std::max(1, clock.beatsPerBar))) + 1;
-        const int beat =
-            static_cast<int>(std::floor(std::fmod(clock.beat, std::max(1, clock.beatsPerBar)))) + 1;
-        text << "  |  " << juce::String(clock.bpm, 1) << " bpm  " << bar << "." << beat;
-    }
-    // External clock source and lock (WP12).
-    if (const auto kind = context_.activeClockKind(); kind != ClockKind::Internal) {
-        static constexpr const char* kNames[] = {"Internal", "Link", "MIDI clock", "MTC", "OSC"};
-        const bool locked = context_.clockInputs().status().locked.load(std::memory_order_relaxed);
-        text << "  " << kNames[static_cast<int>(kind)] << (locked ? " (locked)" : " (unlocked)");
-    } else if (context_.project().clock.kind != ClockKind::Internal) {
-        text << "  (external clock unavailable: internal)";
-    }
-    if (const auto& seq = context_.cues().sequencer(); context_.cues().armed())
-        text << "  |  " << juce::String(seq.list().name);
-    // Driver status (SPEC §14, §16.6).
-    const auto vdev = context_.virtualDeviceStatus();
-    const auto warning = context_.virtualDeviceWarning();
-    if (warning.empty()) {
-        text << "  |  Spacer.driver " << juce::String(vdev.driverVersion);
-        if (vdev.underrunFrames > 0) text << " (underruns " << juce::String(vdev.underrunFrames) << ")";
-    } else {
-        text << "  |  " << juce::String(warning);
-    }
-    statusLabel_.setText(text, juce::dontSendNotification);
-    const bool offerInstall = vdev.state == VirtualDeviceReceiver::State::Absent ||
-                              vdev.state == VirtualDeviceReceiver::State::Incompatible;
-    if (offerInstall != installDriverButton_.isVisible()) {
-        installDriverButton_.setVisible(offerInstall);
-        resized();
-    }
 }
 
 void MainComponent::updateButtons() {
@@ -210,11 +162,9 @@ void MainComponent::saveProject(bool saveAs) {
 }
 
 void MainComponent::installVirtualDevice() {
-    installDriverButton_.setEnabled(false);
     context_.installVirtualDevice(
         [safe = juce::Component::SafePointer<MainComponent>(this)](std::string error) {
             if (safe == nullptr) return;
-            safe->installDriverButton_.setEnabled(true);
             if (error.empty())
                 juce::AlertWindow::showMessageBoxAsync(
                     juce::MessageBoxIconType::InfoIcon, "Virtual device installed",

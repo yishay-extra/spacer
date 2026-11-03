@@ -8,6 +8,7 @@
 
 #include <functional>
 #include <memory>
+#include <string>
 #include <vector>
 
 namespace spacer {
@@ -18,8 +19,11 @@ public:
     explicit MidiInputService(Sink sink) : sink_(std::move(sink)) {}
     ~MidiInputService() override { close(); }
 
-    /// Opens all currently available inputs. Returns how many were opened.
-    int openAll();
+    /// Opens all currently available inputs except those whose name is in
+    /// `disabledNames` (SPEC §16.5). Returns how many were opened.
+    int openAll(const std::vector<std::string>& disabledNames = {});
+    /// Names of the inputs currently present.
+    static std::vector<std::string> availableNames();
     void close();
 
 private:

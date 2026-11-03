@@ -7,6 +7,7 @@
 #include "app/VirtualDeviceInstaller.h"
 #include "core/LayoutPresets.h"
 #include "core/ProjectFile.h"
+#include "engine/device/AggregateDevice.h"
 #include "ui/PluginUi.h"
 #include "ui/logic/EngineSync.h"
 #include "ui/logic/SceneCapture.h"
@@ -42,6 +43,10 @@ AppContext::AppContext()
           [](juce::AudioPluginFormatManager& f) { juce::addDefaultFormatsToManager(f); })) {
     installationSettingsPath_ = settingsDirectory() / "installation.json";
     loadInstallationSettings();
+    appSettingsPath_ = settingsDirectory() / "settings.json";
+    if (auto s = appsettings::load(appSettingsPath_)) appSettings_ = *s;
+    engine_.setVirtualDeviceLatency(appSettings_.virtualDeviceLatencyFrames);
+    appliedSettings_ = settings::fieldsOf(project_);
     engine_.setPluginHost(plugins_.get());
     engine_.onFeedback = [this](const Feedback& f) { onFeedback(f); };
     // External clocks (SPEC §9) travel with the graph; AudioEngine asks for
@@ -74,6 +79,7 @@ void AppContext::start() {
             engine_.setProject(project_);
         }
     }
+    appliedSettings_ = settings::fieldsOf(project_);  // the device opens with these just below
     deviceError_ =
         engine_.openDevice(project_.devices, GraphBuilder::requiredInputChannels(project_)).toStdString();
     resetCueEngine();  // now with the device's rate and block size
@@ -122,7 +128,7 @@ void AppContext::resetControl() {
             if (clockInputs_.handleMidi(m.getRawData(), m.getRawDataSize(), m.getTimeStamp())) return;
             control_->submitMidi(m);
         });
-    midiIn_->openAll();
+    midiIn_->openAll(appSettings_.disabledMidiInputs);
 }
 
 // ---- virtual device -------------------------------------------------------------
@@ -148,6 +154,87 @@ void AppContext::installVirtualDevice(std::function<void(std::string error)> don
     });
 }
 
+// ---- settings (WP11d) -----------------------------------------------------------
+
+void AppContext::applyRuntimeSettings() {
+    const auto now = settings::fieldsOf(project_);
+    const auto delta = settings::classify(appliedSettings_, now);
+    appliedSettings_ = now;
+    // Speed of sound and clock changes are structural edits: the graph was
+    // rebuilt by syncEngine() and AudioEngine's ClockSelector switched the clock.
+    if (delta.device) {
+        reopenDevice();  // also re-binds OSC / MIDI through resetCueEngine()
+    } else if ((delta.osc || delta.midi) && control_) {
+        control_->applyProject();
+    }
+}
+
+void AppContext::reopenDevice() {
+    if (speakerTest_) {
+        speakerTest_.reset();
+        const auto copy = listeners_;
+        for (auto* l : copy) l->projectChanged(Change::SpeakerTest);
+    }
+    // The engine's project copy goes stale after cue recalls (PLAN WP14):
+    // refresh it so the graph the device restart builds shows the live state.
+    engine_.setProject(project_);
+    deviceError_ =
+        engine_.openDevice(project_.devices, GraphBuilder::requiredInputChannels(project_)).toStdString();
+    // The cue engine's rate and block size are fixed at construction (WP14):
+    // rebuild it and re-arm the same list (the position in the list restarts).
+    std::string armedList;
+    if (cues_ && cues_->armed()) armedList = cues_->sequencer().list().name;
+    resetCueEngine();
+    if (!armedList.empty()) cues_->arm(armedList, cueTick());
+    feedback_.clearPositions();
+}
+
+void AppContext::setAppSettings(const AppSettings& settings) {
+    const bool midiChanged = settings.disabledMidiInputs != appSettings_.disabledMidiInputs;
+    appSettings_ = settings;
+    appSettings_.virtualDeviceLatencyFrames =
+        appsettings::normaliseVirtualLatency(appSettings_.virtualDeviceLatencyFrames);
+    engine_.setVirtualDeviceLatency(appSettings_.virtualDeviceLatencyFrames);
+    if (midiChanged && midiIn_) midiIn_->openAll(appSettings_.disabledMidiInputs);
+    appsettings::save(appSettings_, appSettingsPath_);
+}
+
+void AppContext::setInstallationSettings(InstallationSettings settings) {
+    installation_ = std::move(settings);
+    installation_.autosaveSeconds = std::max(1, installation_.autosaveSeconds);
+    std::error_code ec;
+    std::filesystem::create_directories(installationSettingsPath_.parent_path(), ec);
+    installation::saveSettings(installation_, installationSettingsPath_);
+    if (installation_.enabled && !projectPath_.empty())
+        autosaver_ = std::make_unique<Autosaver>(projectPath_, installation_.autosaveSeconds);
+    else
+        autosaver_.reset();
+}
+
+std::string AppContext::oscBindError() const {
+    if (control_ && control_->osc().running()) return {};
+    return "OSC input port " + std::to_string(project_.osc.inPort) + " could not be bound (in use?)";
+}
+
+std::vector<settings::AudioDeviceInfo> AppContext::audioDevices() const {
+    std::vector<settings::AudioDeviceInfo> out;
+    for (const auto& d : AggregateDevice::listDevices())
+        out.push_back({d.uid, d.name, d.numInputs, d.numOutputs});
+    return out;
+}
+
+std::string AppContext::createAggregateDevice(const settings::AggregateRequest& request) {
+    if (!request.error.empty()) return request.error;
+    auto created = AggregateDevice::create(request.name, request.uid, request.subDeviceUids,
+                                           request.subDeviceUids.front());
+    if (!created) return created.error();
+    return {};
+}
+
+std::vector<std::string> AppContext::midiInputNames() const {
+    return MidiInputService::availableNames();
+}
+
 // ---- model --------------------------------------------------------------------
 
 bool AppContext::perform(ProjectEdit edit) {
@@ -155,6 +242,7 @@ bool AppContext::perform(ProjectEdit edit) {
     if (!effect) return false;
     syncEngine(*effect);
     syncArmedList();
+    applyRuntimeSettings();
     modelChanged(Change::Edited);
     return true;
 }
@@ -174,6 +262,7 @@ bool AppContext::undo() {
     syncEngine(*effect);
     if (rebuildPending_) rebuildGraph();
     syncArmedList();
+    applyRuntimeSettings();
     modelChanged(Change::UndoRedo);
     return true;
 }
@@ -184,6 +273,7 @@ bool AppContext::redo() {
     syncEngine(*effect);
     if (rebuildPending_) rebuildGraph();
     syncArmedList();
+    applyRuntimeSettings();
     modelChanged(Change::UndoRedo);
     return true;
 }
@@ -215,7 +305,15 @@ void AppContext::newProject(Project project) {
     history_.clear();
     autosaver_.reset();
     engine_.setProject(project_);
-    resetCueEngine();
+    // A project that names another device / rate / buffer reopens the device
+    // (which also rebuilds the cue engine and control with the new rate).
+    const auto fields = settings::fieldsOf(project_);
+    const bool deviceChanged = settings::classify(appliedSettings_, fields).device;
+    appliedSettings_ = fields;
+    if (deviceChanged)
+        reopenDevice();
+    else
+        resetCueEngine();
     feedback_.clearPositions();
     savedRevision_ = revision_ + 1;  // a fresh project is not dirty
     modelChanged(Change::Loaded);

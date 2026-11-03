@@ -17,8 +17,10 @@
 #include "core/Project.h"
 #include "engine/PluginHost.h"
 #include "engine/device/AudioEngine.h"
+#include "ui/logic/AppSettings.h"
 #include "ui/logic/FeedbackState.h"
 #include "ui/logic/ProjectHistory.h"
+#include "ui/logic/SettingsModel.h"
 #include "ui/logic/SourceSelection.h"
 
 namespace spacer {
@@ -189,6 +191,27 @@ public:
     bool newScene(const std::string& name);
 
     const InstallationSettings& installationSettings() const noexcept { return installation_; }
+    /// Installation mode on / off and its autosave interval (SPEC §11); stored
+    /// in the app's settings folder, not in the project.
+    void setInstallationSettings(InstallationSettings settings);
+
+    // ---- settings (WP11d, SPEC §16.5) -----------------------------------------
+    /// App-level preferences (virtual device latency, MIDI inputs); not in the project.
+    const AppSettings& appSettings() const noexcept { return appSettings_; }
+    void setAppSettings(const AppSettings& settings);
+    /// Project-stored settings (device, rate, buffer, speed of sound, OSC,
+    /// program-change channel, clock) are edited with
+    /// perform(edits::setSettings(...)). The app applies what a change needs
+    /// from the model diff, so undo / redo and project loads take the same
+    /// path: device reopen, graph rebuild (ClockSelector switches), OSC / MIDI
+    /// re-bind.
+    /// Message of the last failed OSC input bind ("" if bound).
+    std::string oscBindError() const;
+    /// Creates a CoreAudio aggregate device (macOS). Returns an error message.
+    std::string createAggregateDevice(const settings::AggregateRequest& request);
+    std::vector<settings::AudioDeviceInfo> audioDevices() const;
+    /// MIDI inputs currently present, by name.
+    std::vector<std::string> midiInputNames() const;
 
     // ---- observers ----------------------------------------------------------
     void addListener(Listener* listener);
@@ -206,6 +229,9 @@ private:
     void syncArmedList();
     void loadInstallationSettings();
     void rememberProjectPath();
+    /// Applies what changed in the settings fields since the last call.
+    void applyRuntimeSettings();
+    void reopenDevice();
 
     Project project_;
     ProjectHistory history_;
@@ -220,6 +246,9 @@ private:
     SourceSelection selection_;
 
     InstallationSettings installation_;
+    AppSettings appSettings_;
+    std::filesystem::path appSettingsPath_;
+    settings::SettingsFields appliedSettings_;  // what the device / control / clock currently run
     std::filesystem::path installationSettingsPath_;
     std::unique_ptr<Autosaver> autosaver_;
 
