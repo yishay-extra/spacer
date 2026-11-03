@@ -9,6 +9,7 @@
 #include <variant>
 #include <vector>
 
+#include "core/ExactEqual.h"
 #include "core/Position.h"
 
 namespace spacer {
@@ -20,7 +21,7 @@ struct Period {
 
     static Period beats(double v) { return {Unit::Beats, v}; }
     static Period seconds(double v) { return {Unit::Seconds, v}; }
-    bool operator==(const Period&) const = default;
+    bool operator==(const Period& o) const { return unit == o.unit && exactlyEqual(value, o.value); }
 };
 
 enum class PlayMode { Once, Loop, PingPong };

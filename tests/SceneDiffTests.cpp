@@ -107,6 +107,9 @@ void applyRamps(Scene& scene, const SceneDiff& diff, const Layout& layout) {
             case RampTarget::SpeakerPolarity:
                 chain->polarityInverted = r.to > 0.5f;
                 break;
+            case RampTarget::SourceMotionParam:
+                FAIL("applyRamps does not model SourceMotionParam");
+                break;
             case RampTarget::SpeakerEqLowFreq:
                 chain->eq.lowFreq = r.to;
                 break;

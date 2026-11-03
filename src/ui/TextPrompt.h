@@ -16,12 +16,12 @@ inline void promptForText(const juce::String& title, const juce::String& label, 
     window->addButton("OK", 1, juce::KeyPress(juce::KeyPress::returnKey));
     window->addButton("Cancel", 0, juce::KeyPress(juce::KeyPress::escapeKey));
     juce::Component::SafePointer<juce::AlertWindow> safe(window);
-    window->enterModalState(true,
-                            juce::ModalCallbackFunction::create([safe, onOk = std::move(onOk)](int result) {
-                                if (result == 1 && safe != nullptr && onOk)
-                                    onOk(safe->getTextEditorContents("text").trim());
-                            }),
-                            true);
+    window->enterModalState(
+        true, juce::ModalCallbackFunction::create([safe, callback = std::move(onOk)](int result) {
+            if (result == 1 && safe != nullptr && callback)
+                callback(safe->getTextEditorContents("text").trim());
+        }),
+        true);
 }
 
 }  // namespace spacer
