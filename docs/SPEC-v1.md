@@ -401,7 +401,8 @@ Each source (or each channel when `linkedPoints`) has one `MotionSpec`:
   default cue list, Go; suppress dialogs; autosave; relaunch on crash via a
   LaunchAgent (WP13).
 - Editing a scene while live: changes are applied immediately and marked
-  "modified"; **Update scene** writes back; **Revert** recalls.
+  "modified"; **Update scene** writes back (capturing live plugin state
+  first, §13); **Revert** recalls.
 
 ## 12. Control: OSC and MIDI
 
@@ -422,6 +423,7 @@ Address space (`{id}` = integer source id or quoted name):
 /spacer/source/{id}/file/play    (none) | /stop | /seek f
 /spacer/speaker/{id}/trim        f
 /spacer/speaker/{id}/mute        i
+/spacer/{source|speaker}/{id}/insert/{slot}/param/{index}  f  (0..1)
 /spacer/master/gain              f
 /spacer/panic                    (none)
 /spacer/cue/go                   (none)
@@ -457,8 +459,14 @@ addresses are ignored and counted.
 - State stored in scenes as `{pluginId, stateBase64, params: {index: value}}`.
   Missing plugin → slot bypassed, warning shown, project still loads.
 - Reported plugin latency is compensated (§5.6).
-- Plugin parameter paths: `source.{id}.insert.{slot}.param.{index}` — usable
-  by modulators, OSC, MIDI.
+- Plugin parameter paths: `source.{id}.insert.{slot}.param.{index}` and
+  `speaker.{id}.insert.{slot}.param.{index}` (normalised 0..1) — usable by
+  OSC, MIDI and (WP14) modulators. Slots may be `bypassed` (20 ms fade,
+  latency kept).
+- Scene capture (**Update scene**, save, before a recall) first captures live
+  plugin state into the model (`PluginHost::captureState`).
+- Full scans run off the message thread; each plugin is still scanned in its
+  own process.
 
 ## 14. Virtual device (`Spacer.driver`)
 
