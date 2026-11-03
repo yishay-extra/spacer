@@ -5,7 +5,8 @@
 
 namespace spacer {
 
-MainComponent::MainComponent(AppContext& context) : context_(context), statusBar_(context) {
+MainComponent::MainComponent(AppContext& context)
+    : context_(context), statusBar_(context), sources_(context) {
     openButton_.onClick = [this] { openProject(); };
     saveButton_.onClick = [this] { saveProject(false); };
     saveAsButton_.onClick = [this] { saveProject(true); };
@@ -37,6 +38,7 @@ MainComponent::MainComponent(AppContext& context) : context_(context), statusBar
     tabs_.addTab("Stage", tabColour, new StageView(context_, StageView::Mode::Perform), true);
     tabs_.addTab("Layout", tabColour, new LayoutEditor(context_), true);
     tabs_.setTabBarDepth(28);
+    addAndMakeVisible(sources_);
     addAndMakeVisible(tabs_);
     addAndMakeVisible(cuesPanel_);
 
@@ -76,6 +78,7 @@ void MainComponent::resized() {
     bar.removeFromLeft(12);
     settingsButton_.setBounds(bar.removeFromLeft(100));
     statusBar_.setBounds(area.removeFromBottom(StatusBar::kHeight));
+    sources_.setBounds(area.removeFromLeft(kSourcePanelWidth));
     cuesPanel_.setBounds(area.removeFromRight(CuesPanel::kPreferredWidth));
     tabs_.setBounds(area);
 }

@@ -529,7 +529,16 @@ void SettingsPanel::show(AppContext& context) {
         return;
     }
     juce::DialogWindow::LaunchOptions options;
-    options.content.setOwned(new SettingsPanel(context));
+    // The panel is tall: scroll it inside a window that fits a laptop screen.
+    auto* panel = new SettingsPanel(context);
+    auto* viewport = new juce::Viewport();
+    viewport->setViewedComponent(panel, true);
+    viewport->setScrollBarsShown(true, false);
+    const int maxHeight = 640;
+    const int scrollBar = viewport->getScrollBarThickness();
+    viewport->setSize(panel->getWidth() + scrollBar, std::min(panel->getHeight(), maxHeight));
+    panel->setSize(viewport->getMaximumVisibleWidth(), panel->getHeight());
+    options.content.setOwned(viewport);
     options.dialogTitle = "Settings";
     options.dialogBackgroundColour = juce::Colour(0xff1e2126);
     options.escapeKeyTriggersCloseButton = true;

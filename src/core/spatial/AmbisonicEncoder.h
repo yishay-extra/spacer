@@ -9,6 +9,8 @@
 
 namespace spacer {
 
+class AmbisonicDecoder;
+
 /// Ambisonic encoder for one source (SPEC §6.3): order N in [1, 5], ACN
 /// channel order, SN3D, real spherical harmonics, direction only (distance is
 /// the distance model's job, §6.5).
@@ -38,7 +40,8 @@ public:
     int numChannels() const { return ambisonicChannels(order_); }
 
     /// Non-RT. Builds the layout's decoder once to learn its per-degree
-    /// energy (spread compensation, see class comment).
+    /// energy (spread compensation, see class comment). Does nothing after
+    /// useDecoder().
     void prepare(const Layout& layout, double sampleRate, int maxBlockSize) override;
 
     /// RT. Encoding coefficients at `start` and `end`, linearly interpolated
@@ -48,6 +51,12 @@ public:
 
     /// Ambisonics has no per-speaker gains: fills `outGains` with 0.
     void gainsFor(const Position& pos, float spread, std::span<float> outGains) const override;
+
+    /// Non-RT. Takes the spread-compensation energy from an already prepared
+    /// project decoder (which must have this encoder's order and max-rE
+    /// setting) instead of building one per encoder in prepare(): the engine
+    /// builds one decoder per graph and shares it with all of its encoders.
+    void useDecoder(const AmbisonicDecoder& decoder);
 
     /// The encoding coefficients for a direction (numChannels() values, or
     /// fewer if `out` is shorter). RT-safe.
@@ -62,6 +71,7 @@ private:
 
     int order_;
     bool maxRe_;
+    bool energyFromDecoder_{false};
     double energy_[kMaxAmbisonicOrder + 1][kMaxAmbisonicOrder + 1]{};  // E(l, l')
 };
 

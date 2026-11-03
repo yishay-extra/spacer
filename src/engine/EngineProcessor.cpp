@@ -244,6 +244,8 @@ bool EngineProcessor::applyPendingSwap() noexcept {
     if (graph_ != nullptr) {
         // The old graph must be able to go back for deletion; otherwise wait.
         if (retired_.size() >= SpscQueue<Graph*, kRetireCapacity>::capacity()) return false;
+        // An ambisonic decoder crossfade in progress finishes first (one at a time).
+        if (graph_->isAmbisonicCrossfading()) return false;
         pending_->takeStateFrom(*graph_);
         pending_->inheritClockFrom(*graph_);  // before the old graph can be deleted
         retired_.push(graph_);

@@ -266,6 +266,7 @@ Split so each lands after its subsystem:
   driver install flow, aggregate creation.
   Also: clock-source selection (Internal / MIDI clock / MTC / OSC / Link when built) — on change call `AudioEngine::setProject` or rebuild so `ClockSelector` switches (WP12 note); show clock lock status.
 - **WP11e Plugin UI · S** (after WP10): insert slots, editor windows.
+  Also: run `PluginHost::scanAll` on a worker thread with progress (WP10 issue 5); Update-scene captures plugin state first (SPEC §13).
 
 Acceptance per sub-WP: manual checklist in `docs/ui-checklist.md`, no
 UI call blocks the audio thread (allocation guard stays silent), undo/redo
@@ -297,8 +298,6 @@ Collects cross-WP follow-ups reported in PRs:
   of hand-over + 50 ms fade-in (WP4 note).
 - `ControlHub` must accept a `ControlDispatcher::Config` (selected source,
   motion-param and file-transport hooks) from `AppContext` (WP11a note).
-- An OSC/MIDI scene recall that does not move the cue index must notify the
-  UI/model observers (WP11a note).
 - Re-anchor motion phase on a live period change (SPEC §8 last bullet;
   WP4 issue 1).
 - `AudioEngine` must keep its project copy current after cue recalls
@@ -309,6 +308,9 @@ Collects cross-WP follow-ups reported in PRs:
   *heard* (device output latency + limiter look-ahead), automatic with a
   per-project trim (WP12 issue 1). Make `EngineProcessor::clockState()`
   reads exact from the message thread (seqlock) (WP12 issue 3).
+- Modulators targeting plugin parameters (`…insert.{slot}.param.{index}`):
+  a modulator output channel per insert parameter in `SourceNode` (WP10
+  issue 3).
 - Any other "follow-up" items listed in merged PR descriptions.
 Acceptance: each item has a test; no open follow-ups left in the status log.
 
@@ -343,12 +345,15 @@ mode relaunch, CI release job on tags, `docs/INSTALL.md`.
 | WP2d | done | `SphericalHarmonics` (ACN/SN3D, AmbiX), embedded 240-point 21-design, `AmbisonicEncoder` (orders 1–5, spread via effective order), `AmbisonicDecoder` (AllRAD over WP2b `Vbap` with `setAlways3D`, max-rE, LFE excluded). rE criterion revised (see WP2d entry). Engine wiring is WP3b. Details: PR #13 |
 | WP3 | done | Engine (`EngineProcessor`, `Graph`/`GraphBuilder`, `SwapGraph` with state carry-over, `SpeakerChain`: Lagrange delay → gain → 3-band EQ → inserts → limiter), `OfflineRenderer`, `AllocationGuard`, `spatial/Direct`; macOS `AudioEngine` + `AggregateDevice` + `spacer-engine-check` CLI. `LookaheadLimiter` gain computer is hand-written (juce::dsp::Limiter has no look-ahead); its delay is `juce::dsp::DelayLine`. Mac checks: `docs/mac-validation/WP3.md`. Details: PR #11 |
 | WP4 | done | `GeneratorInput`, `HardwareInput`, `FilePlayer`/`FileStream`/`StreamRing`/`DiskStreamer` (disk thread, 1 s ring, FIR + Lagrange resampling), `SourceInputFactory`; WP7 motion + modulators wired into `SourceNode`; commands `SetMotionParam`/`ResetMotion`/`SetModulatorValue`/`FilePlay`/`FileStop`/`FileSeek`. File-on-recall crossfade limitation in WP14. Mac checks: `docs/mac-validation/WP4.md`. Details: PR #15 |
+| WP5 | done | `driver/protocol/vdev` (header-only shm ring, versioned; 2-process tests), `Spacer.driver` HAL plug-in (64 ch, 44.1–96 kHz, built + bundle-checked + in-process harness on macOS CI), `VirtualDeviceReceiver` (PI fill-steered Lagrange resampling, reconnect/restart handling), `VirtualInput` sources, install via osascript admin prompt (SMJobBless needs signing → WP13). Risk: coreaudiod sandbox vs `shm_open` — first Mac check. Mac checks: `docs/mac-validation/WP5.md`. Details: PR #24 |
 | WP6 | done | `InternalClock` (tempo, play/resume/stop, setBeat, tap tempo, quantised start). Decisions and open points: see "WP6 notes" below |
 | WP7 | done | `src/core/motion/`: all §10 trajectory kinds, `MotionFactory`, `ModulatorBank` (LFO/OSC/MIDI), `ParameterPath`, seeded `Rng`; shared test `AllocationCounter`. Phase-origin and Orbit decisions now in SPEC §10; other decisions in PR #9. Open: live param edits without phase restart (WP11b), `motionRight.*` modulation paths |
 | WP8 | done | `src/control`: `OscRouter`/`OscServer`/`OscSender`, `MidiMapper` (learn, 7/14-bit CC, NRPN, pitch bend, curves, note→cue, PC→scene), `ControlPath` over `ParameterPath`, `ControlDispatcher`, `ControlHub` (single producer: `pump()` on the message thread), `MidiInputService`; `MidiConfig::programChangeChannel`. Follow-ups in WP14. Mac checks: `docs/mac-validation/WP8.md`. Details: PR #18 |
 | WP9 | done | `SceneDiff`, `CueSequencer` (core); `RecallScene{RecallPlan*}` with linear ramps / 50 ms ghost-node crossfades / sample-accurate `AtBeat` scheduling (engine); `CueEngine`, `InstallationMode`, `Autosaver` (control; wired into the app by WP11a). `ClockState::startOffset`/`startBeat`. Mac checks: `docs/mac-validation/WP9.md`. Details: PR #14 |
 | WP12 | done | `src/core/clock/` (`TimeDll`, `MidiClockTracker`, `MtcDecoder`/`MtcTracker`, `OscBeatTracker`, `ClockFollower`); `MidiClock`/`MtcClock`/`OscClock` (+ `LinkClock` behind `SPACER_WITH_LINK`, default OFF — Link is GPLv2+/proprietary, needs an Ableton licence or an AGPL release); clock owned by `Graph`, switched via `SwapGraph`. Latency compensation in WP14, clock UI in WP11d. Mac checks: `docs/mac-validation/WP12.md`. Details: PR #22 |
+| WP10 | done | `HostedPlugin`, `InsertChain` (4 slots, bypass fade, latency padding), `InsertStage` in `SourceNode`/`SpeakerChain`, `Graph::alignInsertLatencies`, `PluginHost` (registry, state capture, missing → bypass+warning), out-of-process `spacer-plugin-scanner` with cache/blacklist/dead-man's pedal; `SetInsertParam`/`SetInsertBypass`; OSC insert param address; scene insert diffs ramp params, crossfade structure. CI: fake test plugins on Linux, Apple AUDelay on macOS. Mac checks: `docs/mac-validation/WP10.md`. Details: PR #23 |
 | WP11a | done | `AppContext` composition root (project + `ProjectHistory` scoped undo, `AudioEngine`, `CueEngine`, installation mode, `ControlHub` + `MidiInputService`, 30 Hz feedback tick); `src/ui/logic` (no-JUCE, tested: `StageTransform`, hit-test, drag rules, trajectory preview, `LayoutEditing`, `EngineSync`, `SpeakerTest`, `FeedbackState`); `StageView`, `LayoutEditor`, `MainComponent`. Follow-ups in WP14. Mac checks: `docs/mac-validation/WP11a.md`. Details: PR #19 |
+| WP11c | done | `CuesPanel` + `SceneManager` (right panel); `src/ui/logic`: `TriggerText` (all six trigger kinds as text), `CueListEditing`, `SceneEditing`, `CueListView`, scoped `edits::editShow` undo; armed list follows edits (`CueSequencer::updateList`); recall counter fixes OSC-recall UI notification. Mac checks: `docs/mac-validation/WP11c.md`. Details: PR #26 |
 | WP2c | done | `spacer::Dbap` (`src/core/spatial/Dbap.h/.cpp`): §6.2 gains, Σg²=1 over panned speakers, `r_s = 0.2 + 3·spread`, LFE speakers excluded from gains, normalisation and render (§7). Tests in `tests/DbapTests.cpp`. Open spec issue: see "WP2c notes" below |
 
 ### WP2c notes

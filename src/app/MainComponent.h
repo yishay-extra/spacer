@@ -8,6 +8,7 @@
 #include "ui/CuesPanel.h"
 #include "ui/LayoutEditor.h"
 #include "ui/SettingsPanel.h"
+#include "ui/SourcePanel.h"
 #include "ui/StageView.h"
 #include "ui/StatusBar.h"
 
@@ -21,6 +22,7 @@ class MainComponent final : public juce::Component, private AppContext::Listener
 public:
     static constexpr int kMinWidth = 1100;  // SPEC §16
     static constexpr int kMinHeight = 700;
+    static constexpr int kSourcePanelWidth = 340;  // SPEC §16: Sources on the left
 
     explicit MainComponent(AppContext& context);
     ~MainComponent() override;
@@ -47,6 +49,7 @@ private:
     juce::TextButton panicButton_{"Panic"};
     juce::TextButton settingsButton_{"Settings..."};
     StatusBar statusBar_;
+    SourcePanel sources_;
     CuesPanel cuesPanel_{context_};  // right (SPEC §16 item 3)
     juce::TabbedComponent tabs_{juce::TabbedButtonBar::TabsAtTop};
     std::unique_ptr<juce::FileChooser> chooser_;
