@@ -56,6 +56,12 @@ public:
     void setList(CueList list);
     const CueList& list() const noexcept { return list_; }
 
+    /// Replaces the list's contents (a UI edit of the armed list) but keeps the
+    /// position: `current()` stays (clamped into the new list) and a running
+    /// AfterPrevious countdown continues unless the next cue or its trigger
+    /// changed, in which case it is re-timed from `tick`.
+    void updateList(CueList list, const CueTick& tick);
+
     /// Back to "nothing fired yet"; the first cue's automatic trigger (if any)
     /// is timed from `tick`.
     void arm(const CueTick& tick);

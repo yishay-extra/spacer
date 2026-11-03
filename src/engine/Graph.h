@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "core/Clock.h"
+#include "core/InsertParamPath.h"
 #include "core/Layout.h"
 #include "core/SceneDiff.h"
 #include "core/spatial/AmbisonicDecoder.h"
@@ -30,7 +31,13 @@ public:
     /// Prepares the node for this graph's layout and rate.
     void addSource(std::unique_ptr<SourceNode> node);
     /// Speakers must be added in layout order (bus index = layout index).
-    void addSpeaker(const SpeakerChainSettings& settings, int outputChannel);
+    /// `inserts` null = no insert slots.
+    void addSpeaker(const SpeakerChainSettings& settings, int outputChannel,
+                    std::unique_ptr<InsertChain> inserts = nullptr);
+    /// After all sources and speakers are added: pad every source's and every
+    /// speaker's insert chain to the largest plugin latency of its kind, so all
+    /// sources stay aligned with each other and so do all speakers (SPEC §5.6).
+    void alignInsertLatencies();
 
     /// Non-RT, before the graph is handed to the engine: the project's
     /// ambisonic decoder (SPEC §6.3), built by GraphBuilder. Needs
@@ -49,8 +56,14 @@ public:
     int numSpeakers() const noexcept { return static_cast<int>(chains_.size()); }
     int ambisonicOrder() const noexcept { return ambisonicOrder_; }
     const Layout& layout() const noexcept { return layout_; }
-    /// Latency added by the graph (limiter look-ahead), in samples.
+    /// Latency added by the graph, in samples: limiter look-ahead plus the
+    /// largest source insert latency plus the largest speaker insert latency.
     int latencySamples() const noexcept;
+    /// Largest plugin latency over the sources' / speakers' insert chains.
+    int sourceInsertLatency() const noexcept { return sourceInsertLatency_; }
+    int speakerInsertLatency() const noexcept { return speakerInsertLatency_; }
+    /// The insert stage of a source / speaker by model id, or null.
+    InsertStage* findInserts(InsertOwner owner, int id) noexcept;
 
     SourceNode& source(int index) noexcept { return *sources_[static_cast<std::size_t>(index)]; }
     SpeakerChain& speaker(int index) noexcept { return *chains_[static_cast<std::size_t>(index)]; }
@@ -114,6 +127,7 @@ private:
     void takeSpeakerStateFrom(Graph& old) noexcept;
     void beginAmbisonicCrossfade(Graph& old) noexcept;
     void decodeAmbisonics(int n) noexcept;
+    void claimInserts() noexcept;
     void adoptGhost(Graph& old, int sourceId, int fadeSamples) noexcept;
 
     Layout layout_;
@@ -121,6 +135,8 @@ private:
     int maxBlockSize_;
     int numOutputs_;
     int ambisonicOrder_;
+    int sourceInsertLatency_{0};
+    int speakerInsertLatency_{0};
 
     std::vector<std::unique_ptr<SourceNode>> sources_;
     /// Nodes fading out after a scene recall (still rendered until silent).

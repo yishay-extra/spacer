@@ -63,6 +63,8 @@ void SourceNode::prepare(const Layout& layout, double sampleRate, int maxBlockSi
     sampleRate_ = sampleRate;
     if (spatializer_) spatializer_->prepare(layout, sampleRate, maxBlockSize);
     if (input_) input_->prepare(sampleRate, maxBlockSize);
+    if (!inserts_) inserts_ = std::make_unique<InsertStage>();
+    inserts_->prepare(sampleRate, maxBlockSize, numChannels());
     buffer_.setSize(2, std::max(1, maxBlockSize));
     buffer_.clear();
     for (auto& d : distance_) d.prepare(sampleRate);
@@ -178,6 +180,10 @@ void SourceNode::takeStateFrom(SourceNode& old, bool sameLayout) noexcept {
     }
     if (juce::exactlyEqual(old.sampleRate_, sampleRate_)) distance_ = old.distance_;
     if (input_ && old.input_) input_->takeStateFrom(*old.input_);
+    // Keep the running insert stage (plugin instances, delay lines) and move
+    // it to this node's configuration; the fresh one goes back with `old`.
+    std::swap(inserts_, old.inserts_);
+    inserts_->retargetTo(*old.inserts_);
 
     // Motion phase (SPEC §5.2: sources keep their motion phase across swaps).
     const bool samePoints = numPoints() == old.numPoints();
@@ -256,7 +262,8 @@ void SourceNode::process(const InputContext& ctx, const ClockState& clock, int n
     else
         for (int c = 0; c < channels; ++c) std::fill(ch[c], ch[c] + n, 0.0f);
 
-    // Insert slots (pre-spatializer): WP10.
+    // Insert slots (pre-gain, pre-spatializer; SPEC §5.3).
+    inserts_->process(ch, channels, n);
 
     // Modulators first, then the motion (SPEC §10), both at the end of this block.
     const MotionContext mctx{clock, n, sampleRate_};

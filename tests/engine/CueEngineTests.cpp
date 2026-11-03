@@ -278,3 +278,46 @@ TEST_CASE("Installation mode: startShow arms the default list and fires its firs
     s.defaultCueList = "Missing";
     CHECK_FALSE(installation::startShow(*show.cues, s, show.tick()));
 }
+
+TEST_CASE("CueEngine: refreshArmedList follows edits to the armed list") {
+    Show show({cue("one", "A", 0.0f), cue("two", "B", 0.0f), cue("three", "C", 0.0f)});
+    CHECK_FALSE(show.cues->refreshArmedList(show.tick()));  // not armed: nothing to do
+    REQUIRE(show.cues->arm("Show", show.tick()));
+    CHECK_FALSE(show.cues->refreshArmedList(show.tick()));  // unchanged
+    REQUIRE(show.cues->go(show.tick()));
+    CHECK(show.cues->sequencer().current() == 0);
+
+    // Edit a cue: the armed copy follows and the position is kept.
+    show.project.cueLists[0].cues[1].sceneName = "C";
+    CHECK(show.cues->refreshArmedList(show.tick()));
+    CHECK(show.cues->sequencer().list().cues[1].sceneName == "C");
+    CHECK(show.cues->sequencer().current() == 0);
+    CHECK(show.cues->sequencer().next() == 1);
+
+    // Rename (same number of lists): still armed, same position.
+    show.project.cueLists[0].name = "Renamed";
+    CHECK(show.cues->refreshArmedList(show.tick()));
+    CHECK(show.cues->armed());
+    CHECK(show.cues->armedName() == "Renamed");
+    CHECK(show.cues->sequencer().current() == 0);
+
+    // Removed: disarmed.
+    show.project.cueLists.clear();
+    CHECK(show.cues->refreshArmedList(show.tick()));
+    CHECK_FALSE(show.cues->armed());
+}
+
+TEST_CASE("CueEngine: recallCount counts every recall that changed the live model") {
+    Show show({cue("one", "A", 0.0f), cue("two", "B", 0.0f)});
+    REQUIRE(show.cues->arm("Show", show.tick()));
+    CHECK(show.cues->recallCount() == 0);
+    REQUIRE(show.cues->go(show.tick()));
+    CHECK(show.cues->recallCount() == 1);
+    // A scene recall outside the cue list does not move the cue index but is counted.
+    const int current = show.cues->sequencer().current();
+    REQUIRE(show.cues->recallScene("C", 0.0f, false));
+    CHECK(show.cues->sequencer().current() == current);
+    CHECK(show.cues->recallCount() == 2);
+    CHECK_FALSE(show.cues->recallScene("Missing", 0.0f, false));
+    CHECK(show.cues->recallCount() == 2);
+}

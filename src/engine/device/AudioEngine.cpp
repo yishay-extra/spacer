@@ -4,6 +4,7 @@
 
 #include "engine/AllocationGuard.h"
 #include "engine/GraphBuilder.h"
+#include "engine/PluginHost.h"
 
 namespace spacer {
 
@@ -51,8 +52,11 @@ std::unique_ptr<Graph> AudioEngine::buildGraph(double sampleRate, int blockSize,
     builder.setDiskStreamer(&streamer_);
     builder.setProjectDirectory(projectDirectory_);
     builder.setNumOutputChannels(numOutputs);
+    builder.setPluginHost(pluginHost_);
     warnings_.clear();
     auto graph = builder.build(sampleRate, blockSize, &warnings_);
+    if (pluginHost_ != nullptr)
+        for (auto& w : pluginHost_->takeWarnings()) warnings_.push_back(std::move(w));
     if (graph) clockSelector_.apply(*graph, project_->clock);
     return graph;
 }
