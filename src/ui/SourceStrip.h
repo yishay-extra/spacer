@@ -8,6 +8,7 @@
 
 #include "app/AppContext.h"
 #include "ui/FieldList.h"
+#include "ui/InsertSlotsView.h"
 #include "ui/logic/ProjectEdit.h"
 
 namespace spacer {
@@ -25,7 +26,7 @@ public:
 /// All content comes from the tables in src/ui/logic; every edit is a
 /// ProjectEdit through AppContext::perform(), so it is undoable, and
 /// continuous motion parameters reach the engine as SetMotionParam (no phase
-/// restart). Plug-in editor windows are WP11e.
+/// restart). The insert section is the shared InsertSlotsView (editor windows, WP11e).
 class SourceStrip final : public juce::Component {
 public:
     explicit SourceStrip(AppContext& context);
@@ -48,7 +49,6 @@ private:
     const SourceSpec* source() const;
     bool apply(std::optional<ProjectEdit> edit);
     void browseForFile(const std::string& fieldId);
-    void showInsertMenu();
     void layoutContent(int width, bool place);
     int motionChannel() const;
 
@@ -58,12 +58,12 @@ private:
 
     juce::Label title_;
     LevelMeter meter_;
-    juce::Label inputTitle_, levelTitle_, spatialTitle_, motionTitle_, modulatorTitle_, insertTitle_;
-    FieldList inputList_, levelList_, spatialList_, motionList_, modulatorList_, insertList_;
+    juce::Label inputTitle_, levelTitle_, spatialTitle_, motionTitle_, modulatorTitle_;
+    FieldList inputList_, levelList_, spatialList_, motionList_, modulatorList_;
     juce::ComboBox motionKind_;
     juce::TextButton channelLeft_{"Left"}, channelRight_{"Right"};
-    juce::TextButton addItem_, addModulator_, addInsert_;
-    juce::Label insertsHint_;
+    juce::TextButton addItem_, addModulator_;
+    InsertSlotsView inserts_;
     std::unique_ptr<juce::FileChooser> chooser_;
     bool refreshing_{false};
     int contentHeight_{80};

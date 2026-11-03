@@ -53,14 +53,20 @@ void PluginHost::addPlatformFormats(juce::AudioPluginFormatManager& formats) {
 #endif
 }
 
-PluginScanner::Report PluginHost::scanAll(bool rescanAll, const PluginScanner::Progress& progress) {
-    return scanner_->scanAll(rescanAll, progress);
+PluginScanner::Report PluginHost::scanAll(bool rescanAll, const PluginScanner::Progress& progress,
+                                          const PluginScanner::ShouldCancel& cancel) {
+    return scanner_->scanAll(rescanAll, progress, cancel);
+}
+
+void PluginHost::adoptScanCache(PluginScanCache&& scanned) {
+    cache_ = std::move(scanned);
 }
 
 std::optional<juce::PluginDescription> PluginHost::resolve(const std::string& pluginId) {
     const juce::String id(pluginId);
     if (auto d = cache_.find(id)) return d;
-    if (cache_.isBlacklisted(id) || !options_.scanUnknownOnDemand) return std::nullopt;
+    if (cache_.isBlacklisted(id) || !options_.scanUnknownOnDemand || backgroundScan_.load())
+        return std::nullopt;
     auto* format = scanner_->formatFor(id);
     if (format == nullptr) return std::nullopt;
     scanner_->scanIdentifiers(format->getName(), {id});

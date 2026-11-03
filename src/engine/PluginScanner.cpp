@@ -104,37 +104,64 @@ void PluginScanner::scanOne(const juce::String& formatName, const juce::String& 
     report.blacklisted.push_back(id);
 }
 
-PluginScanner::Report PluginScanner::scanIdentifiers(const juce::String& formatName,
-                                                     const std::vector<juce::String>& identifiers,
-                                                     bool rescanAll, const Progress& progress) {
+PluginScanner::Report PluginScanner::scanList(const juce::String& formatName,
+                                              const std::vector<juce::String>& identifiers, bool rescanAll,
+                                              const Progress& progress, const ShouldCancel& cancel,
+                                              int indexOffset, int grandTotal) {
     Report report;
     juce::AudioPluginFormat* format = nullptr;
     for (auto* f : formats_.getFormats())
         if (f->getName() == formatName) format = f;
     if (format == nullptr) return report;
 
-    const int total = static_cast<int>(identifiers.size());
-    for (int i = 0; i < total; ++i) {
+    const int count = static_cast<int>(identifiers.size());
+    for (int i = 0; i < count; ++i) {
+        if (cancel && cancel()) {
+            report.cancelled = true;
+            break;
+        }
         const juce::String& id = identifiers[static_cast<std::size_t>(i)];
         if (!needsScan(*format, id, rescanAll)) {
             ++report.skipped;
             continue;
         }
-        if (progress) progress(i, total, id);
+        if (progress) progress(indexOffset + i, grandTotal, id);
         scanOne(formatName, id, report);
     }
     cache_.save();
     return report;
 }
 
-PluginScanner::Report PluginScanner::scanAll(bool rescanAll, const Progress& progress) {
-    Report total;
+PluginScanner::Report PluginScanner::scanIdentifiers(const juce::String& formatName,
+                                                     const std::vector<juce::String>& identifiers,
+                                                     bool rescanAll, const Progress& progress,
+                                                     const ShouldCancel& cancel) {
+    return scanList(formatName, identifiers, rescanAll, progress, cancel, 0,
+                    static_cast<int>(identifiers.size()));
+}
+
+PluginScanner::Report PluginScanner::scanAll(bool rescanAll, const Progress& progress,
+                                             const ShouldCancel& cancel) {
+    // List every format first so progress runs over the whole scan.
+    std::vector<std::pair<juce::String, std::vector<juce::String>>> lists;
+    int grandTotal = 0;
     for (auto* f : formats_.getFormats()) {
-        const Report r = scanIdentifiers(f->getName(), candidates(*f), rescanAll, progress);
+        lists.emplace_back(f->getName(), candidates(*f));
+        grandTotal += static_cast<int>(lists.back().second.size());
+    }
+    Report total;
+    int offset = 0;
+    for (const auto& [name, ids] : lists) {
+        const Report r = scanList(name, ids, rescanAll, progress, cancel, offset, grandTotal);
+        offset += static_cast<int>(ids.size());
         total.scanned += r.scanned;
         total.skipped += r.skipped;
         total.added += r.added;
         total.blacklisted.insert(total.blacklisted.end(), r.blacklisted.begin(), r.blacklisted.end());
+        if (r.cancelled) {
+            total.cancelled = true;
+            break;
+        }
     }
     cache_.save();
     return total;

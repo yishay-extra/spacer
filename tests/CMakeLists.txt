@@ -83,6 +83,7 @@ if(SPACER_WITH_ENGINE_TESTS)
     endif()
     target_link_libraries(spacer_engine_tests
         PRIVATE
+            spacer_ui_logic  # the plug-in UI logic against a real PluginHost (WP11e)
             spacer_core
             spacer_vdev_protocol
             Catch2::Catch2WithMain

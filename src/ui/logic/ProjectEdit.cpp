@@ -1,6 +1,7 @@
 #include "ui/logic/ProjectEdit.h"
 
 #include <utility>
+#include <vector>
 
 #include "ui/logic/SourceGeometry.h"
 
@@ -40,8 +41,16 @@ const SourceSpec* findSource(const Project& p, int id) {
 ProjectEdit setLayout(const Project& project, Layout after, std::string name) {
     ProjectEdit e;
     e.name = std::move(name);
-    e.apply = [after = std::move(after)](Project& p) { p.layout = after; };
-    e.revert = [before = project.layout](Project& p) { p.layout = before; };
+    e.apply = [after = std::move(after)](Project& p) {
+        p.layout = after;
+        std::erase_if(p.speakerChains, [&](const SpeakerChainSpec& c) {
+            return p.layout.findSpeaker(c.speakerId) == nullptr;
+        });
+    };
+    e.revert = [before = project.layout, chains = project.speakerChains](Project& p) {
+        p.layout = before;
+        p.speakerChains = chains;
+    };
     e.effect = EngineEffect::structural();
     return e;
 }

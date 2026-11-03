@@ -25,6 +25,8 @@
 
 namespace spacer {
 
+class PluginUi;
+
 /// The app's composition root. Owned by the main window; everything here runs
 /// on the JUCE message thread (SPEC §5.1).
 ///
@@ -130,6 +132,13 @@ public:
     AudioEngine& engine() noexcept { return engine_; }
     /// Plug-in scan results and hosting (WP10); the Sources panel lists them for inserts.
     PluginHost& plugins() noexcept { return *plugins_; }
+    /// Plug-in editor windows and the background plug-in scan (WP11e).
+    PluginUi& pluginUi() noexcept { return *pluginUi_; }
+    /// Writes the live plug-in state (edits made in plug-in editors) into the
+    /// model (SPEC §13) and marks the project modified if it changed. Save,
+    /// scene update and cue recalls do this themselves. Returns the number
+    /// of slots read.
+    int capturePluginState();
     /// Live parameter change (not undoable, not stored in the model). False if dropped.
     bool send(const Command& command) { return engine_.send(command); }
     const FeedbackState& feedback() const noexcept { return feedback_; }
@@ -176,6 +185,10 @@ public:
     bool jumpToCue(int index);
     /// Scene manager: recalls a stored scene outside any cue list.
     bool recallScene(const std::string& name, float transitionSeconds, bool restartMotionPhase);
+    /// Scene manager: "Update scene" / "New scene". Both capture the live
+    /// plug-in state first (SPEC §13), then store the live state as an undoable show edit.
+    bool updateScene(const std::string& name);
+    bool newScene(const std::string& name);
 
     const InstallationSettings& installationSettings() const noexcept { return installation_; }
     /// Installation mode on / off and its autosave interval (SPEC §11); stored
@@ -228,6 +241,7 @@ private:
     std::unique_ptr<CueEngine> cues_;
     std::unique_ptr<ControlHub> control_;  // after cues_: holds a pointer to it
     std::unique_ptr<MidiInputService> midiIn_;
+    std::unique_ptr<PluginUi> pluginUi_;  // reset first in ~AppContext (it listens to us)
     FeedbackState feedback_;
     SourceSelection selection_;
 

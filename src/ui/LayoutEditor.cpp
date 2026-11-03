@@ -2,6 +2,7 @@
 
 #include "core/LayoutPresets.h"
 #include "core/Validate.h"
+#include "ui/logic/SpeakerChainEditing.h"
 
 namespace spacer {
 
@@ -71,7 +72,19 @@ private:
 };
 
 LayoutEditor::LayoutEditor(AppContext& context)
-    : context_(context), stage_(context, StageView::Mode::LayoutEdit) {
+    : context_(context),
+      inserts_(context,
+               {[this](const std::string& pluginId) {
+                    return chainedit::editAddInsert(context_.project(), selectedSpeakerId(), pluginId);
+                },
+                [this](int slot) {
+                    return chainedit::editRemoveInsert(context_.project(), selectedSpeakerId(), slot);
+                },
+                [this](int slot, bool bypassed) {
+                    return chainedit::editInsertBypass(context_.project(), selectedSpeakerId(), slot,
+                                                       bypassed);
+                }}),
+      stage_(context, StageView::Mode::LayoutEdit) {
     int item = 1;
     for (const auto& id : layoutpresets::ids()) presetBox_.addItem(id, item++);
     presetBox_.setTextWhenNothingSelected("Preset...");
@@ -121,6 +134,11 @@ LayoutEditor::LayoutEditor(AppContext& context)
     issuesLabel_.setColour(juce::Label::textColourId, juce::Colour(0xffffb347));
     addAndMakeVisible(issuesLabel_);
 
+    insertsTitle_.setFont(juce::FontOptions(13.0f, juce::Font::bold));
+    insertsTitle_.setColour(juce::Label::textColourId, juce::Colour(0xffd9dee5));
+    addAndMakeVisible(insertsTitle_);
+    addAndMakeVisible(inserts_);
+
     stage_.onSpeakerClicked = [this](int id) { selectSpeaker(id); };
     addAndMakeVisible(stage_);
 
@@ -156,6 +174,14 @@ void LayoutEditor::resized() {
 
     auto left = area.removeFromLeft(std::min(area.getWidth() * 3 / 5, 900));
     issuesLabel_.setBounds(left.removeFromBottom(60));
+    left.removeFromBottom(6);
+    {
+        auto panel =
+            left.removeFromBottom(std::min(inserts_.idealHeight() + 26, std::max(0, left.getHeight() / 2)));
+        insertsTitle_.setBounds(panel.removeFromTop(22));
+        inserts_.setBounds(panel);
+    }
+    left.removeFromBottom(4);
     table_.setBounds(left);
     area.removeFromLeft(8);
     stage_.setBounds(area);
@@ -274,6 +300,7 @@ void LayoutEditor::selectedRowsChanged(int lastRowSelected) {
                        ? speakers[static_cast<std::size_t>(lastRowSelected)].id
                        : -1;
     stage_.setSelectedSpeaker(id);
+    refreshInserts();
 }
 
 int LayoutEditor::selectedSpeakerId() const {
@@ -355,6 +382,10 @@ void LayoutEditor::projectChanged(AppContext::Change) {
     refresh();
 }
 
+void LayoutEditor::feedbackUpdated() {
+    inserts_.tick();  // plug-ins that finished loading
+}
+
 void LayoutEditor::refresh() {
     const Project& p = context_.project();
     rows_ = layoutedit::compensationRows(p);
@@ -372,6 +403,18 @@ void LayoutEditor::refresh() {
     issuesLabel_.setText(issues, juce::dontSendNotification);
     removeButton_.setEnabled(p.layout.speakers.size() > 2);
     addButton_.setEnabled(p.layout.speakers.size() < static_cast<std::size_t>(kMaxSpeakers));
+    refreshInserts();
+}
+
+void LayoutEditor::refreshInserts() {
+    const int sel = selectedSpeakerId();
+    const Speaker* speaker = sel >= 0 ? context_.project().layout.findSpeaker(sel) : nullptr;
+    insertsTitle_.setText(speaker != nullptr
+                              ? "Speaker " + juce::String::fromUTF8(speaker->name.c_str()) + " - inserts"
+                              : juce::String("Speaker inserts - select a speaker"),
+                          juce::dontSendNotification);
+    inserts_.setOwner(InsertOwner::Speaker, speaker != nullptr ? sel : -1);
+    resized();
 }
 
 }  // namespace spacer

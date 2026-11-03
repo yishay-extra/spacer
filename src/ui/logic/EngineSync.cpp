@@ -31,7 +31,8 @@ void sourceCommands(const SourceSpec& s, EngineSyncPlan& plan) {
 
 EngineSyncPlan planEngineSync(const Project& project, const EngineEffect& effect) {
     EngineSyncPlan plan;
-    plan.commands.reserve(16);  // the largest plan (a source) has 8; also avoids a GCC false -Wstringop-overflow
+    plan.commands.reserve(
+        16);  // the largest plan (a source) has 8; also avoids a GCC false -Wstringop-overflow
     switch (effect.kind) {
         case EngineEffect::Kind::None:
             break;
@@ -98,6 +99,20 @@ EngineSyncPlan planEngineSync(const Project& project, const EngineEffect& effect
             plan.commands.push_back(
                 cmd::SetInsertBypass{InsertOwner::Source, effect.id, effect.channel,
                                      spec->inserts[static_cast<std::size_t>(effect.channel)].bypassed});
+            break;
+        }
+        case EngineEffect::Kind::SpeakerInsertBypass: {
+            const SpeakerChainSpec* chain = nullptr;
+            for (const auto& c : project.speakerChains)
+                if (c.speakerId == effect.id) chain = &c;
+            if (chain == nullptr || effect.channel < 0 ||
+                effect.channel >= static_cast<int>(chain->inserts.size())) {
+                plan.rebuildGraph = true;
+                break;
+            }
+            plan.commands.push_back(
+                cmd::SetInsertBypass{InsertOwner::Speaker, effect.id, effect.channel,
+                                     chain->inserts[static_cast<std::size_t>(effect.channel)].bypassed});
             break;
         }
         case EngineEffect::Kind::Master:

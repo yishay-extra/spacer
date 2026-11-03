@@ -3,6 +3,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #include "app/AppContext.h"
+#include "ui/InsertSlotsView.h"
 #include "ui/StageView.h"
 #include "ui/logic/LayoutEditing.h"
 
@@ -11,7 +12,9 @@ namespace spacer {
 /// Layout editor (SPEC §16 item 4): speaker table + stage edit, presets,
 /// computed compensation shown read-only, output channel assignment and a
 /// per-speaker test. Every change is an undoable layout edit
-/// (edits::setLayout) and rebuilds the engine graph.
+/// (edits::setLayout) and rebuilds the engine graph. Below the table, the
+/// inserts of the selected speaker (SPEC §13, WP11e): the same view as the
+/// source strip, with edits from ui/logic/SpeakerChainEditing.
 class LayoutEditor final : public juce::Component,
                            private juce::TableListBoxModel,
                            private AppContext::Listener {
@@ -51,11 +54,13 @@ private:
 
     // AppContext::Listener
     void projectChanged(AppContext::Change change) override;
+    void feedbackUpdated() override;
 
     static std::optional<layoutedit::SpeakerField> fieldFor(int columnId);
     void editField(int speakerId, layoutedit::SpeakerField field, const juce::String& text);
     void applyLayout(Layout layout, const std::string& name);
     void refresh();
+    void refreshInserts();
     int selectedSpeakerId() const;
     void selectSpeaker(int speakerId);
 
@@ -78,6 +83,8 @@ private:
     juce::Label nameLabel_;
     juce::TableListBox table_;
     juce::Label issuesLabel_;
+    juce::Label insertsTitle_;
+    InsertSlotsView inserts_;
     StageView stage_;
     std::vector<layoutedit::CompensationRow> rows_;
 
