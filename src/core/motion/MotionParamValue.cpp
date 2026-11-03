@@ -77,4 +77,13 @@ std::optional<float> motionParamValue(const MotionSpec& spec, MotionParam param)
     return std::visit(Lookup{param}, spec.value);
 }
 
+std::optional<Period> primaryPeriod(const MotionSpec& spec) {
+    if (const auto* m = std::get_if<OrbitMotion>(&spec.value)) return m->period;
+    if (const auto* m = std::get_if<LineMotion>(&spec.value)) return m->period;
+    if (const auto* m = std::get_if<LissajousMotion>(&spec.value)) return m->period;
+    if (const auto* m = std::get_if<PathMotion>(&spec.value)) return m->period;
+    if (const auto* m = std::get_if<RandomWalkMotion>(&spec.value)) return m->stepPeriod;
+    return std::nullopt;
+}
+
 }  // namespace spacer

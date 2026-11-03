@@ -77,6 +77,12 @@ public:
     /// Phase 0 at the next block for the motion(s) and modulator LFOs.
     void resetMotion() noexcept;
     void setModulatorValue(int index, float value) noexcept { modulators_.setExternal(index, value); }
+    /// Live modulator edit (cmd::SetModulator): no rebuild, LFO phase kept.
+    void setModulator(int index, const ModulatorBank::Live& m, int count) noexcept;
+    /// SetInsertParam / recall ramp on an insert parameter a modulator is
+    /// driving: `value` becomes the base the modulation is added to. False if
+    /// no modulator drives that parameter (set the plugin directly then).
+    bool setModulatedInsertBase(int slot, int index, float value) noexcept;
 
     /// RT. Ramp to silence over exactly `numSamples` (removed sources, §5.2).
     void fadeOut(int numSamples) noexcept;
@@ -135,6 +141,7 @@ public:
 private:
     float gainTarget() const noexcept;
     void evaluatePositions(const MotionContext& ctx, const ModulatorBank::Output& mod, float width) noexcept;
+    void applyInsertModulation(const ModulatorBank::Output& mod) noexcept;
     int numPoints() const noexcept { return stereo_ && linkedPoints_ ? 2 : 1; }
 
     int id_{0};
@@ -161,6 +168,21 @@ private:
     std::vector<ModulatorSpec> modulatorSpecs_;
     ModulatorBank modulators_;
     bool modulatesGain_{false};
+    bool hasMotionRight_{false};  // linkedPoints with its own motionRight spec
+
+    // Modulated insert parameters (SPEC §13 paths as modulator targets): the
+    // plugin gets base + Σ offsets each block, clamped to 0..1. The base is
+    // the model value when the slot lists the parameter, otherwise the
+    // plugin's value when the modulation started; SetInsertParam moves it.
+    struct InsertMod {
+        bool active{false};
+        int slot{0};
+        int index{0};
+        float base{0.0f};
+        bool haveBase{false};
+    };
+    std::array<InsertMod, kMaxModulators> insertMods_{};
+    std::vector<PluginSlot> insertSpecs_;  // for model base values (message thread copy)
 
     double sampleRate_{48000.0};
     juce::AudioBuffer<float> buffer_;

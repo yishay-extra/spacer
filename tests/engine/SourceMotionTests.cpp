@@ -449,3 +449,69 @@ TEST_CASE("Source motion: restartMotion (scene recall restartMotionPhase) resets
     CHECK(rig.pos().azimuth == Approx(reference.pos().azimuth).margin(1e-3));
     CHECK(rig.pos().distance == Approx(reference.pos().distance).margin(1e-4));
 }
+
+// ---- WP14 -------------------------------------------------------------------------
+
+TEST_CASE("Source motion: a live period change re-anchors the phase (SPEC §8, WP14)") {
+    Project p = quad();
+    p.sources = {orbitSource(Period::seconds(1.0))};
+    Rig rig(p);
+    rig.run(25);  // 90 degrees
+    const float before = rig.pos().azimuth;
+    Project edited = p;
+    std::get<OrbitMotion>(edited.sources[0].motion.value).period = Period::seconds(4.0);
+    rig.proc.swapGraph(rig.build(edited));
+    rig.run(1);
+    // Continuous: one 10 ms block further at the new 4 s period (0.9 degrees),
+    // not the 25 * 0.9 = 22.5 degrees elapsed time alone would give.
+    CHECK(std::abs(Position::wrapAzimuth(rig.pos().azimuth - before) - 0.9f) < 0.05f);
+    rig.run(100);  // one more second = 90 degrees at 4 s
+    CHECK(std::abs(Position::wrapAzimuth(rig.pos().azimuth - before) - 0.9f - 90.0f) < 0.1f);
+}
+
+TEST_CASE("Source modulators: SetModulator edits live without restarting the LFO (WP14)") {
+    Project p = quad();
+    p.sources = {orbitSource(Period::seconds(1000.0))};
+    p.sources[0].modulators = {
+        ModulatorSpec{LfoSource{LfoShape::Saw, Period::seconds(1.0)}, "motion.radius", 0.5f, 0.0f}};
+    Project reference = p;
+    reference.sources[0].modulators[0].depth = 1.0f;
+    Rig rig(p), ref(reference);
+    rig.run(30);
+    ref.run(30);
+    ModulatorBank::Live live = ModulatorBank::Live::fromSpec(reference.sources[0].modulators[0]);
+    rig.proc.push(cmd::SetModulator{1, 0, 1, live});
+    rig.run(7);
+    ref.run(7);
+    CHECK(rig.source().modulators().value(0) == Approx(ref.source().modulators().value(0)));
+    CHECK(rig.pos().distance == Approx(ref.pos().distance).margin(1e-4));
+    // Appending a gain modulator live switches gain modulation on.
+    ModulatorBank::Live gain;
+    gain.lfo = false;
+    gain.targetValid = true;
+    gain.target = *ParameterPath::parse("gain");
+    gain.depth = 1.0f;
+    rig.proc.push(cmd::SetModulator{1, 1, 2, gain});
+    rig.proc.push(cmd::SetModulatorValue{1, 1, -100.0f});
+    rig.run(10);
+    CHECK(rig.source().modulators().size() == 2);
+    CHECK(peakAbs(rig.out.getReadPointer(0), kBlock) < 1e-3f);
+}
+
+TEST_CASE("Source modulators: motionRight.* drives the right point of a linked pair (WP14)") {
+    Project p = quad();
+    SourceSpec s = orbitSource(Period::seconds(1000.0));
+    s.stereo = true;
+    s.linkedPoints = true;
+    s.input.value = GeneratorSpec{};
+    s.motionRight = MotionSpec{orbit(Period::seconds(1000.0), 2.0f)};
+    s.modulators = {ModulatorSpec{OscSource{"/r"}, "motionRight.radius", 1.0f, 0.0f},
+                    ModulatorSpec{OscSource{"/l"}, "motion.radius", 1.0f, 0.0f}};
+    p.sources = {s};
+    Rig rig(p);
+    rig.proc.push(cmd::SetModulatorValue{1, 0, 1.0f});
+    rig.proc.push(cmd::SetModulatorValue{1, 1, 0.5f});
+    rig.run(3);
+    CHECK(rig.pos(1, 0).distance == Approx(2.5f).margin(1e-3));
+    CHECK(rig.pos(1, 1).distance == Approx(3.0f).margin(1e-3));
+}

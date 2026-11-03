@@ -381,14 +381,26 @@ std::vector<std::string> modulatorTargets(const SourceSpec& s) {
         src(SourceParam::DistanceRMin);
         src(SourceParam::DistanceQ);
     }
+    // The right point of a linked pair with its own motion has `motionRight.*`.
+    const bool ownRight = s.stereo && s.linkedPoints && s.motionRight.has_value();
     for (int ch = 0; ch < motionChannelCount(s); ++ch)
         for (std::size_t i = 0; i < kNumMotionParams; ++i) {
             const auto p = static_cast<MotionParam>(i);
             if (!motionParamValue(motionOf(s, ch), p)) continue;
             ParameterPath path;
-            path.domain = ParameterPath::Domain::Motion;
+            path.domain =
+                (ch == 1 && ownRight) ? ParameterPath::Domain::MotionRight : ParameterPath::Domain::Motion;
             path.motion = p;
             add(std::string(path.toString()));
+        }
+    // Insert parameters the slots already list (SPEC §13 paths).
+    for (std::size_t slot = 0; slot < s.inserts.size(); ++slot)
+        for (const auto& [index, value] : s.inserts[slot].params) {
+            ParameterPath path;
+            path.domain = ParameterPath::Domain::Insert;
+            path.slot = static_cast<int>(slot);
+            path.index = index;
+            add(path.toPathString());
         }
     return out;
 }

@@ -110,7 +110,14 @@ bool ControlDispatcher::setSourceParam(const EntityRef& ref, const std::string& 
         return send(cmd::SetSourceDistance{id, m});
     }
 
+    if (parsed->domain == ParameterPath::Domain::Insert) {
+        if (!std::isfinite(value)) return false;
+        return send(cmd::SetInsertParam{InsertOwner::Source, id, parsed->slot, parsed->index,
+                                        std::clamp(value, 0.0f, 1.0f)});
+    }
     const MotionParam mp = parsed->motion;
+    if (parsed->domain == ParameterPath::Domain::MotionRight)  // right point of a linkedPoints source
+        return send(cmd::SetMotionParam{id, 1, mp, value});
     if (mp == MotionParam::PositionAz || mp == MotionParam::PositionEl || mp == MotionParam::PositionDist) {
         Position p = currentPosition(id);
         (mp == MotionParam::PositionAz   ? p.azimuth

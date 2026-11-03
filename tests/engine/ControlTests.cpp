@@ -965,3 +965,18 @@ TEST_CASE("ControlHub: an OSC bundle timetag is applied at its sample (WP14)") {
     const std::int64_t expected = snap.blockStartSample + 1000 - base;
     CHECK(std::abs(rig.firstChange(steady) - expected) <= 1);
 }
+
+TEST_CASE("ControlDispatcher: motionRight.* and insert.* parameter paths (WP14)") {
+    Rig rig;
+    rig.dispatcher.dispatch(ev::SetSourceParam{{1, {}}, "motionRight.radius", 2.0f});
+    rig.dispatcher.dispatch(ev::SetSourceParam{{1, {}}, "insert.1.param.4", 1.5f});
+    REQUIRE(rig.sent.size() == 2);
+    const auto& m = std::get<cmd::SetMotionParam>(rig.sent[0]);
+    CHECK(m.channel == 1);
+    CHECK(m.param == MotionParam::Radius);
+    const auto& i = std::get<cmd::SetInsertParam>(rig.sent[1]);
+    CHECK(i.id == 1);
+    CHECK(i.slot == 1);
+    CHECK(i.index == 4);
+    CHECK(i.value == 1.0f);
+}

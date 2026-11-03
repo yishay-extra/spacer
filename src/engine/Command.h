@@ -14,6 +14,7 @@
 #include "core/Position.h"
 #include "core/Source.h"
 #include "core/SpeakerChain.h"
+#include "core/motion/ModulatorBank.h"
 #include "core/motion/MotionParam.h"
 
 namespace spacer {
@@ -78,6 +79,18 @@ struct SetModulatorValue {
     int sourceId{0};
     int index{0};
     float value{0.0f};
+};
+
+/// Live modulator edit (no graph rebuild, LFO phase kept): replaces modulator
+/// `index` of the source, or appends it when `index` equals the current
+/// count; `count` is the number of modulators afterwards (`index` -1: only
+/// truncate to `count`). Like
+/// SetMotionParam, the control side also writes the model.
+struct SetModulator {
+    int sourceId{0};
+    int index{0};
+    int count{0};
+    ModulatorBank::Live modulator;
 };
 
 /// File transport (SPEC §8, OSC `/source/{id}/file/play | stop | seek`).
@@ -174,11 +187,12 @@ struct CancelScheduledRecall {};
 using Command =
     std::variant<cmd::SetSourceGain, cmd::SetSourceMute, cmd::SetSourcePosition, cmd::SetSourceSpread,
                  cmd::SetSourceWidth, cmd::SetSourceDistance, cmd::SetMotionParam, cmd::ResetMotion,
-                 cmd::SetModulatorValue, cmd::FilePlay, cmd::FileStop, cmd::FileSeek, cmd::SetSpeakerTrim,
-                 cmd::SetSpeakerMute, cmd::SetSpeakerDelay, cmd::SetSpeakerPolarity, cmd::SetSpeakerEq,
-                 cmd::SetInsertParam, cmd::SetInsertBypass, cmd::SetMasterGain, cmd::SetPanic, cmd::ClockPlay,
-                 cmd::ClockStop, cmd::ClockContinue, cmd::ClockSetBpm, cmd::ClockSetBeat, cmd::ClockTap,
-                 cmd::SwapGraph, cmd::RecallScene, cmd::CancelScheduledRecall>;
+                 cmd::SetModulatorValue, cmd::SetModulator, cmd::FilePlay, cmd::FileStop, cmd::FileSeek,
+                 cmd::SetSpeakerTrim, cmd::SetSpeakerMute, cmd::SetSpeakerDelay, cmd::SetSpeakerPolarity,
+                 cmd::SetSpeakerEq, cmd::SetInsertParam, cmd::SetInsertBypass, cmd::SetMasterGain,
+                 cmd::SetPanic, cmd::ClockPlay, cmd::ClockStop, cmd::ClockContinue, cmd::ClockSetBpm,
+                 cmd::ClockSetBeat, cmd::ClockTap, cmd::SwapGraph, cmd::RecallScene,
+                 cmd::CancelScheduledRecall>;
 
 static_assert(std::is_trivially_copyable_v<Command>);
 

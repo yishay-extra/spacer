@@ -41,6 +41,10 @@ public:
     /// state. RT-safe.
     void continueTimelineFrom(const Trajectory& other) { timeline_ = other.timeline_; }
 
+    /// After continueTimelineFrom(): the period went from `from` to `to`;
+    /// keep the phase reached so far (SPEC §8 re-anchor). RT-safe.
+    void reanchorPeriod(const Period& from, const Period& to) { timeline_.reanchor(from, to); }
+
 protected:
     /// Return the position at the end of the block described by `t`.
     virtual Position compute(const MotionTime& t) = 0;

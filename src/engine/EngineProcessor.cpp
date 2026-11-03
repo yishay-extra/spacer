@@ -258,6 +258,9 @@ void EngineProcessor::apply(const Command& command) noexcept {
                     if (auto* s = graph_->findSource(c.sourceId)) s->resetMotion();
                 } else if constexpr (std::is_same_v<C, cmd::SetModulatorValue>) {
                     if (auto* s = graph_->findSource(c.sourceId)) s->setModulatorValue(c.index, c.value);
+                } else if constexpr (std::is_same_v<C, cmd::SetModulator>) {
+                    if (auto* s = graph_->findSource(c.sourceId))
+                        s->setModulator(c.index, c.modulator, c.count);
                 } else if constexpr (std::is_same_v<C, cmd::FilePlay>) {
                     if (auto* s = graph_->findSource(c.sourceId))
                         if (auto* in = s->input()) in->play();
@@ -278,6 +281,9 @@ void EngineProcessor::apply(const Command& command) noexcept {
                 } else if constexpr (std::is_same_v<C, cmd::SetSpeakerEq>) {
                     if (auto* s = graph_->findSpeaker(c.speakerId)) s->setEq(c.eq);
                 } else if constexpr (std::is_same_v<C, cmd::SetInsertParam>) {
+                    // A modulated parameter takes the value as its new base.
+                    SourceNode* src = c.owner == InsertOwner::Source ? graph_->findSource(c.id) : nullptr;
+                    if (src != nullptr && src->setModulatedInsertBase(c.slot, c.index, c.value)) return;
                     if (auto* st = graph_->findInserts(c.owner, c.id))
                         st->chain().setParameter(c.slot, c.index, c.value);
                 } else if constexpr (std::is_same_v<C, cmd::SetInsertBypass>) {
@@ -590,6 +596,9 @@ void EngineProcessor::applyRampValue(const Ramp& r, float v, const Position& pos
     const RampTarget t = r.target;
     if (t == RampTarget::SourceInsertParam || t == RampTarget::SpeakerInsertParam) {
         const auto owner = t == RampTarget::SpeakerInsertParam ? InsertOwner::Speaker : InsertOwner::Source;
+        if (owner == InsertOwner::Source)
+            if (auto* src = graph_->findSource(r.id); src && src->setModulatedInsertBase(r.slot, r.param, v))
+                return;
         if (auto* st = graph_->findInserts(owner, r.id)) st->chain().setParameter(r.slot, r.param, v);
         return;
     }

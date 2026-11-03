@@ -43,7 +43,8 @@ SourceNode::SourceNode(const SourceSpec& spec, std::unique_ptr<Spatializer> spat
       distanceModel_(spec.distance),
       spatializer_(std::move(spatializer)),
       input_(std::move(input)),
-      modulatorSpecs_(spec.modulators) {
+      modulatorSpecs_(spec.modulators),
+      insertSpecs_(spec.inserts) {
     motionSpec_[0] = spec.motion;
     motionSpec_[1] = (linkedPoints_ && stereo_ && spec.motionRight) ? *spec.motionRight : spec.motion;
     for (std::size_t k = 0; k < 2; ++k) {
@@ -51,11 +52,61 @@ SourceNode::SourceNode(const SourceSpec& spec, std::unique_ptr<Spatializer> spat
         defaultSmoothMs_[k] = smoothMs_[k] = smoothMsOf(motionSpec_[k]);
         smoothed_[k] = target_[k].toCartesian();
     }
+    hasMotionRight_ = linkedPoints_ && stereo_ && spec.motionRight.has_value();
     modulators_.configure(modulatorSpecs_);
-    for (std::size_t i = 0; i < std::min<std::size_t>(modulatorSpecs_.size(), kMaxModulators); ++i) {
-        const auto path = ParameterPath::parse(modulatorSpecs_[i].target);
-        if (path && path->domain == ParameterPath::Domain::Source && path->source == SourceParam::GainDb)
-            modulatesGain_ = true;
+    modulatesGain_ = modulators_.targets(SourceParam::GainDb);
+}
+
+void SourceNode::setModulator(int index, const ModulatorBank::Live& m, int count) noexcept {
+    modulators_.setLive(index, m, count);
+    modulatesGain_ = modulators_.targets(SourceParam::GainDb);
+}
+
+bool SourceNode::setModulatedInsertBase(int slot, int index, float value) noexcept {
+    for (auto& m : insertMods_)
+        if (m.active && m.slot == slot && m.index == index) {
+            m.base = std::clamp(value, 0.0f, 1.0f);
+            m.haveBase = true;
+            return true;
+        }
+    return false;
+}
+
+void SourceNode::applyInsertModulation(const ModulatorBank::Output& mod) noexcept {
+    InsertChain& chain = inserts_->chain();
+    // Parameters no longer modulated go back to their base.
+    for (auto& m : insertMods_) {
+        if (!m.active) continue;
+        bool still = false;
+        for (int i = 0; i < mod.numInserts; ++i)
+            still = still || (mod.inserts[static_cast<std::size_t>(i)].slot == m.slot &&
+                              mod.inserts[static_cast<std::size_t>(i)].index == m.index);
+        if (!still) {
+            if (m.haveBase) chain.setParameter(m.slot, m.index, m.base);
+            m = InsertMod{};
+        }
+    }
+    for (int i = 0; i < mod.numInserts; ++i) {
+        const auto& o = mod.inserts[static_cast<std::size_t>(i)];
+        if (chain.plugin(o.slot) == nullptr) continue;  // empty / missing slot
+        InsertMod* state = nullptr;
+        for (auto& m : insertMods_)
+            if (m.active && m.slot == o.slot && m.index == o.index) state = &m;
+        if (state == nullptr) {
+            for (auto& m : insertMods_)
+                if (!m.active && state == nullptr) state = &m;
+            if (state == nullptr) continue;
+            *state = InsertMod{true, o.slot, o.index, 0.0f, false};
+        }
+        if (!state->haveBase) {
+            state->base = chain.parameter(o.slot, o.index);
+            if (o.slot >= 0 && o.slot < static_cast<int>(insertSpecs_.size())) {
+                const auto& params = insertSpecs_[static_cast<std::size_t>(o.slot)].params;
+                if (const auto it = params.find(o.index); it != params.end()) state->base = it->second;
+            }
+            state->haveBase = true;
+        }
+        chain.setParameter(o.slot, o.index, std::clamp(state->base + o.value, 0.0f, 1.0f));
     }
 }
 
@@ -200,8 +251,14 @@ void SourceNode::takeStateFrom(SourceNode& old, bool sameLayout) noexcept {
             std::swap(manual_[k], old.manual_[ok]);
         } else {
             motion_[k]->continueTimelineFrom(*old.motion_[ok]);
+            // A live period edit keeps the position continuous (SPEC §8).
+            const auto from = primaryPeriod(old.motionSpec_[ok]);
+            const auto to = primaryPeriod(motionSpec_[k]);
+            if (from && to) motion_[k]->reanchorPeriod(*from, *to);
         }
     }
+    // Modulated insert parameters keep their base (same plugin instances).
+    insertMods_ = old.insertMods_;
     if (specEqual(modulatorSpecs_, old.modulatorSpecs_))
         modulators_ = old.modulators_;
     else
@@ -228,7 +285,9 @@ void SourceNode::evaluatePositions(const MotionContext& ctx, const ModulatorBank
             }
             manual->setTarget(Position::fromCartesian(smoothed_[k]));
         }
-        MotionModulation m = mod.motion;
+        // `motionRight.*` drives the right point when it has its own spec;
+        // otherwise both points share the `motion` spec and its paths.
+        MotionModulation m = (k == 1 && hasMotionRight_) ? mod.motionRight : mod.motion;
         for (std::size_t i = 0; i < m.values.size(); ++i) m.values[i] += paramOffsets_[k].values[i];
         motion.setModulation(m);
         points[k] = motion.evaluate(ctx);
@@ -262,12 +321,17 @@ void SourceNode::process(const InputContext& ctx, const ClockState& clock, int n
     else
         for (int c = 0; c < channels; ++c) std::fill(ch[c], ch[c] + n, 0.0f);
 
+    // Modulators first (SPEC §10), at the end of this block; insert
+    // parameter targets apply to this block's plugin processing.
+    const MotionContext mctx{clock, n, sampleRate_};
+    const ModulatorBank::Output mod = modulators_.process(mctx);
+    if (mod.numInserts > 0 ||
+        std::any_of(insertMods_.begin(), insertMods_.end(), [](const InsertMod& m) { return m.active; }))
+        applyInsertModulation(mod);
+
     // Insert slots (pre-gain, pre-spatializer; SPEC §5.3).
     inserts_->process(ch, channels, n);
 
-    // Modulators first, then the motion (SPEC §10), both at the end of this block.
-    const MotionContext mctx{clock, n, sampleRate_};
-    const ModulatorBank::Output mod = modulators_.process(mctx);
     evaluatePositions(mctx, mod, width_ + mod.source[SourceParam::Width]);
 
     const float gainMod =

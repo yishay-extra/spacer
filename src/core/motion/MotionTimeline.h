@@ -15,6 +15,13 @@ public:
 
     MotionTime advance(const MotionContext& ctx);
 
+    /// Live period change (SPEC §8: re-anchor the phase so the position is
+    /// continuous): moves the origin so that the number of `to` periods
+    /// elapsed at the end of the last block equals the number of `from`
+    /// periods elapsed then. Units may differ. No effect before the first
+    /// advance() or for non-positive periods. RT-safe.
+    void reanchor(const Period& from, const Period& to);
+
 private:
     bool pending_{true};
     double originBeat_{0.0};
