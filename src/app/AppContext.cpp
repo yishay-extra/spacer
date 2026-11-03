@@ -1,5 +1,7 @@
 #include "app/AppContext.h"
 
+#include <juce_audio_processors/juce_audio_processors.h>
+
 #include <algorithm>
 
 #include "app/VirtualDeviceInstaller.h"
@@ -31,13 +33,19 @@ std::filesystem::path settingsDirectory() {
 
 }  // namespace
 
-AppContext::AppContext() : project_(defaultProject()) {
+AppContext::AppContext()
+    : project_(defaultProject()),
+      // GUI formats (not headless) so hosted plugins can open editors (WP11e).
+      plugins_(std::make_unique<PluginHost>(
+          PluginHost::Options::appDefaults(),
+          [](juce::AudioPluginFormatManager& f) { juce::addDefaultFormatsToManager(f); })) {
     installationSettingsPath_ = settingsDirectory() / "installation.json";
     loadInstallationSettings();
     appSettingsPath_ = settingsDirectory() / "settings.json";
     if (auto s = appsettings::load(appSettingsPath_)) appSettings_ = *s;
     engine_.setVirtualDeviceLatency(appSettings_.virtualDeviceLatencyFrames);
     appliedSettings_ = settings::fieldsOf(project_);
+    engine_.setPluginHost(plugins_.get());
     engine_.onFeedback = [this](const Feedback& f) { onFeedback(f); };
     // External clocks (SPEC §9) travel with the graph; AudioEngine asks for
     // one whenever project.clock changes.
@@ -90,6 +98,7 @@ void AppContext::resetCueEngine() {
     config.maxBlockSize =
         std::max(status.bufferSize > 0 ? status.bufferSize : project_.devices.bufferSize, 512);
     if (status.outputChannels > 0) config.numOutputChannels = status.outputChannels;
+    config.pluginHost = plugins_.get();
     if (midiIn_) midiIn_->close();
     control_.reset();
     cues_ = std::make_unique<CueEngine>(engine_.processor(), project_, std::move(config));
@@ -228,6 +237,7 @@ bool AppContext::perform(ProjectEdit edit) {
     const auto effect = history_.perform(project_, std::move(edit));
     if (!effect) return false;
     syncEngine(*effect);
+    syncArmedList();
     applyRuntimeSettings();
     modelChanged(Change::Edited);
     return true;
@@ -247,6 +257,7 @@ bool AppContext::undo() {
     if (!effect) return false;
     syncEngine(*effect);
     if (rebuildPending_) rebuildGraph();
+    syncArmedList();
     applyRuntimeSettings();
     modelChanged(Change::UndoRedo);
     return true;
@@ -257,6 +268,7 @@ bool AppContext::redo() {
     if (!effect) return false;
     syncEngine(*effect);
     if (rebuildPending_) rebuildGraph();
+    syncArmedList();
     applyRuntimeSettings();
     modelChanged(Change::UndoRedo);
     return true;
@@ -317,6 +329,7 @@ std::string AppContext::openProject(const std::filesystem::path& path) {
 std::string AppContext::saveProject(const std::filesystem::path& path) {
     const auto target = path.empty() ? projectPath_ : path;
     if (target.empty()) return "No file name";
+    plugins_->captureState(project_);  // edits made in plugin editors are saved too
     if (const auto err = projectfile::save(project_, target)) return err->message;
     projectPath_ = target;
     savedRevision_ = revision_;
@@ -334,8 +347,17 @@ void AppContext::rememberProjectPath() {
 
 void AppContext::modelChanged(Change change) {
     ++revision_;
+    notify(change);
+}
+
+void AppContext::notify(Change change) {
     const auto copy = listeners_;  // listeners may remove themselves
     for (auto* l : copy) l->projectChanged(change);
+}
+
+void AppContext::syncArmedList() {
+    // The armed cue list is a copy: follow edits / undo of the project's lists.
+    cues_->refreshArmedList(cueTick());
 }
 
 // ---- engine -------------------------------------------------------------------
@@ -404,6 +426,28 @@ bool AppContext::back() {
     return true;
 }
 
+bool AppContext::armCueList(const std::string& name) {
+    if (!cues_->arm(name, cueTick())) return false;
+    notify(Change::CueState);
+    return true;
+}
+
+bool AppContext::jumpToCue(int index) {
+    const auto tick = cueTick();
+    if (!cues_->armed() && !cues_->armFirst(tick)) return false;
+    if (speakerTest_) stopSpeakerTest();
+    if (!cues_->jump(index, tick)) return false;
+    modelChanged(Change::SceneRecalled);
+    return true;
+}
+
+bool AppContext::recallScene(const std::string& name, float transitionSeconds, bool restartMotionPhase) {
+    if (speakerTest_) stopSpeakerTest();
+    if (!cues_->recallScene(name, transitionSeconds, restartMotionPhase)) return false;
+    modelChanged(Change::SceneRecalled);
+    return true;
+}
+
 // ---- observers ----------------------------------------------------------------
 
 void AppContext::addListener(Listener* listener) {
@@ -421,11 +465,15 @@ void AppContext::timerCallback() {
     lastTick_ = now;
 
     if (rebuildPending_ && now - lastRebuild_ >= kGestureRebuildSeconds) rebuildGraph();
+    // A plugin changed its latency: rebuild so it is compensated (SPEC §5.6).
+    if (plugins_->takeLatencyChanged()) rebuildGraph();
 
     // OSC / MIDI. A cue fired from there changes the live model (SPEC §11).
-    const int cueBefore = cues_->sequencer().current();
+    // Any recall counts, also an OSC / MIDI scene recall that leaves the cue
+    // index alone (PLAN WP14 item, fixed here because the Cues panel shows it).
+    const auto recallsBefore = cues_->recallCount();
     control_->pump();
-    if (cues_->sequencer().current() != cueBefore) modelChanged(Change::SceneRecalled);
+    if (cues_->recallCount() != recallsBefore) modelChanged(Change::SceneRecalled);
 
     // Automatic cue triggers are held while a speaker test runs: a recall
     // rebuilds the engine from the model and would end the test half-way.

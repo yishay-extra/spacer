@@ -15,6 +15,7 @@
 #include "control/InstallationMode.h"
 #include "control/device/MidiInputService.h"
 #include "core/Project.h"
+#include "engine/PluginHost.h"
 #include "engine/device/AudioEngine.h"
 #include "ui/logic/AppSettings.h"
 #include "ui/logic/FeedbackState.h"
@@ -67,6 +68,7 @@ public:
         SceneRecalled,  // a cue or scene recall changed the live model
         SpeakerTest,    // speaker test started / stopped
         Panic,          // panic engaged / released
+        CueState,       // a cue list was armed (the model is untouched)
     };
 
     class Listener {
@@ -154,6 +156,13 @@ public:
     /// Go / Back on the armed cue list (arms the first list if none is armed).
     bool go();
     bool back();
+    /// Arms the named cue list (position resets to "nothing fired"). False if
+    /// there is no such list.
+    bool armCueList(const std::string& name);
+    /// Fires cue `index` of the armed list directly (arms the first list if none is armed).
+    bool jumpToCue(int index);
+    /// Scene manager: recalls a stored scene outside any cue list.
+    bool recallScene(const std::string& name, float transitionSeconds, bool restartMotionPhase);
 
     const InstallationSettings& installationSettings() const noexcept { return installation_; }
     /// Installation mode on / off and its autosave interval (SPEC §11); stored
@@ -190,6 +199,8 @@ private:
     void resetCueEngine();
     void resetControl();
     void modelChanged(Change change);
+    void notify(Change change);
+    void syncArmedList();
     void loadInstallationSettings();
     void rememberProjectPath();
     /// Applies what changed in the settings fields since the last call.
@@ -198,6 +209,7 @@ private:
 
     Project project_;
     ProjectHistory history_;
+    std::unique_ptr<PluginHost> plugins_;  // before engine_: outlives its graphs
     ClockInputs clockInputs_;  // before engine_: its clock factory refers to it
     AudioEngine engine_;
     std::unique_ptr<CueEngine> cues_;

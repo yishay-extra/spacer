@@ -38,6 +38,7 @@ MainComponent::MainComponent(AppContext& context) : context_(context), statusBar
     tabs_.addTab("Layout", tabColour, new LayoutEditor(context_), true);
     tabs_.setTabBarDepth(28);
     addAndMakeVisible(tabs_);
+    addAndMakeVisible(cuesPanel_);
 
     setWantsKeyboardFocus(true);
     context_.addListener(this);
@@ -75,6 +76,7 @@ void MainComponent::resized() {
     bar.removeFromLeft(12);
     settingsButton_.setBounds(bar.removeFromLeft(100));
     statusBar_.setBounds(area.removeFromBottom(StatusBar::kHeight));
+    cuesPanel_.setBounds(area.removeFromRight(CuesPanel::kPreferredWidth));
     tabs_.setBounds(area);
 }
 

@@ -3,6 +3,7 @@
 #include <charconv>
 #include <string>
 
+#include "core/InsertParamPath.h"
 #include "core/motion/ParameterPath.h"
 
 namespace spacer::controlpath {
@@ -34,6 +35,11 @@ std::optional<ControlEvent> makeEvent(std::string_view path, float value) {
     constexpr std::string_view kSpeaker = "speaker.";
     int id = 0;
     std::string_view rest;
+
+    if (const auto p = InsertParamPath::parse(path))
+        return ev::SetInsertParam{p->owner, EntityRef{p->ownerId, {}}, p->slot, p->index, value};
+    if (const auto p = InsertParamPath::parseUnscoped(path))
+        return ev::SetInsertParam{InsertOwner::Source, EntityRef{0, {}}, p->slot, p->index, value};
 
     if (path.substr(0, kSource.size()) == kSource) {
         if (!splitScoped(path.substr(kSource.size()), id, rest) || !ParameterPath::parse(rest)) return {};

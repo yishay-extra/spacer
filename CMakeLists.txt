@@ -130,9 +130,16 @@ file(GLOB SPACER_ENGINE_SOURCES CONFIGURE_DEPENDS
 file(GLOB SPACER_CONTROL_SOURCES CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_SOURCE_DIR}/src/control/*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/control/*.h)
+# Plugin hosting (SPEC §13): AudioUnit v2 on macOS only; no other formats.
 set(SPACER_ENGINE_JUCE_DEFINITIONS
     JUCE_WEB_BROWSER=0
-    JUCE_USE_CURL=0)
+    JUCE_USE_CURL=0
+    JUCE_PLUGINHOST_VST=0
+    JUCE_PLUGINHOST_VST3=0
+    JUCE_PLUGINHOST_LV2=0
+    JUCE_PLUGINHOST_LADSPA=0
+    JUCE_PLUGINHOST_ARA=0
+    $<IF:$<BOOL:${APPLE}>,JUCE_PLUGINHOST_AU=1,JUCE_PLUGINHOST_AU=0>)
 
 # ---------------------------------------------------------------------------
 # Spacer app: JUCE. macOS only for phase 1.
@@ -170,8 +177,6 @@ if(SPACER_WITH_APP)
     target_compile_definitions(Spacer PRIVATE
         ${SPACER_ENGINE_JUCE_DEFINITIONS}
         $<$<CONFIG:Debug>:SPACER_ALLOCATION_GUARD=1>
-        JUCE_PLUGINHOST_AU=1
-        JUCE_PLUGINHOST_VST3=0
         JUCE_APPLICATION_NAME_STRING="$<TARGET_PROPERTY:Spacer,JUCE_PRODUCT_NAME>"
         JUCE_APPLICATION_VERSION_STRING="$<TARGET_PROPERTY:Spacer,JUCE_VERSION>")
 
@@ -191,6 +196,30 @@ if(SPACER_WITH_APP)
             juce::juce_recommended_config_flags
             juce::juce_recommended_lto_flags
             juce::juce_recommended_warning_flags)
+
+    # spacer-plugin-scanner: out-of-process AudioUnit scanner (SPEC §13),
+    # copied next to the app's executable (Contents/MacOS) where PluginHost
+    # looks for it.
+    juce_add_console_app(spacer_plugin_scanner PRODUCT_NAME "spacer-plugin-scanner")
+    target_sources(spacer_plugin_scanner PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/tools/PluginScanner.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/PluginScanProcess.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/PluginScanner.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/PluginScanCache.cpp)
+    target_include_directories(spacer_plugin_scanner PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_compile_definitions(spacer_plugin_scanner PRIVATE ${SPACER_ENGINE_JUCE_DEFINITIONS})
+    target_link_libraries(spacer_plugin_scanner
+        PRIVATE
+            juce::juce_audio_processors_headless
+            juce::juce_events
+        PUBLIC
+            juce::juce_recommended_config_flags
+            juce::juce_recommended_warning_flags)
+    add_dependencies(Spacer spacer_plugin_scanner)
+    add_custom_command(TARGET Spacer POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:spacer_plugin_scanner>
+                $<TARGET_BUNDLE_CONTENT_DIR:Spacer>/MacOS/spacer-plugin-scanner
+        VERBATIM)
 
     # Ship Spacer.driver inside the app for "Install virtual device..." (SPEC §14).
     add_dependencies(Spacer SpacerDriver)
@@ -222,6 +251,7 @@ if(SPACER_WITH_APP)
             spacer_vdev_protocol
             juce::juce_audio_devices
             juce::juce_audio_formats
+            juce::juce_audio_processors_headless
             juce::juce_dsp
             juce::juce_events
             "-framework CoreAudio"

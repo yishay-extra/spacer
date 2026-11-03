@@ -5,6 +5,7 @@
 #include <memory>
 
 #include "app/AppContext.h"
+#include "ui/CuesPanel.h"
 #include "ui/LayoutEditor.h"
 #include "ui/SettingsPanel.h"
 #include "ui/StageView.h"
@@ -14,8 +15,8 @@ namespace spacer {
 
 /// Root component of the main window (SPEC §16): toolbar, Stage and Layout
 /// tabs, Settings dialog and status bar (WP11d). Keyboard: space = Go, Esc = panic (toggle),
-/// Cmd+Z = undo, Shift+Cmd+Z = redo. The source and cue panels arrive with
-/// WP11b-c.
+/// Cmd+Z = undo, Shift+Cmd+Z = redo. The cues panel (WP11c) sits on the
+/// right; the source panel arrives with WP11b.
 class MainComponent final : public juce::Component, private AppContext::Listener {
 public:
     static constexpr int kMinWidth = 1100;  // SPEC §16
@@ -46,6 +47,7 @@ private:
     juce::TextButton panicButton_{"Panic"};
     juce::TextButton settingsButton_{"Settings..."};
     StatusBar statusBar_;
+    CuesPanel cuesPanel_{context_};  // right (SPEC §16 item 3)
     juce::TabbedComponent tabs_{juce::TabbedButtonBar::TabsAtTop};
     std::unique_ptr<juce::FileChooser> chooser_;
 

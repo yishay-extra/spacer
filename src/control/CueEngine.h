@@ -30,6 +30,9 @@ public:
         int maxBlockSize{128};
         /// Inputs for sources a recall adds (same factory as the live graph).
         GraphBuilder::InputFactory inputFactory;
+        /// Plugin host of the live graph (null = no plugin hosting). Before
+        /// each recall the live plugin state is captured into the project.
+        PluginHost* pluginHost{nullptr};
         int numOutputChannels{-1};
         std::uint64_t randomSeed{1};
     };
@@ -42,6 +45,21 @@ public:
     bool armFirst(const CueTick& tick);
     bool armed() const noexcept { return armed_; }
     const CueSequencer& sequencer() const noexcept { return sequencer_; }
+    const std::string& armedName() const noexcept { return sequencer_.list().name; }
+
+    /// The armed list is a copy; call after the project's cue lists were edited
+    /// (UI edit, undo, redo). Re-syncs the copy keeping the position, re-
+    /// schedules a pending AtBeat recall, and disarms if the list is gone. A
+    /// rename is followed when the number of lists is unchanged (same index).
+    /// True if anything changed.
+    bool refreshArmedList(const CueTick& tick);
+
+    /// Incremented whenever a recall changed the live model (cue fired, scene
+    /// recalled). Lets the app notice recalls that did not move the cue index
+    /// (OSC / MIDI scene recalls).
+    unsigned long long recallCount() const noexcept { return recallCount_; }
+    /// Scene the live state was last set from (cue or scene-manager recall); "" if none yet.
+    const std::string& lastRecalledScene() const noexcept { return lastRecalled_; }
 
     // Transport. Each returns true if a cue fired.
     bool go(const CueTick& tick);
@@ -77,6 +95,10 @@ private:
     Config config_;
     CueSequencer sequencer_;
     bool armed_{false};
+    int armedIndex_{-1};
+    std::size_t armedCount_{0};
+    unsigned long long recallCount_{0};
+    std::string lastRecalled_;
     bool beatScheduled_{false};
     int dropped_{0};
     std::string lastError_;
