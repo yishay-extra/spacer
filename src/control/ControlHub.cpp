@@ -18,7 +18,6 @@ CueTick makeTick(const EngineProcessor& engine) {
 
 ControlHub::ControlHub(const Project& project, EngineProcessor& engine, CueEngine* cues)
     : project_(project),
-      engine_(engine),
       dispatcher_(project, cues,
                   ControlDispatcher::Config{[&engine](const Command& c) { return engine.push(c); },
                                             [&engine] { return makeTick(engine); },

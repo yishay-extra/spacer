@@ -44,6 +44,10 @@ public:
     /// Restart every LFO's phase at the next process().
     void reset() { timeline_.restart(); }
 
+    /// Adopt `other`'s LFO time origin (edited modulators replacing running
+    /// ones keep their phase). RT-safe.
+    void continueTimelineFrom(const ModulatorBank& other) { timeline_ = other.timeline_; }
+
     /// Feed an external (osc / midi) source value. Ignored for out-of-range
     /// indices and LFO modulators.
     void setExternal(int index, float value);

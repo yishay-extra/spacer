@@ -8,10 +8,13 @@
 #include <functional>
 #include <memory>
 #include <optional>
+#include <string>
+#include <vector>
 
 #include "core/Project.h"
 #include "engine/ClockSelector.h"
 #include "engine/Command.h"
+#include "engine/DiskStreamer.h"
 #include "engine/EngineProcessor.h"
 #include "engine/Feedback.h"
 #include "engine/GraphBuilder.h"
@@ -57,9 +60,13 @@ public:
     /// swaps it in (SPEC §5.2). Also used before the device is open.
     void setProject(const Project& project);
 
-    /// Source inputs for graphs built from now on (null = silence). Until
-    /// WP4/WP5 provide live inputs this is how tools feed test signals.
+    /// Overrides source inputs for graphs built from now on (tools feeding
+    /// test signals); a null result = the source's own live input (SPEC §8).
     void setInputFactory(GraphBuilder::InputFactory factory) { inputFactory_ = std::move(factory); }
+    /// Base for project-relative file paths (the project file's directory).
+    void setProjectDirectory(const juce::File& dir) { projectDirectory_ = dir; }
+    /// Non-fatal problems from the last graph build (e.g. missing files).
+    const std::vector<std::string>& buildWarnings() const noexcept { return warnings_; }
 
     /// Creates external clocks (SPEC §9; WP12). Graphs built after a change of
     /// project.clock carry the new clock; null / unset = internal clock only.
@@ -91,10 +98,13 @@ private:
     std::unique_ptr<Graph> buildGraph(double sampleRate, int blockSize, int numOutputs);
 
     juce::AudioDeviceManager deviceManager_;
+    mutable DiskStreamer streamer_;  // before processor_: outlives the graphs' file players
     EngineProcessor processor_;
     std::optional<Project> project_;
     GraphBuilder::InputFactory inputFactory_;
     ClockSelector clockSelector_;
+    juce::File projectDirectory_;
+    mutable std::vector<std::string> warnings_;
 
     // Written in audioDeviceAboutToStart (callback not running), read by the callback.
     juce::AudioIODevice* device_{nullptr};
