@@ -18,7 +18,7 @@ class DiskStreamer;
 ///   - HardwareInput → HardwareInput (device channels);
 ///   - File          → FilePlayer streamed by `streamer`;
 ///   - Generator     → GeneratorInput;
-///   - VirtualInput  → null (silence) until WP5 provides the driver reader.
+///   - VirtualInput  → VirtualInput (Spacer.driver channels, SPEC §14).
 /// Problems (missing / unreadable file) are appended to `warnings` and give a
 /// silent input, never an error: a project with a missing file must still
 /// play everything else.

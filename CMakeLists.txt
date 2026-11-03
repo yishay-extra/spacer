@@ -41,6 +41,17 @@ target_compile_options(spacer_core PRIVATE
     $<$<CXX_COMPILER_ID:GNU,Clang,AppleClang>:-Wall -Wextra -Wpedantic -Wshadow -Wconversion -Wno-sign-conversion>)
 
 # ---------------------------------------------------------------------------
+# spacer_vdev_protocol: the Spacer.driver <-> app shared-memory ring (SPEC §14).
+# Header-only, plain C++20 + POSIX, no JUCE, no spacer_core: used by the driver
+# (driver/) and by the engine's VirtualDeviceReceiver, tested on every platform.
+# ---------------------------------------------------------------------------
+add_library(spacer_vdev_protocol INTERFACE)
+target_include_directories(spacer_vdev_protocol INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/driver/protocol)
+if(UNIX AND NOT APPLE)
+    target_link_libraries(spacer_vdev_protocol INTERFACE rt)  # shm_open on older glibc
+endif()
+
+# ---------------------------------------------------------------------------
 # spacer_ui_logic: the testable part of the UI (src/ui/logic) — stage
 # transforms, hit-testing, layout-editor operations, undo history, engine
 # sync planning. Plain C++20, NO JUCE (it may include the JUCE-free engine
@@ -132,6 +143,7 @@ if(SPACER_WITH_APP)
     target_link_libraries(Spacer
         PRIVATE
             spacer_ui_logic  # brings spacer_core (listing both makes Apple ld warn)
+            spacer_vdev_protocol
             juce::juce_audio_utils
             juce::juce_audio_processors
             juce::juce_audio_formats
@@ -163,6 +175,7 @@ if(SPACER_WITH_APP)
     target_link_libraries(spacer_engine_check
         PRIVATE
             spacer_core
+            spacer_vdev_protocol
             juce::juce_audio_devices
             juce::juce_audio_formats
             juce::juce_dsp

@@ -8,6 +8,7 @@
 #include "engine/GeneratorInput.h"
 #include "engine/HardwareInput.h"
 #include "engine/SourceInputFactory.h"
+#include "engine/VirtualInput.h"
 
 using Catch::Approx;
 using namespace spacer;
@@ -153,7 +154,7 @@ TEST_CASE("SourceInputFactory: one input per kind; missing files are silent with
     s.input.value = HardwareInputSpec{};
     CHECK(dynamic_cast<HardwareInput*>(f.create(s).get()) != nullptr);
     s.input.value = VirtualInputSpec{};
-    CHECK(f.create(s) == nullptr);  // WP5
+    CHECK(dynamic_cast<VirtualInput*>(f.create(s).get()) != nullptr);
 
     FileInputSpec file;
     file.path = "/definitely/not/here.wav";
