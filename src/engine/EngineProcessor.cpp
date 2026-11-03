@@ -177,7 +177,7 @@ void EngineProcessor::applyCommands(bool holdWhileSwapPending) noexcept {
 
 void EngineProcessor::insertTimed(const QueuedCommand& q) noexcept {
     if (numTimed_ >= kMaxTimedCommands) {
-        apply(q.command);  // no room to wait: late rather than lost
+        apply(q.command);  // no room to wait: applied now rather than dropped (early)
         return;
     }
     // Sorted by sample; equal samples keep their push order.

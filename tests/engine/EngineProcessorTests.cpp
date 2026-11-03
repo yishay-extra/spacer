@@ -350,7 +350,9 @@ TEST_CASE("EngineProcessor: a timed command due during a pending swap is applied
     CHECK(rig.proc.droppedCommands() == 0);
 }
 
-TEST_CASE("EngineProcessor: a newer SwapGraph still supersedes a pending one while commands are held") {
+TEST_CASE(
+    "EngineProcessor: a SwapGraph behind a held command lands after the pending one and the held command "
+    "survives") {
     SwapRig rig;
     rig.proc.setGraphWhileStopped(rig.build({1, 2}));
     rig.run(10);
@@ -364,6 +366,26 @@ TEST_CASE("EngineProcessor: a newer SwapGraph still supersedes a pending one whi
     rig.run(3);
     CHECK(rig.proc.currentGraph() == graphB);
     CHECK(rig.filePlaying(3));
+    CHECK(rig.proc.droppedCommands() == 0);
+}
+
+TEST_CASE("EngineProcessor: a newer SwapGraph supersedes a pending one in the same drain") {
+    SwapRig rig;
+    rig.proc.setGraphWhileStopped(rig.build({1, 2}));
+    rig.run(10);
+    auto a = rig.build({1});
+    const Graph* graphA = a.get();
+    auto b = rig.build({1, 3});
+    const Graph* graphB = b.get();
+    REQUIRE(rig.proc.swapGraph(std::move(a)));
+    REQUIRE(rig.proc.swapGraph(std::move(b)));
+    bool aWasLive = false;
+    for (int i = 0; i < 4; ++i) {
+        rig.run();
+        aWasLive = aWasLive || rig.proc.currentGraph() == graphA;
+    }
+    CHECK_FALSE(aWasLive);
+    CHECK(rig.proc.currentGraph() == graphB);
     CHECK(rig.proc.droppedCommands() == 0);
 }
 
