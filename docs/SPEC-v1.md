@@ -132,10 +132,13 @@ struct Project { int schemaVersion; Layout layout; DeviceMapping devices;
 
 - **Control → audio**: a lock-free SPSC FIFO of `Command` (fixed-size POD
   variants: `SetGain{sourceId, dB}`, `SetPosition{sourceId, Position, smoothMs}`,
-  `SetMotionParam{...}`, `RecallScene{plan*}` (a recall plan built on the
+  `SetMotionParam{...}`, `SetModulator{sourceId, index, …}` (live modulator
+  edit, LFO phase kept), `RecallScene{plan*}` (a recall plan built on the
   message thread from the live state and the target scene),
   `SwapGraph{newGraphPtr}` …). Capacity 4096; overflow is dropped and counted
   on the producer side (the count is reported to the UI as `CommandDropped`).
+  Timed commands (`pushAt(cmd, engineSample)`, e.g. from OSC timetags) are
+  applied at that sample by splitting the block; up to 1024 may be pending.
   **Single producer:** only the message thread pushes commands. OSC, MIDI and
   other control callbacks that run on their own threads hand events to the
   message thread first (or through their own SPSC queue drained there); they
@@ -262,7 +265,10 @@ layout, no hull required. `spread` maps to `r_s = 0.2 + spread·3.0` m.
   weighting by default.
 - Decode matrix is precomputed; per block the decode is a matrix multiply.
 - Normalisation: the matrix is scaled so the mean decoded energy of a unit
-  plane wave is 1 (matching Σ g² = 1 for VBAP/DBAP). The t-design → layout
+  plane wave is 1 (matching Σ g² = 1 for VBAP/DBAP) — averaged over the
+  sphere for 3D layouts and over the horizontal plane for horizontal ones
+  (every non-LFE speaker below 5° elevation). `ambisonics.maxRe` (default
+  true) selects max-rE weighting. The t-design → layout
   VBAP step always runs in 3D mode, even for horizontal layouts.
 - Spread: effective order `N_eff = N·(1 − spread)`; degrees ≤ ⌊N_eff⌋ get
   weight 1, the next degree its fractional part, higher degrees 0 (spread 1 =
@@ -351,6 +357,9 @@ advances by `n / sampleRate / secondsPerBeat` while `playing`.
   interface; only one is active; switching happens through `SwapGraph`.
 - Everything that references time uses **beats** (musical) or **seconds**
   (absolute); each motion/cue parameter says which.
+- External clocks are latency-compensated: the reported beat is the
+  reference beat at the time the block is *heard* (device output latency +
+  engine latency), plus a per-project `clock.latencyTrimMs` (±1000 ms).
 
 ## 10. Motion
 
@@ -438,7 +447,8 @@ Address space (`{id}` = integer source id or quoted name):
 Out (optional, 30 Hz): `/spacer/source/{id}/pos/aed`, `/spacer/meter/speaker/{id} f`,
 `/spacer/clock/beat f`, `/spacer/cue/current i`.
 
-Bundles with timetags are respected (scheduled to the sample). Unknown
+Bundles with timetags are respected: scheduled to the sample whose audio
+callback runs at the timetag (callback time, not heard time). Unknown
 addresses are ignored and counted.
 
 ### 12.2 MIDI
