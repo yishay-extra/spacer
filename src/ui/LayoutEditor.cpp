@@ -25,10 +25,15 @@ public:
         };
     }
 
-    void bind(int speakerId, layoutedit::SpeakerField field, const juce::String& text) {
+    void bind(int speakerId, layoutedit::SpeakerField field, const layoutedit::TableCell& cell) {
         speakerId_ = speakerId;
         field_ = field;
-        setText(text, juce::dontSendNotification);
+        setText(juce::String(cell.text), juce::dontSendNotification);
+        // Values a speaker chain overrides show the chain's (effective) value.
+        setEditable(false, cell.editable, false);
+        setColour(juce::Label::textColourId,
+                  cell.fromChain ? juce::Colour(0xff9fc6ff) : juce::Colours::white);
+        setTooltip(juce::String(cell.tooltip));
     }
 
     void mouseDown(const juce::MouseEvent& e) override {
@@ -290,7 +295,7 @@ juce::Component* LayoutEditor::refreshComponentForCell(int row, int columnId, bo
         delete existing;
         cell = new EditableCell(*this);
     }
-    cell->bind(s.id, *field, juce::String(layoutedit::formatField(s, *field)));
+    cell->bind(s.id, *field, layoutedit::tableCell(context_.project(), s, *field));
     return cell;
 }
 

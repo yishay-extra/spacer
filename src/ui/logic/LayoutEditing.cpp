@@ -270,4 +270,28 @@ std::vector<CompensationRow> compensationRows(const Project& project) {
     return rows;
 }
 
+TableCell tableCell(const Project& project, const Speaker& speaker, SpeakerField field) {
+    TableCell cell;
+    cell.text = formatField(speaker, field);
+    const bool overridable =
+        field == SpeakerField::TrimDb || field == SpeakerField::DelayMs || field == SpeakerField::Polarity;
+    if (!overridable) return cell;
+    const SpeakerChainSpec* chain = nullptr;
+    for (const auto& c : project.speakerChains)
+        if (c.speakerId == speaker.id) chain = &c;
+    if (chain == nullptr) return cell;
+    Speaker effective = speaker;
+    effective.trimDb = chain->trimDb;
+    effective.userDelayMs = chain->userDelayMs;
+    effective.polarityInverted = chain->polarityInverted;
+    const std::string chainText = formatField(effective, field);
+    cell.text = (chainText.empty() ? std::string("-") : chainText) + " (chain)";
+    cell.fromChain = true;
+    cell.editable = false;
+    const std::string layoutText = formatField(speaker, field);
+    cell.tooltip = "Set by this speaker's chain (SPEC 7: the chain overrides the layout); layout value: " +
+                   (layoutText.empty() ? std::string("-") : layoutText);
+    return cell;
+}
+
 }  // namespace spacer::layoutedit
