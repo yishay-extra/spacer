@@ -29,7 +29,6 @@
 #include <vector>
 
 #include "core/Project.h"
-#include "engine/BufferInput.h"
 #include "engine/device/AggregateDevice.h"
 #include "engine/device/AudioEngine.h"
 
@@ -97,7 +96,10 @@ Project tonePlan(float az, bool nearLeft) {
     SourceSpec s;
     s.id = 1;
     s.name = "tone";
+    // A live generator: a pre-rendered buffer would play at the wrong pitch,
+    // and run out, after the device restarts at another rate.
     s.input.value = GeneratorSpec{};
+    s.gainDb = -20.0f;
     s.spatializer = SpatializerKind::Vbap;
     s.distance.k = 0.0f;
     s.motion.value = ManualMotion{{az, 0.0f, 2.0f}, 20.0f};
@@ -148,18 +150,6 @@ int playTone(const Args& a, const std::string& mode) {
         std::fprintf(stderr, "cannot open device: %s\n", error.toRawUTF8());
         return 1;
     }
-    // The tone is generated at the rate the device actually opened at.
-    const double sr = engine.status().sampleRate > 0.0 ? engine.status().sampleRate : 48000.0;
-    const int total = static_cast<int>(sr * (a.seconds + 1.0));
-    engine.setInputFactory([sr, total](const SourceSpec&) -> std::unique_ptr<SourceInput> {
-        juce::AudioBuffer<float> b(1, total);
-        const float amp = juce::Decibels::decibelsToGain(-20.0f);
-        for (int i = 0; i < total; ++i)
-            b.setSample(
-                0, i,
-                amp * static_cast<float>(std::sin(2.0 * juce::MathConstants<double>::pi * 440.0 * i / sr)));
-        return std::make_unique<BufferInput>(std::move(b));
-    });
     engine.setProject(p);
 
     std::printf("mode=%s: %s\n", mode.c_str(),
