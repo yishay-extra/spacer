@@ -4,6 +4,7 @@
 
 #include <array>
 #include <memory>
+#include <optional>
 #include <vector>
 
 #include "core/Clock.h"
@@ -74,9 +75,18 @@ public:
     void setDistanceModel(const DistanceModel& model) noexcept { distanceModel_ = model; }
     /// Absolute live value of a motion parameter (see cmd::SetMotionParam).
     void setMotionParam(int channel, MotionParam param, float value) noexcept;
+    /// Live value of a motion parameter (spec + SetMotionParam offset) of
+    /// control point `channel` (-1 = the first); nullopt if the kind has none.
+    std::optional<float> motionParamLive(int channel, MotionParam param) const noexcept;
     /// Phase 0 at the next block for the motion(s) and modulator LFOs.
     void resetMotion() noexcept;
     void setModulatorValue(int index, float value) noexcept { modulators_.setExternal(index, value); }
+    /// Live modulator edit (cmd::SetModulator): no rebuild, LFO phase kept.
+    void setModulator(int index, const ModulatorBank::Live& m, int count) noexcept;
+    /// SetInsertParam / recall ramp on an insert parameter a modulator is
+    /// driving: `value` becomes the base the modulation is added to. False if
+    /// no modulator drives that parameter (set the plugin directly then).
+    bool setModulatedInsertBase(int slot, int index, float value) noexcept;
 
     /// RT. Ramp to silence over exactly `numSamples` (removed sources, §5.2).
     void fadeOut(int numSamples) noexcept;
@@ -88,6 +98,19 @@ public:
     /// RT. Carry only the input's playback state over from `old` (a replaced
     /// source continues the same audio while its gain and position start afresh).
     void takeInputStateFrom(SourceNode& old) noexcept;
+    /// True if the input's playback was moved to another node (see
+    /// SourceInput::handedOver).
+    bool inputHandedOver() const noexcept { return input_ && input_->handedOver(); }
+    /// RT. Scene-recall ghost whose input was handed over: instead of
+    /// reading its own input it replays the raw input of the node it is
+    /// crossfading into (Graph passes it to process()), so a file source
+    /// truly crossfades. 0 = off.
+    void setInputMirror(int sourceId) noexcept { mirrorOf_ = sourceId; }
+    int inputMirror() const noexcept { return mirrorOf_; }
+    /// RT. Keep a copy of each block's raw input for a mirroring ghost.
+    void setKeepRawInput(bool keep) noexcept { keepRaw_ = keep; }
+    /// The last block's raw input (pre-inserts), valid while keepRawInput is on.
+    const float* rawInput(int channel) const noexcept { return raw_.getReadPointer(channel & 1); }
 
     /// RT. Graph swap: continue from `old`'s state (current gain, positions,
     /// distance-filter state, input playback state, motion phase) while
@@ -102,8 +125,10 @@ public:
     /// `legacyBus` (optional) is the ambisonic bus of an ambisonic-decoder
     /// crossfade (see adoptLegacySpatializer): when non-null and this node
     /// holds a legacy spatializer, the block is also encoded into it.
+    /// `mirror` (optional, with `mirrorChannels`): read this block's input
+    /// from these buffers instead of the node's own input (setInputMirror).
     void process(const InputContext& ctx, const ClockState& clock, int numSamples, SpeakerBus& bus,
-                 SpeakerBus* legacyBus = nullptr) noexcept;
+                 SpeakerBus* legacyBus = nullptr, const SourceNode* mirror = nullptr) noexcept;
 
     /// Ambisonic order / layout change (SPEC §5.2 swap): takes over `old`'s
     /// ambisonic encoder (a pointer swap, nothing is allocated or freed) so
@@ -135,6 +160,7 @@ public:
 private:
     float gainTarget() const noexcept;
     void evaluatePositions(const MotionContext& ctx, const ModulatorBank::Output& mod, float width) noexcept;
+    void applyInsertModulation(const ModulatorBank::Output& mod) noexcept;
     int numPoints() const noexcept { return stereo_ && linkedPoints_ ? 2 : 1; }
 
     int id_{0};
@@ -161,9 +187,27 @@ private:
     std::vector<ModulatorSpec> modulatorSpecs_;
     ModulatorBank modulators_;
     bool modulatesGain_{false};
+    bool hasMotionRight_{false};  // linkedPoints with its own motionRight spec
+
+    // Modulated insert parameters (SPEC §13 paths as modulator targets): the
+    // plugin gets base + Σ offsets each block, clamped to 0..1. The base is
+    // the model value when the slot lists the parameter, otherwise the
+    // plugin's value when the modulation started; SetInsertParam moves it.
+    struct InsertMod {
+        bool active{false};
+        int slot{0};
+        int index{0};
+        float base{0.0f};
+        bool haveBase{false};
+    };
+    std::array<InsertMod, kMaxModulators> insertMods_{};
+    std::vector<PluginSlot> insertSpecs_;  // for model base values (message thread copy)
 
     double sampleRate_{48000.0};
     juce::AudioBuffer<float> buffer_;
+    juce::AudioBuffer<float> raw_;  // raw input copy for a mirroring ghost
+    bool keepRaw_{false};
+    int mirrorOf_{0};
     GainRamp gain_;
     GainRamp modGain_;  // gain modulation, ramped per block
     std::array<DistanceProcessor, 2> distance_;

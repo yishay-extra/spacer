@@ -214,3 +214,24 @@ TEST_CASE("PluginHost: app defaults put the scanner next to the executable") {
           juce::File::getSpecialLocation(juce::File::currentExecutableFile).getParentDirectory());
     CHECK(o.cacheDirectory.getFileName() == "Spacer");
 }
+
+TEST_CASE("PluginHost: editor edits are flagged, host parameter changes are not (WP14)") {
+    TempDir tmp;
+    PluginHost host(inProcess(tmp.dir), addTestFormat);
+    auto chain = host.buildChain(InsertOwner::Source, 1, {slot("gain")}, 1, kSr, kBlock);
+    CHECK_FALSE(host.takeEdited());
+    // Host-side changes (commands, ramps, modulators) do not mark the project.
+    chain->setParameter(0, 0, 0.3f);
+    CHECK_FALSE(host.takeEdited());
+    // An editor gesture does, once.
+    auto* param = testPlugin(*chain, 0).getParameters()[0];
+    param->beginChangeGesture();
+    param->setValueNotifyingHost(0.7f);
+    param->endChangeGesture();
+    CHECK(host.takeEdited());
+    CHECK_FALSE(host.takeEdited());
+    // A program / state change from the plugin itself does too.
+    testPlugin(*chain, 0).updateHostDisplay(
+        juce::AudioProcessor::ChangeDetails{}.withNonParameterStateChanged(true));
+    CHECK(host.takeEdited());
+}

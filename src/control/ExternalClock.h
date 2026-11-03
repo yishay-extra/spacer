@@ -28,6 +28,11 @@ namespace spacer {
 struct ExternalClockStatus {
     std::atomic<bool> locked{false};
     std::atomic<int> kind{static_cast<int>(ClockKind::Internal)};  // ClockKind of the clock that wrote last
+    /// Written by the control side (ClockInputs::setCompensation), read by
+    /// the clock each block: how long after its callback a block is heard.
+    /// The clock reports the reference beat at that later time, so what is
+    /// heard lines up with the reference (DAW, Link peers).
+    std::atomic<double> compensationSeconds{0.0};
 };
 
 class ExternalClock : public ClockSource {

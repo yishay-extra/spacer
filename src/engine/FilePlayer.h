@@ -42,6 +42,7 @@ public:
     /// buffered audio kept; loop setting updated). Same file at another rate:
     /// continues from the old position and transport state.
     void takeStateFrom(SourceInput& old) noexcept override;
+    bool handedOver() const noexcept override { return handedOver_; }
 
     void play() noexcept override;
     void stop() noexcept override;
@@ -75,6 +76,7 @@ private:
     std::int64_t baseFrame_{0};  // file frame where the current generation starts
     std::int64_t consumed_{0};   // output frames played since then
     std::uint32_t underruns_{0};
+    bool handedOver_{false};  // stream moved to another player (takeStateFrom)
 };
 
 }  // namespace spacer

@@ -5,7 +5,14 @@
 namespace spacer {
 
 bool ClockSelector::apply(Graph& graph, const ClockConfig& config) {
-    if (known_ && specEqual(config, current_)) return false;
+    // The latency trim is read live (ClockInputs::setCompensation); changing
+    // it must not recreate (and relock) the clock.
+    ClockConfig same = config;
+    same.latencyTrimMs = current_.latencyTrimMs;
+    if (known_ && specEqual(same, current_)) {
+        current_ = config;
+        return false;
+    }
     std::unique_ptr<ClockSource> clock;
     if (config.kind != ClockKind::Internal && factory_) clock = factory_(config);
     activeKind_ = clock ? config.kind : ClockKind::Internal;

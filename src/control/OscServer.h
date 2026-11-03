@@ -19,8 +19,9 @@ namespace spacer {
 ///
 /// Bundle timetags are honoured: an event inside a bundle with a future
 /// timetag is held on the message thread and delivered by pump() once due.
-/// (Commands carry no sample timestamp yet, so "due" has message-thread tick
-/// resolution, not sample accuracy: see the WP8 PR notes.)
+/// With the look-ahead pump, events that become engine commands are handed
+/// over up to `lookaheadSeconds` early together with their timetag, so the
+/// engine can apply them at the exact sample (EngineProcessor::pushAt).
 class OscServer : private juce::OSCReceiver::Listener<juce::OSCReceiver::RealtimeCallback> {
 public:
     struct Stats {
@@ -42,6 +43,11 @@ public:
     /// `deliver` for every event that is due at `nowEpochSeconds` (seconds
     /// since 1970), in timetag order, then arrival order.
     void pump(double nowEpochSeconds, const std::function<void(const ControlEvent&)>& deliver);
+    /// As above, but engine events (everything except cues, scenes and cue
+    /// triggers) due within `lookaheadSeconds` are delivered early.
+    /// `dueEpochSeconds` is the event's timetag, 0 for an immediate message.
+    void pump(double nowEpochSeconds, double lookaheadSeconds,
+              const std::function<void(const ControlEvent&, double dueEpochSeconds)>& deliver);
 
     Stats stats() const noexcept;
 

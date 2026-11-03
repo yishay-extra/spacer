@@ -11,7 +11,11 @@ ControlDispatcher::ControlDispatcher(const Project& project, CueEngine* cues, Co
     : project_(project), cues_(cues), config_(std::move(config)) {}
 
 bool ControlDispatcher::send(const Command& c) {
-    if (config_.push && config_.push(c)) return true;
+    if (due_ > 0.0 && config_.pushAt) {
+        if (config_.pushAt(c, due_)) return true;
+    } else if (config_.push && config_.push(c)) {
+        return true;
+    }
     ++stats_.commandsDropped;
     return false;
 }
@@ -68,6 +72,31 @@ bool ControlDispatcher::setPosition(int sourceId, const Position& p) {
     return send(cmd::SetSourcePosition{sourceId, -1, n, -1.0f});
 }
 
+bool ControlDispatcher::modulatorOsc(const std::string& address, float value) {
+    bool any = false;
+    for (const auto& s : project_.sources)
+        for (std::size_t i = 0; i < s.modulators.size(); ++i)
+            if (const auto* osc = std::get_if<OscSource>(&s.modulators[i].source);
+                osc && osc->address == address) {
+                send(cmd::SetModulatorValue{s.id, static_cast<int>(i), value});
+                any = true;
+            }
+    return any;
+}
+
+bool ControlDispatcher::modulatorCc(int cc, int value) {
+    bool any = false;
+    const float v = static_cast<float>(std::clamp(value, 0, 127)) / 127.0f;
+    for (const auto& s : project_.sources)
+        for (std::size_t i = 0; i < s.modulators.size(); ++i)
+            if (const auto* midi = std::get_if<MidiCcSource>(&s.modulators[i].source);
+                midi && midi->cc == cc) {
+                send(cmd::SetModulatorValue{s.id, static_cast<int>(i), v});
+                any = true;
+            }
+    return any;
+}
+
 void ControlDispatcher::invalidateState() {
     // A recall rewrites the live project; forget what we cached from it.
     positions_.clear();
@@ -106,7 +135,14 @@ bool ControlDispatcher::setSourceParam(const EntityRef& ref, const std::string& 
         return send(cmd::SetSourceDistance{id, m});
     }
 
+    if (parsed->domain == ParameterPath::Domain::Insert) {
+        if (!std::isfinite(value)) return false;
+        return send(cmd::SetInsertParam{InsertOwner::Source, id, parsed->slot, parsed->index,
+                                        std::clamp(value, 0.0f, 1.0f)});
+    }
     const MotionParam mp = parsed->motion;
+    if (parsed->domain == ParameterPath::Domain::MotionRight)  // right point of a linkedPoints source
+        return send(cmd::SetMotionParam{id, 1, mp, value});
     if (mp == MotionParam::PositionAz || mp == MotionParam::PositionEl || mp == MotionParam::PositionDist) {
         Position p = currentPosition(id);
         (mp == MotionParam::PositionAz   ? p.azimuth
@@ -114,9 +150,12 @@ bool ControlDispatcher::setSourceParam(const EntityRef& ref, const std::string& 
                                          : p.distance) = value;
         return setPosition(id, p);
     }
-    if (config_.motionParam && config_.motionParam(id, mp, value)) return true;
-    ++stats_.unsupported;
-    return false;
+    if (config_.motionParam) {
+        if (config_.motionParam(id, mp, value)) return true;
+        ++stats_.unsupported;
+        return false;
+    }
+    return send(cmd::SetMotionParam{id, -1, mp, value});
 }
 
 struct ControlDispatcher::Visitor {
@@ -138,8 +177,19 @@ struct ControlDispatcher::Visitor {
     bool operator()(const ev::SourceFile& e) const {
         const int id = d.resolveSource(e.source);
         if (id == 0) return false;
-        if (d.config_.fileTransport && d.config_.fileTransport(id, e.action, e.seconds)) return true;
-        ++d.stats_.unsupported;
+        if (d.config_.fileTransport) {
+            if (d.config_.fileTransport(id, e.action, e.seconds)) return true;
+            ++d.stats_.unsupported;
+            return false;
+        }
+        switch (e.action) {
+            case ev::SourceFile::Action::Play:
+                return d.send(cmd::FilePlay{id});
+            case ev::SourceFile::Action::Stop:
+                return d.send(cmd::FileStop{id});
+            case ev::SourceFile::Action::Seek:
+                return d.send(cmd::FileSeek{id, std::max(0.0, e.seconds)});
+        }
         return false;
     }
     bool operator()(const ev::SetSpeakerTrim& e) const {
@@ -219,12 +269,13 @@ struct ControlDispatcher::Visitor {
     bool operator()(const ev::ClockBeat& e) const { return d.send(cmd::ClockSetBeat{e.beat}); }
 
     bool operator()(const ev::OscTrigger& e) const {
+        const bool modulated = e.hasValue && d.modulatorOsc(e.address, e.value);
         const bool fired = d.cues_ != nullptr && d.cues_->onOsc(e.address, d.tick());
         if (fired)
             d.invalidateState();
-        else
+        else if (!modulated)
             ++d.stats_.unknownAddress;
-        return fired;
+        return fired || modulated;
     }
     bool operator()(const ev::MidiTrigger& e) const {
         if (d.cues_ == nullptr) return false;
@@ -236,9 +287,11 @@ struct ControlDispatcher::Visitor {
     }
 };
 
-void ControlDispatcher::dispatch(const ControlEvent& event) {
+void ControlDispatcher::dispatch(const ControlEvent& event, double dueEpochSeconds) {
     ++stats_.dispatched;
+    due_ = dueEpochSeconds;
     std::visit(Visitor{*this}, event);
+    due_ = 0.0;
 }
 
 }  // namespace spacer

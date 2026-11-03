@@ -8,8 +8,11 @@
 #include "EngineTestUtils.h"
 #include "engine/AllocationGuard.h"
 #include "engine/BufferInput.h"
+#include "engine/DiskStreamer.h"
 #include "engine/EngineProcessor.h"
+#include "engine/OfflineRenderer.h"
 #include "engine/RecallPlanner.h"
+#include "engine/SourceInputFactory.h"
 
 using Catch::Approx;
 using namespace spacer;
@@ -397,4 +400,81 @@ TEST_CASE("Recall: neither flat nor structural recalls allocate on the audio thr
     // Plan building allocates (message thread) but runs outside the audio scope;
     // collectGarbage() frees in run() outside it as well.
     CHECK(allocguard::violations() == 0);
+}
+
+TEST_CASE("Recall: a replaced file source truly crossfades (the ghost mirrors the stream, WP14)") {
+    const auto dir = juce::File::createTempFile("spacer-file-recall");
+    REQUIRE(dir.createDirectory());
+    // A slow ramp: any jump in file position shows up as a step.
+    const auto wav = dir.getChildFile("ramp.wav");
+    const int length = 48000 * 4;
+    {
+        OfflineRenderer::Result ramp;
+        ramp.sampleRate = kSr;
+        ramp.audio.setSize(1, length);
+        for (int i = 0; i < length; ++i)
+            ramp.audio.setSample(0, i, 0.2f + 0.6f * static_cast<float>(i) / length);
+        REQUIRE_FALSE(OfflineRenderer::writeWav(ramp, wav).has_value());
+    }
+    SourceSpec s = directSource(1, 1);
+    FileInputSpec f;
+    f.path = wav.getFullPathName().toStdString();
+    s.input.value = f;
+    Project project = twoChannelProject({s});
+
+    DiskStreamer streamer;
+    auto factory = std::make_shared<SourceInputFactory>();
+    factory->setDiskStreamer(&streamer);
+    const GraphBuilder::InputFactory inputs = [factory](const SourceSpec& spec) {
+        return factory->create(spec);
+    };
+    EngineProcessor proc;
+    {
+        GraphBuilder b(project);
+        b.setInputFactory(inputs);
+        proc.setGraphWhileStopped(b.build(kSr, kBlock));
+    }
+    std::vector<std::vector<float>> rec{2};
+    auto run = [&](int samples) {
+        juce::AudioBuffer<float> out(2, kBlock);
+        for (int done = 0; done < samples; done += kBlock) {
+            streamer.serviceAll();
+            float* ptrs[] = {out.getWritePointer(0), out.getWritePointer(1)};
+            proc.process(nullptr, 0, ptrs, 2, kBlock);
+            for (int c = 0; c < 2; ++c)
+                rec[static_cast<std::size_t>(c)].insert(rec[static_cast<std::size_t>(c)].end(), ptrs[c],
+                                                        ptrs[c] + kBlock);
+            Feedback fb;
+            while (proc.popFeedback(fb)) {
+            }
+            proc.collectGarbage();
+        }
+    };
+    proc.push(cmd::FilePlay{1});
+    run(48000);
+    REQUIRE(rec[0].back() > 0.3f);
+
+    Scene target = sceneOf(project);
+    target.sources[0].directSpeakers = {2};
+    RecallRequest r;
+    r.project = &project;
+    r.target = &target;
+    r.transitionSeconds = 0.0f;
+    r.sampleRate = kSr;
+    r.maxBlockSize = kBlock;
+    r.inputFactory = inputs;
+    REQUIRE(proc.push(cmd::RecallScene{buildRecallPlan(r).release()}));
+    const int t0 = static_cast<int>(rec[0].size());
+    const int L = proc.latencySamples();
+    run(9600);
+    const int fade = 2400;  // 50 ms
+    float maxStep = 0.0f;
+    for (int i = -50; i < fade + 200; ++i) {
+        const auto k = static_cast<std::size_t>(t0 + L + i);
+        maxStep = std::max(maxStep, std::abs(rec[0][k] + rec[1][k] - rec[0][k - 1] - rec[1][k - 1]));
+    }
+    CHECK(maxStep < 1e-4f);  // the sum continues the ramp: no gap, no restart
+    const auto mid = static_cast<std::size_t>(t0 + L + fade / 2);
+    CHECK(rec[0][mid] == Approx(rec[1][mid]).margin(1e-3));  // half way through the crossfade
+    dir.deleteRecursively();
 }

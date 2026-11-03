@@ -41,6 +41,21 @@ public:
     std::unique_ptr<ClockSource> makeClock(const ClockConfig& config,
                                            ExternalClock::HostClock hostClock = {}) const;
 
+    /// External-clock latency compensation (seconds a block is heard after
+    /// its callback), applied by every external clock from its next block.
+    /// Any non-audio thread.
+    void setCompensation(double seconds) noexcept {
+        status_->compensationSeconds.store(seconds, std::memory_order_relaxed);
+    }
+    double compensation() const noexcept {
+        return status_->compensationSeconds.load(std::memory_order_relaxed);
+    }
+    /// The automatic part (device output latency + engine latency, i.e.
+    /// limiter look-ahead and plugin compensation) plus the project's trim.
+    /// Never negative.
+    static double compensationSeconds(int deviceOutputLatencySamples, int engineLatencySamples,
+                                      double sampleRate, float trimMs) noexcept;
+
     /// Lock status of the external clock that ran last (any thread).
     const ExternalClockStatus& status() const noexcept { return *status_; }
 

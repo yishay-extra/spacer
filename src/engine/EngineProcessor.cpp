@@ -34,8 +34,13 @@ EngineProcessor::EngineProcessor() {
 }
 
 EngineProcessor::~EngineProcessor() {
-    Command c;
-    while (commands_.pop(c)) {
+    QueuedCommand q;
+    while (commands_.pop(q)) {
+        if (auto* s = std::get_if<cmd::SwapGraph>(&q.command)) delete s->graph;
+        if (auto* r = std::get_if<cmd::RecallScene>(&q.command)) delete r->plan;
+    }
+    for (int i = 0; i < numTimed_; ++i) {
+        auto& c = timed_[static_cast<std::size_t>(i)].command;
         if (auto* s = std::get_if<cmd::SwapGraph>(&c)) delete s->graph;
         if (auto* r = std::get_if<cmd::RecallScene>(&c)) delete r->plan;
     }
@@ -46,12 +51,23 @@ EngineProcessor::~EngineProcessor() {
 }
 
 bool EngineProcessor::push(const Command& command) noexcept {
-    return commands_.push(command);
+    return commands_.push(QueuedCommand{command, -1});
+}
+
+bool EngineProcessor::pushAt(const Command& command, std::int64_t engineSample) noexcept {
+    return commands_.push(QueuedCommand{command, std::max<std::int64_t>(engineSample, -1)});
+}
+
+std::int64_t EngineProcessor::sampleAtHostTime(double hostSeconds) const noexcept {
+    const Snapshot s = snapshot_.load();
+    if (s.hostTimeSeconds < 0.0 || s.sampleRate <= 0.0) return -1;
+    return s.blockStartSample +
+           static_cast<std::int64_t>(std::llround((hostSeconds - s.hostTimeSeconds) * s.sampleRate));
 }
 
 bool EngineProcessor::swapGraph(std::unique_ptr<Graph> graph) {
     Graph* raw = graph.release();
-    if (commands_.push(cmd::SwapGraph{raw})) return true;
+    if (commands_.push(QueuedCommand{cmd::SwapGraph{raw}, -1})) return true;
     delete raw;
     return false;
 }
@@ -137,8 +153,44 @@ ClockState EngineProcessor::advanceClock(int numSamples) noexcept {
 }
 
 void EngineProcessor::applyCommands() noexcept {
-    Command c;
-    while (commands_.pop(c)) apply(c);
+    QueuedCommand q;
+    while (commands_.pop(q)) {
+        if (q.atSample > samplePosition_)
+            insertTimed(q);
+        else
+            apply(q.command);
+    }
+}
+
+void EngineProcessor::insertTimed(const QueuedCommand& q) noexcept {
+    if (numTimed_ >= kMaxTimedCommands) {
+        apply(q.command);  // no room to wait: late rather than lost
+        return;
+    }
+    // Sorted by sample; equal samples keep their push order.
+    int i = numTimed_;
+    while (i > 0 && timed_[static_cast<std::size_t>(i - 1)].atSample > q.atSample) {
+        timed_[static_cast<std::size_t>(i)] = timed_[static_cast<std::size_t>(i - 1)];
+        --i;
+    }
+    timed_[static_cast<std::size_t>(i)] = q;
+    ++numTimed_;
+}
+
+void EngineProcessor::applyTimedUpTo(std::int64_t sample) noexcept {
+    int done = 0;
+    while (done < numTimed_ && timed_[static_cast<std::size_t>(done)].atSample <= sample)
+        apply(timed_[static_cast<std::size_t>(done++)].command);
+    if (done == 0) return;
+    for (int i = done; i < numTimed_; ++i)
+        timed_[static_cast<std::size_t>(i - done)] = timed_[static_cast<std::size_t>(i)];
+    numTimed_ -= done;
+}
+
+int EngineProcessor::nextTimedOffset(std::int64_t blockStart, int numSamples) const noexcept {
+    if (numTimed_ == 0) return -1;
+    const std::int64_t offset = timed_[0].atSample - blockStart;
+    return offset < numSamples ? static_cast<int>(std::max<std::int64_t>(offset, 0)) : -1;
 }
 
 void EngineProcessor::apply(const Command& command) noexcept {
@@ -206,6 +258,9 @@ void EngineProcessor::apply(const Command& command) noexcept {
                     if (auto* s = graph_->findSource(c.sourceId)) s->resetMotion();
                 } else if constexpr (std::is_same_v<C, cmd::SetModulatorValue>) {
                     if (auto* s = graph_->findSource(c.sourceId)) s->setModulatorValue(c.index, c.value);
+                } else if constexpr (std::is_same_v<C, cmd::SetModulator>) {
+                    if (auto* s = graph_->findSource(c.sourceId))
+                        s->setModulator(c.index, c.modulator, c.count);
                 } else if constexpr (std::is_same_v<C, cmd::FilePlay>) {
                     if (auto* s = graph_->findSource(c.sourceId))
                         if (auto* in = s->input()) in->play();
@@ -226,6 +281,9 @@ void EngineProcessor::apply(const Command& command) noexcept {
                 } else if constexpr (std::is_same_v<C, cmd::SetSpeakerEq>) {
                     if (auto* s = graph_->findSpeaker(c.speakerId)) s->setEq(c.eq);
                 } else if constexpr (std::is_same_v<C, cmd::SetInsertParam>) {
+                    // A modulated parameter takes the value as its new base.
+                    SourceNode* src = c.owner == InsertOwner::Source ? graph_->findSource(c.id) : nullptr;
+                    if (src != nullptr && src->setModulatedInsertBase(c.slot, c.index, c.value)) return;
                     if (auto* st = graph_->findInserts(c.owner, c.id))
                         st->chain().setParameter(c.slot, c.index, c.value);
                 } else if constexpr (std::is_same_v<C, cmd::SetInsertBypass>) {
@@ -271,7 +329,11 @@ void EngineProcessor::process(const float* const* inputs, int numInputs, float* 
         if (outputs[c]) std::fill(outputs[c], outputs[c] + numSamples, 0.0f);
     if (numSamples <= 0) return;
 
+    const std::int64_t blockStart = samplePosition_;
+    const double hostTime = nextHostTime_;
+    nextHostTime_ = -1.0;
     applyCommands();
+    applyTimedUpTo(blockStart);
 
     // Structural change (SPEC §5.2): sources missing from the new graph are
     // faded out over this block in the old graph; the swap happens at the
@@ -302,7 +364,11 @@ void EngineProcessor::process(const float* const* inputs, int numInputs, float* 
             recallAt = -1;
             applyRecall(plan);
         }
-        const int limit = recallAt > offset ? recallAt : numSamples;
+        // Timed commands (OSC timetags) split the block at their sample.
+        applyTimedUpTo(blockStart + offset);
+        const int timedAt = nextTimedOffset(blockStart, numSamples);
+        int limit = recallAt > offset ? recallAt : numSamples;
+        if (timedAt > offset) limit = std::min(limit, timedAt);
         if (graph_ == nullptr) {
             offset = limit;
             continue;
@@ -339,6 +405,9 @@ void EngineProcessor::process(const float* const* inputs, int numInputs, float* 
         }
         offset += n;
     }
+
+    samplePosition_ = blockStart + numSamples;
+    snapshot_.store(Snapshot{clockAtStart, blockStart, hostTime, sampleRate_});
 
     samplesToFeedback_ -= numSamples;
     if (samplesToFeedback_ <= 0) {
@@ -495,6 +564,11 @@ void EngineProcessor::startRamp(const Ramp& r, int totalSamples, float rampMs) n
             a.from = s->distanceModel().q;
         else if (t == RampTarget::SourcePosition)
             a.fromPosition = s->controlPosition(std::max(0, r.channel));
+        else if (t == RampTarget::SourceMotionParam) {
+            const auto live = s->motionParamLive(r.channel, static_cast<MotionParam>(r.param));
+            if (!live) return;  // the kind has no such parameter (any more)
+            a.from = *live;
+        }
     } else if (auto* sp = graph_->findSpeaker(r.id)) {
         Eq3 e = sp->settings().eq;
         if (const float* field = eqField(e, t)) a.from = *field;
@@ -527,6 +601,9 @@ void EngineProcessor::applyRampValue(const Ramp& r, float v, const Position& pos
     const RampTarget t = r.target;
     if (t == RampTarget::SourceInsertParam || t == RampTarget::SpeakerInsertParam) {
         const auto owner = t == RampTarget::SpeakerInsertParam ? InsertOwner::Speaker : InsertOwner::Source;
+        if (owner == InsertOwner::Source)
+            if (auto* src = graph_->findSource(r.id); src && src->setModulatedInsertBase(r.slot, r.param, v))
+                return;
         if (auto* st = graph_->findInserts(owner, r.id)) st->chain().setParameter(r.slot, r.param, v);
         return;
     }
@@ -547,6 +624,8 @@ void EngineProcessor::applyRampValue(const Ramp& r, float v, const Position& pos
             s->setDistanceModel(m);
         } else if (t == RampTarget::SourcePosition) {
             s->setPosition(r.channel, position, 0.0f);
+        } else if (t == RampTarget::SourceMotionParam) {
+            s->setMotionParam(r.channel, static_cast<MotionParam>(r.param), v);
         }
     } else if (auto* sp = graph_->findSpeaker(r.id)) {
         Eq3 e = sp->settings().eq;

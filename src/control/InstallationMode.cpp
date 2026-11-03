@@ -76,27 +76,44 @@ Expected<LoadedProject, Error> autoload(const InstallationSettings& settings, bo
     return main;  // report the original failure
 }
 
+bool armDefault(CueEngine& cues, const InstallationSettings& settings, const CueTick& tick) {
+    return settings.defaultCueList.empty() ? cues.armFirst(tick) : cues.arm(settings.defaultCueList, tick);
+}
+
 bool startShow(CueEngine& cues, const InstallationSettings& settings, const CueTick& tick) {
-    const bool armed =
-        settings.defaultCueList.empty() ? cues.armFirst(tick) : cues.arm(settings.defaultCueList, tick);
-    return armed && cues.go(tick);
+    return armDefault(cues, settings, tick) && cues.go(tick);
 }
 
 }  // namespace installation
 
-bool Autosaver::tick(double nowSeconds, const Project& project, bool dirty) {
+bool Autosaver::due(double nowSeconds, bool dirty) {
     if (!started_) {
         started_ = true;
         lastSave_ = nowSeconds;
     }
     if (!dirty || nowSeconds - lastSave_ < interval_) return false;
     lastSave_ = nowSeconds;
+    return true;
+}
+
+bool Autosaver::write(const Project& project) {
     if (const auto err = projectfile::save(project, path_)) {
         lastError_ = err->message;
         return false;
     }
     lastError_.clear();
     return true;
+}
+
+bool Autosaver::tick(double nowSeconds, const Project& project, bool dirty) {
+    return due(nowSeconds, dirty) && write(project);
+}
+
+bool Autosaver::tick(double nowSeconds, Project& project, bool dirty,
+                     const std::function<void(Project&)>& beforeSave) {
+    if (!due(nowSeconds, dirty)) return false;
+    if (beforeSave) beforeSave(project);
+    return write(project);
 }
 
 }  // namespace spacer

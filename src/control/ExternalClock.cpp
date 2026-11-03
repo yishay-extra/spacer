@@ -32,13 +32,20 @@ ClockState ExternalClock::advance(int numSamples) {
     }
     const double t = now();
     const double blockTime = timer_.blockStart(t, numSamples);
-    const ClockTimeline& tl = poll(t);
+    ClockTimeline tl = poll(t);  // copy: the compensation widens its look-ahead below
     locked_.store(tl.locked, std::memory_order_relaxed);
     if (status_) {
         status_->locked.store(tl.locked, std::memory_order_relaxed);
         status_->kind.store(static_cast<int>(kind_), std::memory_order_relaxed);
     }
-    last_ = follower_.follow(tl, blockTime, numSamples, sampleRate_, timer_.secondsPerSample(), beatsPerBar_);
+    // Latency compensation: the beat at the time this block is heard. The
+    // tracker's extrapolation cap is measured from "now", so it grows by the
+    // same amount (otherwise the compensated beat would stall).
+    const double compensation =
+        status_ ? std::max(0.0, status_->compensationSeconds.load(std::memory_order_relaxed)) : 0.0;
+    tl.maxAheadSeconds += compensation;
+    const double heardAt = blockTime + compensation;
+    last_ = follower_.follow(tl, heardAt, numSamples, sampleRate_, timer_.secondsPerSample(), beatsPerBar_);
     // The engine overrides timeSeconds with its own timeline; keep a
     // monotonic one here too for direct users.
     last_.timeSeconds = timeSeconds_;

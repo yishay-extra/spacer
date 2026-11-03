@@ -131,6 +131,9 @@ struct ClockBeat {
 /// offered to cues with an `Osc{address}` trigger, otherwise counted unknown.
 struct OscTrigger {
     std::string address;
+    /// The message's first number, if any (for `osc{address}` modulators).
+    float value{0.0f};
+    bool hasValue{false};
     bool operator==(const OscTrigger&) const = default;
 };
 /// A MIDI note-on (or CC with value > 0) offered to cues with a `Midi` trigger.

@@ -5,6 +5,7 @@
 // autosave while running. (Relaunch after a crash is a LaunchAgent: WP13.)
 
 #include <filesystem>
+#include <functional>
 #include <optional>
 #include <string>
 
@@ -41,6 +42,10 @@ Expected<LoadedProject, Error> autoload(const InstallationSettings& settings, bo
 /// Arms the default (or first) cue list and fires its first cue. False if
 /// there is nothing to arm or fire.
 bool startShow(CueEngine& cues, const InstallationSettings& settings, const CueTick& tick);
+/// Arms the default cue list (`settings.defaultCueList`), or the first list
+/// when that is empty. False if there is no such list. Used by startShow
+/// and by Go with nothing armed (WP14).
+bool armDefault(CueEngine& cues, const InstallationSettings& settings, const CueTick& tick);
 
 }  // namespace installation
 
@@ -54,10 +59,17 @@ public:
 
     /// Returns true if a file was written. `lastError()` holds the reason otherwise.
     bool tick(double nowSeconds, const Project& project, bool dirty);
+    /// As above; `beforeSave` runs only when a file is about to be written and
+    /// may update `project` first (the app captures live plugin state, SPEC §13).
+    bool tick(double nowSeconds, Project& project, bool dirty,
+              const std::function<void(Project&)>& beforeSave);
     const std::filesystem::path& path() const { return path_; }
     const std::string& lastError() const { return lastError_; }
 
 private:
+    bool due(double nowSeconds, bool dirty);
+    bool write(const Project& project);
+
     std::filesystem::path path_;
     double interval_;
     double lastSave_{0.0};

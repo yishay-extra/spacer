@@ -246,3 +246,124 @@ TEST_CASE("ModulatorBank::process does not allocate") {
     }
     CHECK(allocs == 0);
 }
+
+// ---- WP14: motionRight / insert paths, live edits, phase continuity ----------
+
+TEST_CASE("ParameterPath: motionRight.* and insert.{slot}.param.{index} (WP14)") {
+    const auto r = ParameterPath::parse("motionRight.radius");
+    REQUIRE(r);
+    CHECK(r->domain == ParameterPath::Domain::MotionRight);
+    CHECK(r->motion == MotionParam::Radius);
+    CHECK(r->toString() == "motionRight.radius");
+    for (std::size_t i = 0; i < kNumMotionParams; ++i) {
+        ParameterPath p;
+        p.domain = ParameterPath::Domain::Motion;
+        p.motion = static_cast<MotionParam>(i);
+        const std::string right = "motionRight." + std::string(p.toString()).substr(7);
+        const auto parsed = ParameterPath::parse(right);
+        REQUIRE(parsed);
+        CHECK(parsed->motion == p.motion);
+        CHECK(parsed->toString() == right);
+    }
+    const auto ins = ParameterPath::parse("insert.2.param.17");
+    REQUIRE(ins);
+    CHECK(ins->domain == ParameterPath::Domain::Insert);
+    CHECK(ins->slot == 2);
+    CHECK(ins->index == 17);
+    CHECK(ins->toPathString() == "insert.2.param.17");
+    CHECK_FALSE(ParameterPath::parse("motionRight.bogus"));
+    CHECK_FALSE(ParameterPath::parse("insert.9.param.0"));  // slot out of range
+    CHECK_FALSE(ParameterPath::parse("motionRight."));
+}
+
+TEST_CASE("ModulatorBank: motionRight and insert targets have their own outputs (WP14)") {
+    ModulatorBank bank;
+    bank.configure({ModulatorSpec{OscSource{"/a"}, "motionRight.radius", 1.0f, 0.0f},
+                    ModulatorSpec{OscSource{"/b"}, "insert.1.param.3", 0.5f, 0.0f},
+                    ModulatorSpec{OscSource{"/c"}, "insert.1.param.3", 1.0f, 0.1f},
+                    ModulatorSpec{OscSource{"/d"}, "motion.radius", 1.0f, 0.0f}});
+    bank.setExternal(0, 2.0f);
+    bank.setExternal(1, 0.2f);
+    bank.setExternal(2, 0.1f);
+    bank.setExternal(3, 3.0f);
+    ClockDriver d;
+    const auto out = bank.process(d.next());
+    CHECK(out.motionRight[MotionParam::Radius] == Approx(2.0f));
+    CHECK(out.motion[MotionParam::Radius] == Approx(3.0f));
+    REQUIRE(out.numInserts == 1);
+    CHECK(out.inserts[0].slot == 1);
+    CHECK(out.inserts[0].index == 3);
+    CHECK(out.inserts[0].value == Approx(0.5f * 0.2f + (0.1f + 0.1f)));
+}
+
+TEST_CASE("ModulatorBank: a live edit keeps the LFO phase, also across a period change (WP14)") {
+    ModulatorBank live, reference;
+    live.configure({lfo(LfoShape::Saw, Period::beats(4), "gain", 1.0f)});
+    reference.configure({lfo(LfoShape::Saw, Period::beats(4), "gain", 2.0f)});
+    ClockDriver d;
+    for (int i = 0; i < kBlocksPerBeat; ++i) {  // beat 1: saw at phase 0.25
+        const MotionContext c = d.next();
+        live.process(c);
+        reference.process(c);
+    }
+    CHECK(live.value(0) == Approx(-0.5f));
+    // Depth edit: same phase as a bank that always had depth 2.
+    live.setLive(0, ModulatorBank::Live::fromSpec(lfo(LfoShape::Saw, Period::beats(4), "gain", 2.0f)), 1);
+    MotionContext c = d.next();
+    live.process(c);
+    reference.process(c);
+    CHECK(live.value(0) == Approx(reference.value(0)));
+    // Period edit 4 -> 8 beats: the phase continues from where it was (no jump).
+    const float before = live.value(0);
+    live.setLive(0, ModulatorBank::Live::fromSpec(lfo(LfoShape::Saw, Period::beats(8), "gain", 2.0f)), 1);
+    live.process(d.next());
+    // One block = 0.02 beats: saw slope 2·depth per period -> 4 / 8 · 0.02.
+    CHECK(live.value(0) - before == Approx(4.0f / 8.0f * 0.02f).margin(1e-4));
+}
+
+TEST_CASE("ModulatorBank: an appended LFO starts at phase 0, truncation drops (WP14)") {
+    ModulatorBank bank;
+    bank.configure({lfo(LfoShape::Saw, Period::beats(4), "gain", 1.0f)});
+    ClockDriver d;
+    for (int i = 0; i < 77; ++i) bank.process(d.next());
+    bank.setLive(1, ModulatorBank::Live::fromSpec(lfo(LfoShape::Saw, Period::beats(4), "spread", 1.0f)), 2);
+    CHECK(bank.size() == 2);
+    bank.process(d.next());
+    CHECK(bank.value(1) == Approx(-1.0f + 2.0f * 0.02f / 4.0f));  // one block after phase 0
+    bank.setLive(-1, {}, 1);
+    CHECK(bank.size() == 1);
+    CHECK_FALSE(bank.targets(SourceParam::Spread));
+    CHECK(bank.targets(SourceParam::GainDb));
+}
+
+TEST_CASE("ModulatorBank: continueTimelineFrom keeps phase and external values (WP14)") {
+    ModulatorBank old, next;
+    old.configure({lfo(LfoShape::Saw, Period::beats(4), "gain", 1.0f),
+                   ModulatorSpec{OscSource{"/x"}, "spread", 1.0f, 0.0f}});
+    old.setExternal(1, 0.7f);
+    ClockDriver d;
+    for (int i = 0; i < kBlocksPerBeat; ++i) old.process(d.next());
+    const float phaseValue = old.value(0);
+    next.configure({lfo(LfoShape::Saw, Period::beats(2), "gain", 1.0f),
+                    ModulatorSpec{OscSource{"/y"}, "spread", 1.0f, 0.0f}});
+    next.continueTimelineFrom(old);
+    next.process(d.next());
+    CHECK(next.value(0) - phaseValue == Approx(2.0f * 0.02f / 2.0f).margin(1e-4));
+    CHECK(next.value(1) == Approx(0.7f));
+}
+
+TEST_CASE("Trajectory: a re-anchored period change keeps the position continuous (WP14)") {
+    OrbitMotion a = orbit();
+    OrbitMotion b = orbit();
+    b.period = Period::seconds(3);  // other unit too
+    const auto runningA = MotionFactory::create(MotionSpec{a});
+    ClockDriver d;
+    Position last;
+    for (int i = 0; i < 37; ++i) last = runningA->evaluate(d.next());
+    const auto edited = MotionFactory::create(MotionSpec{b});
+    edited->continueTimelineFrom(*runningA);
+    edited->reanchorPeriod(a.period, b.period);
+    const Position p = edited->evaluate(d.next());
+    // One 10 ms block at a 3 s period: 1.2 degrees further.
+    CHECK(p.azimuth - last.azimuth == Approx(360.0f * 0.01f / 3.0f).margin(1e-2));
+}

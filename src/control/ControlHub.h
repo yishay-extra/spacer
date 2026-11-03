@@ -20,8 +20,16 @@ namespace spacer {
 
 class ControlHub {
 public:
+    /// How far ahead of their timetag OSC bundle events that become engine
+    /// commands are pushed (EngineProcessor::pushAt holds them to the sample).
+    static constexpr double kTimetagLookaheadSeconds = 0.5;
+
     /// `cues` may be null. `project` is the live model (not copied).
-    ControlHub(const Project& project, EngineProcessor& engine, CueEngine* cues);
+    /// `config` comes from the composition root (selected source, optional
+    /// hooks); its `push`, `makeTick` and `pushAt` are filled in with the
+    /// engine's when left empty.
+    ControlHub(const Project& project, EngineProcessor& engine, CueEngine* cues,
+               ControlDispatcher::Config config = {});
 
     /// Applies project.osc and project.midi: (re)binds the OSC input port,
     /// (re)connects the output when enabled, loads the MIDI mappings. False if
@@ -45,7 +53,10 @@ public:
     void pump(double nowEpochSeconds, double monotonicSeconds);
 
 private:
+    ControlDispatcher::Config completeConfig(EngineProcessor& engine, ControlDispatcher::Config config);
+
     const Project& project_;
+    double nowEpoch_{0.0}, nowMonotonic_{0.0};  // times of the running pump()
     OscServer server_;
     OscSender sender_;
     MidiMapper mapper_;

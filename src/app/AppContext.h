@@ -73,6 +73,7 @@ public:
         Panic,          // panic engaged / released
         Selection,      // the selected source changed (selectSource())
         CueState,       // a cue list was armed (the model is untouched)
+        PluginEdited,   // a plugin was edited in its editor (the project is now modified)
     };
 
     class Listener {
@@ -223,6 +224,7 @@ private:
     void syncEngine(const EngineEffect& effect);
     void rebuildGraph();
     void resetCueEngine();
+    CueEngine::Config cueConfig();
     void resetControl();
     void modelChanged(Change change);
     void notify(Change change);

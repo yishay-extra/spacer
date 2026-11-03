@@ -22,8 +22,12 @@ namespace spacer {
 ///     weights (or 1 when max-rE is off). The sampling decoder for SN3D input
 ///     is (1/K)·(2l+1)·Y_n(θ_k);
 ///  4. scale the whole matrix so that the mean decoded energy Σ_s g_s² of a
-///     unit plane wave (averaged over the t-design directions) is 1, matching
-///     the Σg² = 1 convention of VBAP/DBAP.
+///     unit plane wave is 1, matching the Σg² = 1 convention of VBAP/DBAP.
+///     The mean is over the t-design directions, or for a horizontal layout
+///     (every non-LFE speaker below 5° elevation, the VBAP 2D rule) over the
+///     horizontal plane, so an in-plane ambisonic source has the same level
+///     as a VBAP/DBAP one (WP14). degreeEnergy() uses the same directions, so
+///     the encoders' spread compensation keeps in-plane loudness constant.
 ///
 /// decode() (RT) is the matrix multiply, adding into `bus.speakers`.
 class AmbisonicDecoder {
@@ -31,6 +35,13 @@ public:
     /// Non-RT. Rebuild for a layout and order (clamped to [1, 5]). Rows are
     /// layout speaker indices (the first kMaxSpeakers).
     void prepare(const Layout& layout, int order, bool maxRe = true);
+
+    static constexpr float kHorizontalElevationDeg = 5.0f;
+    static constexpr int kHorizontalPoints = 720;  // 0.5° ring for the in-plane mean
+    /// Every non-LFE speaker below kHorizontalElevationDeg (and at least one).
+    static bool isHorizontalLayout(const Layout& layout);
+    /// Whether the last prepare() normalised over the horizontal plane.
+    bool normalisedInPlane() const { return horizontal_; }
 
     /// RT. bus.speakers[s] += Σ_n D[s][n]·bus.ambisonic[n] for the speakers
     /// and channels both the decoder and the bus have. Does nothing if
@@ -64,6 +75,7 @@ public:
 private:
     std::array<float, kMaxSpeakers * kMaxAmbisonicChannels> matrix_{};
     std::array<double, (kMaxAmbisonicOrder + 1) * (kMaxAmbisonicOrder + 1)> degreeEnergy_{};
+    bool horizontal_{false};
     int order_{1};
     int numSpeakers_{0};
     bool prepared_{false};

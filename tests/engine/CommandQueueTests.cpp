@@ -1,10 +1,14 @@
+#include <atomic>
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
+#include <cmath>
 #include <memory>
 #include <thread>
 
 #include "engine/AllocationGuard.h"
 #include "engine/Command.h"
 #include "engine/EngineProcessor.h"
+#include "engine/Seqlock.h"
 #include "engine/SpscQueue.h"
 
 using namespace spacer;
@@ -90,4 +94,43 @@ TEST_CASE("Allocation guard: detects an allocation inside the audio scope only")
     }
     CHECK(allocguard::violations() == 2);
     allocguard::resetViolations();
+}
+
+TEST_CASE("Seqlock: readers never see a torn value while the writer stores (WP14)") {
+    struct Pair {
+        std::int64_t a{0};
+        std::int64_t b{0};  // always -a
+        double c{0.0};      // always a * 0.5
+    };
+    spacer::Seqlock<Pair> lock;
+    std::atomic<bool> stop{false};
+    std::thread writer([&] {
+        for (std::int64_t i = 1; !stop.load(); ++i) lock.store(Pair{i, -i, static_cast<double>(i) * 0.5});
+    });
+    int torn = 0;
+    std::int64_t last = 0;
+    bool monotonic = true;
+    for (int i = 0; i < 200000; ++i) {
+        const Pair p = lock.load();
+        if (p.b != -p.a || std::abs(p.c - static_cast<double>(p.a) * 0.5) > 0.0) ++torn;
+        if (p.a < last) monotonic = false;
+        last = p.a;
+    }
+    stop = true;
+    writer.join();
+    CHECK(torn == 0);
+    CHECK(monotonic);
+}
+
+TEST_CASE("EngineProcessor: clockState() is the published snapshot of the last block (WP14)") {
+    spacer::EngineProcessor engine;
+    engine.push(spacer::cmd::ClockSetBpm{90.0});
+    engine.push(spacer::cmd::ClockPlay{});
+    float* out[1] = {nullptr};
+    for (int i = 0; i < 4; ++i) engine.process(nullptr, 0, out, 0, 480);
+    const auto s = engine.snapshot();
+    CHECK(s.blockStartSample == 3 * 480);
+    CHECK(engine.clockState().bpm == Catch::Approx(90.0));
+    CHECK(engine.clockState().playing);
+    CHECK(engine.clockState().beat == Catch::Approx(s.clock.beat));
 }

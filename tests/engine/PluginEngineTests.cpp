@@ -367,3 +367,27 @@ TEST_CASE("Plugins engine: processing and recall with plugins do not allocate on
     rig.run(48000);
     CHECK(allocguard::violations() == 0);
 }
+
+TEST_CASE("Plugins engine: a modulator drives an insert parameter (insert.{slot}.param.{index}, WP14)") {
+    Project p = twoChannels({directSource(1, {1})});
+    p.sources[0].inserts = {slot("gain", {{0, 0.5f}})};  // x1
+    p.sources[0].modulators = {ModulatorSpec{OscSource{"/g"}, "insert.0.param.0", 1.0f, 0.0f}};
+    Rig rig(p);
+    rig.run(4800);
+    CHECK(rig.last(0) == Approx(0.25f));
+    rig.proc.push(cmd::SetModulatorValue{1, 0, -0.25f});  // 0.5 - 0.25 -> x0.5
+    rig.run(1280);
+    CHECK(rig.last(0) == Approx(0.125f));
+    // SetInsertParam moves the base the modulation is added to.
+    rig.proc.push(cmd::SetInsertParam{InsertOwner::Source, 1, 0, 0, 0.75f});  // 0.75 - 0.25 -> x1
+    rig.run(1280);
+    CHECK(rig.last(0) == Approx(0.25f));
+    // Clamped to 0..1.
+    rig.proc.push(cmd::SetModulatorValue{1, 0, 5.0f});
+    rig.run(1280);
+    CHECK(rig.last(0) == Approx(0.5f));  // x2
+    // Dropping the modulator puts the parameter back on its base.
+    rig.proc.push(cmd::SetModulator{1, -1, 0, {}});
+    rig.run(1280);
+    CHECK(rig.last(0) == Approx(0.375f));  // 0.75 -> x1.5
+}
