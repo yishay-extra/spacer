@@ -5,6 +5,7 @@
 #include "engine/FilePlayer.h"
 #include "engine/GeneratorInput.h"
 #include "engine/HardwareInput.h"
+#include "engine/VirtualInput.h"
 
 namespace spacer {
 
@@ -47,7 +48,8 @@ std::unique_ptr<SourceInput> SourceInputFactory::create(const SourceSpec& spec,
                 return std::make_unique<FilePlayer>(in, channels, std::move(reader), streamer_,
                                                     file.getFullPathName().toStdString());
             } else {
-                return nullptr;  // VirtualInput: WP5
+                static_assert(std::is_same_v<T, VirtualInputSpec>);
+                return std::make_unique<VirtualInput>(in);
             }
         },
         spec.input.value);

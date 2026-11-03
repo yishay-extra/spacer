@@ -37,6 +37,25 @@ jobs:
         run: cmake --build build
       - name: Test
         run: ctest --test-dir build --output-on-failure
+      - name: Check Spacer.driver bundle
+        run: |
+          set -euo pipefail
+          driver=build/driver/Spacer.driver
+          plutil -lint "$driver/Contents/Info.plist"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$driver/Contents/Info.plist")" = org.spacer.driver
+          /usr/libexec/PlistBuddy -c 'Print :CFPlugInTypes:443ABAB8-E7B3-491A-B985-BEB9187030DB' "$driver/Contents/Info.plist"
+          file "$driver/Contents/MacOS/Spacer"
+          nm -gU "$driver/Contents/MacOS/Spacer" | grep -q '_SpacerDriver_Create$'
+          # Only system libraries (no JUCE, no spacer_core: SPEC §3).
+          otool -L "$driver/Contents/MacOS/Spacer"
+          ! otool -L "$driver/Contents/MacOS/Spacer" | tail -n +2 | grep -v -E '^\s+/(System/Library|usr/lib)/'
+          test -f build/Spacer_artefacts/Release/Spacer.app/Contents/Resources/Spacer.driver/Contents/MacOS/Spacer
+      - name: Upload driver
+        uses: actions/upload-artifact@v4
+        with:
+          name: Spacer-driver-macOS
+          path: build/driver/Spacer.driver
+          if-no-files-found: error
       - name: Upload app
         uses: actions/upload-artifact@v4
         with:

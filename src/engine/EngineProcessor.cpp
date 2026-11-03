@@ -258,10 +258,12 @@ bool EngineProcessor::applyPendingSwap() noexcept {
 }
 
 void EngineProcessor::process(const float* const* inputs, int numInputs, float* const* outputs,
-                              int numOutputs, int numSamples) noexcept {
+                              int numOutputs, int numSamples, const float* const* virtualInputs,
+                              int numVirtualInputs) noexcept {
     allocguard::ScopedAudioThread audioThread;
 
     numInputs = std::clamp(numInputs, 0, kMaxIoChannels);
+    numVirtualInputs = virtualInputs != nullptr ? std::clamp(numVirtualInputs, 0, kMaxIoChannels) : 0;
     numOutputs = std::clamp(numOutputs, 0, kMaxIoChannels);
     for (int c = 0; c < numOutputs; ++c)
         if (outputs[c]) std::fill(outputs[c], outputs[c] + numSamples, 0.0f);
@@ -309,7 +311,10 @@ void EngineProcessor::process(const float* const* inputs, int numInputs, float* 
             inputChunk_[static_cast<std::size_t>(c)] = inputs[c] ? inputs[c] + offset : nullptr;
         for (int c = 0; c < numOutputs; ++c)
             outputChunk_[static_cast<std::size_t>(c)] = outputs[c] ? outputs[c] + offset : nullptr;
-        const InputContext ctx{inputChunk_.data(), numInputs};
+        for (int c = 0; c < numVirtualInputs; ++c)
+            virtualChunk_[static_cast<std::size_t>(c)] =
+                virtualInputs[c] ? virtualInputs[c] + offset : nullptr;
+        const InputContext ctx{inputChunk_.data(), numInputs, virtualChunk_.data(), numVirtualInputs};
         stepRamps(n);
         ClockState chunkClock = clockAtStart;
         if (offset > 0 && sampleRate_ > 0.0) {

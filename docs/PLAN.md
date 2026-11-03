@@ -264,6 +264,7 @@ Split so each lands after its subsystem:
 - **WP11c Cues panel + scene manager · M** (after WP9): §16.3.
 - **WP11d Settings + status bar · S** (after WP5, WP8): §16.5, §16.6,
   driver install flow, aggregate creation.
+  Also: clock-source selection (Internal / MIDI clock / MTC / OSC / Link when built) — on change call `AudioEngine::setProject` or rebuild so `ClockSelector` switches (WP12 note); show clock lock status.
 - **WP11e Plugin UI · S** (after WP10): insert slots, editor windows.
 
 Acceptance per sub-WP: manual checklist in `docs/ui-checklist.md`, no
@@ -304,6 +305,10 @@ Collects cross-WP follow-ups reported in PRs:
   without rebuilding the graph (so a later device restart rebuilds from the
   live state), and `CueEngine::setConfig()` so a device change keeps the
   sequencer state (WP11a issues 1–2).
+- External-clock output-latency compensation: beat at the time the block is
+  *heard* (device output latency + limiter look-ahead), automatic with a
+  per-project trim (WP12 issue 1). Make `EngineProcessor::clockState()`
+  reads exact from the message thread (seqlock) (WP12 issue 3).
 - Any other "follow-up" items listed in merged PR descriptions.
 Acceptance: each item has a test; no open follow-ups left in the status log.
 
@@ -337,10 +342,12 @@ mode relaunch, CI release job on tags, `docs/INSTALL.md`.
 | WP2b | done | 3D VBAP via `SphereHull` (exhaustive hull, coplanar fan), imaginary floor/ceiling, 3D MDAP; decisions now in SPEC §6.1. Details: PR #8 |
 | WP2d | done | `SphericalHarmonics` (ACN/SN3D, AmbiX), embedded 240-point 21-design, `AmbisonicEncoder` (orders 1–5, spread via effective order), `AmbisonicDecoder` (AllRAD over WP2b `Vbap` with `setAlways3D`, max-rE, LFE excluded). rE criterion revised (see WP2d entry). Engine wiring is WP3b. Details: PR #13 |
 | WP3 | done | Engine (`EngineProcessor`, `Graph`/`GraphBuilder`, `SwapGraph` with state carry-over, `SpeakerChain`: Lagrange delay → gain → 3-band EQ → inserts → limiter), `OfflineRenderer`, `AllocationGuard`, `spatial/Direct`; macOS `AudioEngine` + `AggregateDevice` + `spacer-engine-check` CLI. `LookaheadLimiter` gain computer is hand-written (juce::dsp::Limiter has no look-ahead); its delay is `juce::dsp::DelayLine`. Mac checks: `docs/mac-validation/WP3.md`. Details: PR #11 |
+| WP4 | done | `GeneratorInput`, `HardwareInput`, `FilePlayer`/`FileStream`/`StreamRing`/`DiskStreamer` (disk thread, 1 s ring, FIR + Lagrange resampling), `SourceInputFactory`; WP7 motion + modulators wired into `SourceNode`; commands `SetMotionParam`/`ResetMotion`/`SetModulatorValue`/`FilePlay`/`FileStop`/`FileSeek`. File-on-recall crossfade limitation in WP14. Mac checks: `docs/mac-validation/WP4.md`. Details: PR #15 |
 | WP6 | done | `InternalClock` (tempo, play/resume/stop, setBeat, tap tempo, quantised start). Decisions and open points: see "WP6 notes" below |
 | WP7 | done | `src/core/motion/`: all §10 trajectory kinds, `MotionFactory`, `ModulatorBank` (LFO/OSC/MIDI), `ParameterPath`, seeded `Rng`; shared test `AllocationCounter`. Phase-origin and Orbit decisions now in SPEC §10; other decisions in PR #9. Open: live param edits without phase restart (WP11b), `motionRight.*` modulation paths |
 | WP8 | done | `src/control`: `OscRouter`/`OscServer`/`OscSender`, `MidiMapper` (learn, 7/14-bit CC, NRPN, pitch bend, curves, note→cue, PC→scene), `ControlPath` over `ParameterPath`, `ControlDispatcher`, `ControlHub` (single producer: `pump()` on the message thread), `MidiInputService`; `MidiConfig::programChangeChannel`. Follow-ups in WP14. Mac checks: `docs/mac-validation/WP8.md`. Details: PR #18 |
 | WP9 | done | `SceneDiff`, `CueSequencer` (core); `RecallScene{RecallPlan*}` with linear ramps / 50 ms ghost-node crossfades / sample-accurate `AtBeat` scheduling (engine); `CueEngine`, `InstallationMode`, `Autosaver` (control; wired into the app by WP11a). `ClockState::startOffset`/`startBeat`. Mac checks: `docs/mac-validation/WP9.md`. Details: PR #14 |
+| WP12 | done | `src/core/clock/` (`TimeDll`, `MidiClockTracker`, `MtcDecoder`/`MtcTracker`, `OscBeatTracker`, `ClockFollower`); `MidiClock`/`MtcClock`/`OscClock` (+ `LinkClock` behind `SPACER_WITH_LINK`, default OFF — Link is GPLv2+/proprietary, needs an Ableton licence or an AGPL release); clock owned by `Graph`, switched via `SwapGraph`. Latency compensation in WP14, clock UI in WP11d. Mac checks: `docs/mac-validation/WP12.md`. Details: PR #22 |
 | WP11a | done | `AppContext` composition root (project + `ProjectHistory` scoped undo, `AudioEngine`, `CueEngine`, installation mode, `ControlHub` + `MidiInputService`, 30 Hz feedback tick); `src/ui/logic` (no-JUCE, tested: `StageTransform`, hit-test, drag rules, trajectory preview, `LayoutEditing`, `EngineSync`, `SpeakerTest`, `FeedbackState`); `StageView`, `LayoutEditor`, `MainComponent`. Follow-ups in WP14. Mac checks: `docs/mac-validation/WP11a.md`. Details: PR #19 |
 | WP2c | done | `spacer::Dbap` (`src/core/spatial/Dbap.h/.cpp`): §6.2 gains, Σg²=1 over panned speakers, `r_s = 0.2 + 3·spread`, LFE speakers excluded from gains, normalisation and render (§7). Tests in `tests/DbapTests.cpp`. Open spec issue: see "WP2c notes" below |
 

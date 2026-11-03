@@ -1,5 +1,5 @@
 // spacer-engine-check: manual validation tool for WP3 on a real Mac (see
-// docs/mac-validation/WP3.md, WP4.md). Runs the real AudioEngine on a real device.
+// docs/mac-validation/WP3.md, WP4.md, WP5.md). Runs the real AudioEngine on a real device.
 //
 //   spacer-engine-check devices
 //   spacer-engine-check tone  [--device NAME] [--seconds S] [--az DEG] [--rate HZ] [--buffer N]
@@ -9,12 +9,17 @@
 //   spacer-engine-check generator sine|pink|white|impulse [--az DEG] [--device NAME] [--seconds S]
 //   spacer-engine-check input --channel N [--az DEG] [--device NAME] [--seconds S]
 //   spacer-engine-check orbit [--period S] [--device NAME] [--seconds S]
+//   spacer-engine-check virtual --channel N [--az DEG] [--device NAME] [--seconds S]   (WP5: play
+//                       Spacer.driver channel N, print the driver status every second)
+//   spacer-engine-check vsend --channel N [--rate HZ] [--buffer N] [--seconds S]       (WP5: act as a
+//                       sender app: 440 Hz sine on channel N of the "Spacer" device, others silent)
 //   spacer-engine-check aggregate-create NAME UID SUB_UID [SUB_UID...]
 //   spacer-engine-check aggregate-destroy UID
 
 #include <juce_audio_devices/juce_audio_devices.h>
 #include <juce_events/juce_events.h>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <functional>
@@ -261,6 +266,111 @@ int playLive(const Args& a, const std::string& mode) {
     return 0;
 }
 
+/// WP5: a VirtualInput source on Spacer.driver channel `--channel` (0-based).
+int playVirtual(const Args& a) {
+    AudioEngine engine;
+    Project p = tonePlan(a.az, false);
+    VirtualInputSpec in;
+    in.left = a.channel;
+    p.sources.front().input.value = in;
+    p.sources.front().gainDb = 0.0f;
+    DeviceMapping devices;
+    devices.outputDeviceName = a.device;
+    devices.sampleRate = a.rate;
+    devices.bufferSize = a.buffer;
+    const auto error = engine.openDevice(devices);
+    if (error.isNotEmpty()) {
+        std::fprintf(stderr, "cannot open device: %s\n", error.toRawUTF8());
+        return 1;
+    }
+    engine.setProject(p);
+    std::printf("mode=virtual: Spacer.driver channel %d (0-based) -> az %.0f\n", a.channel, a.az);
+    double nextPrint = 0.0;
+    runFor(a.seconds, engine, [&](double t) {
+        if (t < nextPrint) return;
+        nextPrint += 1.0;
+        const auto v = engine.virtualDeviceStatus();
+        const char* state = v.state == VirtualDeviceReceiver::State::Connected       ? "connected"
+                            : v.state == VirtualDeviceReceiver::State::NotResponding ? "not-responding"
+                            : v.state == VirtualDeviceReceiver::State::Incompatible  ? "incompatible"
+                                                                                     : "absent";
+        std::printf(
+            "t=%5.1fs  driver=%s version=%s rate=%.0f running=%d playing=%d fill=%d latency=%d "
+            "ratio=%.6f underruns=%llu overruns=%llu resyncs=%llu  %s\n",
+            t, state, v.driverVersion.c_str(), v.driverSampleRate, v.driverRunning ? 1 : 0, v.playing ? 1 : 0,
+            v.fillFrames, v.latencyFrames, v.ratio, static_cast<unsigned long long>(v.underrunFrames),
+            static_cast<unsigned long long>(v.overrunFrames), static_cast<unsigned long long>(v.resyncs),
+            v.message.c_str());
+        std::fflush(stdout);
+    });
+    return 0;
+}
+
+/// WP5: stands in for a DAW: a 440 Hz sine at -20 dBFS on one channel of the
+/// "Spacer" output device.
+class SineOnChannel final : public juce::AudioIODeviceCallback {
+public:
+    explicit SineOnChannel(int channel) : channel_(channel) {}
+    void audioDeviceAboutToStart(juce::AudioIODevice* d) override { rate_ = d->getCurrentSampleRate(); }
+    void audioDeviceStopped() override {}
+    void audioDeviceIOCallbackWithContext(const float* const*, int, float* const* out, int numOut, int n,
+                                          const juce::AudioIODeviceCallbackContext&) override {
+        for (int c = 0; c < numOut; ++c)
+            if (out[c] != nullptr) std::fill(out[c], out[c] + n, 0.0f);
+        if (channel_ >= numOut || out[channel_] == nullptr) return;
+        const float amp = juce::Decibels::decibelsToGain(-20.0f);
+        for (int i = 0; i < n; ++i) {
+            out[channel_][i] = amp * static_cast<float>(std::sin(phase_));
+            phase_ += 2.0 * juce::MathConstants<double>::pi * 440.0 / rate_;
+        }
+        phase_ = std::fmod(phase_, 2.0 * juce::MathConstants<double>::pi);
+    }
+
+private:
+    int channel_;
+    double rate_{48000.0};
+    double phase_{0.0};
+};
+
+int sendToVirtual(const Args& a) {
+    juce::AudioDeviceManager manager;
+    auto error = manager.initialise(0, 64, nullptr, false, "Spacer");
+    if (error.isEmpty() && manager.getCurrentAudioDevice() != nullptr &&
+        manager.getCurrentAudioDevice()->getName() != "Spacer")
+        error = "the \"Spacer\" device was not found (is Spacer.driver installed?)";
+    if (error.isNotEmpty()) {
+        std::fprintf(stderr, "cannot open Spacer: %s\n", error.toRawUTF8());
+        return 1;
+    }
+    auto setup = manager.getAudioDeviceSetup();
+    if (a.rate > 0.0) setup.sampleRate = a.rate;
+    if (a.buffer > 0) setup.bufferSize = a.buffer;
+    setup.useDefaultOutputChannels = false;
+    setup.outputChannels.clear();
+    setup.outputChannels.setRange(0, 64, true);
+    error = manager.setAudioDeviceSetup(setup, true);
+    if (error.isNotEmpty()) {
+        std::fprintf(stderr, "cannot configure Spacer: %s\n", error.toRawUTF8());
+        return 1;
+    }
+    auto* d = manager.getCurrentAudioDevice();
+    std::printf("mode=vsend: 440 Hz on Spacer channel %d (0-based) of %d, %.0f Hz / %d frames\n", a.channel,
+                d->getActiveOutputChannels().countNumberOfSetBits(), d->getCurrentSampleRate(),
+                d->getCurrentBufferSizeSamples());
+    SineOnChannel sine(a.channel);
+    manager.addAudioCallback(&sine);
+    const double end = juce::Time::getMillisecondCounterHiRes() + a.seconds * 1000.0;
+    while (juce::Time::getMillisecondCounterHiRes() < end) {
+#if JUCE_MODAL_LOOPS_PERMITTED
+        juce::MessageManager::getInstance()->runDispatchLoopUntil(50);
+#else
+        juce::Thread::sleep(50);
+#endif
+    }
+    manager.removeAudioCallback(&sine);
+    return 0;
+}
+
 int listDevices() {
     for (const auto& d : AggregateDevice::listDevices())
         std::printf("%5u  in=%-3d out=%-3d  %-40s  uid=%s\n", d.id, d.numInputs, d.numOutputs, d.name.c_str(),
@@ -308,12 +418,14 @@ int main(int argc, char** argv) {
     if (command == "tone" || command == "pan" || command == "delay") return playTone(a, command);
     if (command == "file" || command == "generator" || command == "input" || command == "orbit")
         return playLive(a, command);
+    if (command == "virtual") return playVirtual(a);
+    if (command == "vsend") return sendToVirtual(a);
     if (command == "aggregate-create") return createAggregate(a);
     if (command == "aggregate-destroy") return destroyAggregate(a);
     std::fprintf(
         stderr,
         "usage: spacer-engine-check devices | tone | pan | delay | file | generator | input | orbit |\n"
-        "                           aggregate-create | aggregate-destroy\n"
+        "                           virtual | vsend | aggregate-create | aggregate-destroy\n"
         "       options: --device NAME --seconds S --az DEG --rate HZ --buffer N --loop --seek-at S\n"
         "                --channel N --period S\n");
     return 2;

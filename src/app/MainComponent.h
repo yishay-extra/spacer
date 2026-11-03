@@ -32,6 +32,7 @@ private:
     void updateButtons();
     void openProject();
     void saveProject(bool saveAs);
+    void installVirtualDevice();
 
     AppContext& context_;
     juce::TextButton openButton_{"Open..."};
@@ -42,6 +43,7 @@ private:
     juce::TextButton backButton_{"Back"};
     juce::TextButton goButton_{"GO"};
     juce::TextButton panicButton_{"Panic"};
+    juce::TextButton installDriverButton_{"Install virtual device..."};
     juce::Label statusLabel_;
     juce::TabbedComponent tabs_{juce::TabbedButtonBar::TabsAtTop};
     std::unique_ptr<juce::FileChooser> chooser_;
