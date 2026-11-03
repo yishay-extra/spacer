@@ -24,7 +24,8 @@ constexpr double kHz = 480.0;  // 100 samples per period
 std::vector<Speaker> ring(int count, float offsetDeg, float elevation = 0.0f) {
     std::vector<Speaker> v;
     for (int i = 0; i < count; ++i) {
-        Speaker s = makeSpeaker(i + 1, -180.0f + offsetDeg + 360.0f * static_cast<float>(i) / count, 2.0f, i);
+        Speaker s = makeSpeaker(
+            i + 1, -180.0f + offsetDeg + 360.0f * static_cast<float>(i) / static_cast<float>(count), 2.0f, i);
         s.position.elevation = elevation;
         v.push_back(s);
     }

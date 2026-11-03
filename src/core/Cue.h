@@ -6,6 +6,7 @@
 #include <variant>
 #include <vector>
 
+#include "core/ExactEqual.h"
 #include "core/MotionSpec.h"
 
 namespace spacer {
@@ -18,14 +19,16 @@ struct Manual {
 struct AtBeat {
     int bar{1};
     double beat{1.0};
-    bool operator==(const AtBeat&) const = default;
+    bool operator==(const AtBeat& o) const { return bar == o.bar && exactlyEqual(beat, o.beat); }
 };
 /// Fires `delay` after the previous cue starts; a random extra in
 /// [0, randomRange] (same unit) is added for installation variation.
 struct AfterPrevious {
     Period delay{Period::seconds(0)};
     double randomRange{0.0};
-    bool operator==(const AfterPrevious&) const = default;
+    bool operator==(const AfterPrevious& o) const {
+        return delay == o.delay && exactlyEqual(randomRange, o.randomRange);
+    }
 };
 struct Osc {
     std::string address;
@@ -60,7 +63,11 @@ struct Cue {
     Trigger trigger;
     bool restartMotionPhase{false};
     float postWaitSeconds{0.0f};
-    bool operator==(const Cue&) const = default;
+    bool operator==(const Cue& o) const {
+        return name == o.name && sceneName == o.sceneName &&
+               exactlyEqual(transitionSeconds, o.transitionSeconds) && trigger == o.trigger &&
+               restartMotionPhase == o.restartMotionPhase && exactlyEqual(postWaitSeconds, o.postWaitSeconds);
+    }
 };
 
 struct CueList {
