@@ -8,6 +8,7 @@
 #include <string>
 #include <variant>
 
+#include "core/InsertParamPath.h"
 #include "core/Position.h"
 
 namespace spacer {
@@ -64,6 +65,16 @@ struct SetSpeakerMute {
     EntityRef speaker;
     bool mute{false};
     bool operator==(const SetSpeakerMute&) const = default;
+};
+/// Insert slot parameter (SPEC §13 `source.{id}.insert.{slot}.param.{index}`,
+/// and the speaker form), normalised 0..1. Source id 0 = the UI-selected source.
+struct SetInsertParam {
+    InsertOwner owner{InsertOwner::Source};
+    EntityRef target;
+    int slot{0};
+    int index{0};
+    float value{0.0f};
+    bool operator==(const SetInsertParam&) const = default;
 };
 struct SetMasterGain {
     float gainDb{0.0f};
@@ -135,9 +146,9 @@ struct MidiTrigger {
 
 using ControlEvent =
     std::variant<ev::SetSourceParam, ev::SetSourcePositionAed, ev::SetSourcePositionXyz, ev::SetSourceMute,
-                 ev::SourceFile, ev::SetSpeakerTrim, ev::SetSpeakerMute, ev::SetMasterGain, ev::Panic,
-                 ev::CueGo, ev::CueBack, ev::CueJump, ev::RecallScene, ev::RecallSceneIndex, ev::ClockBpm,
-                 ev::ClockPlay, ev::ClockStop, ev::ClockContinue, ev::ClockBeat, ev::OscTrigger,
-                 ev::MidiTrigger>;
+                 ev::SourceFile, ev::SetSpeakerTrim, ev::SetSpeakerMute, ev::SetInsertParam,
+                 ev::SetMasterGain, ev::Panic, ev::CueGo, ev::CueBack, ev::CueJump, ev::RecallScene,
+                 ev::RecallSceneIndex, ev::ClockBpm, ev::ClockPlay, ev::ClockStop, ev::ClockContinue,
+                 ev::ClockBeat, ev::OscTrigger, ev::MidiTrigger>;
 
 }  // namespace spacer

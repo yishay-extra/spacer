@@ -14,6 +14,19 @@ void CueSequencer::setList(CueList list) {
     deadlineActive_ = false;
 }
 
+void CueSequencer::updateList(CueList list, const CueTick& tick) {
+    const int oldNext = next();
+    const Trigger oldTrigger =
+        oldNext >= 0 ? list_.cues[static_cast<std::size_t>(oldNext)].trigger : Trigger{};
+    list_ = std::move(list);
+    const int n = static_cast<int>(list_.cues.size());
+    current_ = std::min(current_, n - 1);
+    const int newNext = next();
+    const bool same = newNext == oldNext &&
+                      (newNext < 0 || list_.cues[static_cast<std::size_t>(newNext)].trigger == oldTrigger);
+    if (!same) scheduleNext(tick);
+}
+
 void CueSequencer::arm(const CueTick& tick) {
     current_ = -1;
     postWaitEnd_ = tick.nowSeconds;

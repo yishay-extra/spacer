@@ -13,6 +13,7 @@ inline PluginSlot makeSlot() {
     s.pluginId = "AudioUnit:Effects/aufx,dely,appl";
     s.stateBase64 = "AAECAw==";
     s.params = {{0, 0.25f}, {7, 0.8f}};
+    s.bypassed = true;
     return s;
 }
 

@@ -130,6 +130,18 @@ void applyRamps(Scene& scene, const SceneDiff& diff, const Layout& layout) {
             case RampTarget::MasterGainDb:
                 scene.master.gainDb = r.to;
                 break;
+            case RampTarget::SourceInsertParam:
+                src->inserts[static_cast<std::size_t>(r.slot)].params[r.param] = r.to;
+                break;
+            case RampTarget::SourceInsertBypass:
+                src->inserts[static_cast<std::size_t>(r.slot)].bypassed = r.to > 0.5f;
+                break;
+            case RampTarget::SpeakerInsertParam:
+                chain->inserts[static_cast<std::size_t>(r.slot)].params[r.param] = r.to;
+                break;
+            case RampTarget::SpeakerInsertBypass:
+                chain->inserts[static_cast<std::size_t>(r.slot)].bypassed = r.to > 0.5f;
+                break;
         }
     }
 }
@@ -207,7 +219,8 @@ TEST_CASE("SceneDiff: discrete changes are structural, not ramps") {
 
     const SceneDiff d = diffScenes(a, b, layout);
     CHECK(d.structural());
-    CHECK(d.replacedSources == std::vector<int>{1, 2, 3, 4});
+    CHECK(d.replacedSources == std::vector<int>{1, 2, 4});
+    CHECK(d.sourceInsertChanges == std::vector<int>{3});
     CHECK(d.removedSources == std::vector<int>{5});
     CHECK(d.addedSources == std::vector<int>{6});
     CHECK(d.ramps.empty());
@@ -331,4 +344,116 @@ TEST_CASE("Scene capture / apply / find round trip on a project") {
     CHECK(q.master == p.master);
     CHECK(findScene(q, "Intro") != nullptr);
     CHECK(findScene(q, "nope") == nullptr);
+}
+
+// ---- inserts (WP10) ----------------------------------------------------------
+
+namespace {
+PluginSlot slot(std::string id, std::string state = "", std::map<int, float> params = {},
+                bool bypassed = false) {
+    PluginSlot p;
+    p.pluginId = std::move(id);
+    p.stateBase64 = std::move(state);
+    p.params = std::move(params);
+    p.bypassed = bypassed;
+    return p;
+}
+}  // namespace
+
+TEST_CASE("SceneDiff: insert structure compares plugin and state per slot") {
+    CHECK(sameInsertStructure({}, {}));
+    CHECK(sameInsertStructure({slot("a", "S", {{0, 0.1f}})}, {slot("a", "S", {{0, 0.9f}}, true)}));
+    CHECK_FALSE(sameInsertStructure({slot("a")}, {slot("b")}));
+    CHECK_FALSE(sameInsertStructure({slot("a", "S1")}, {slot("a", "S2")}));
+    CHECK_FALSE(sameInsertStructure({slot("a")}, {slot("a"), slot("a")}));
+    CHECK_FALSE(sameInsertStructure({slot("a"), slot("b")}, {slot("b"), slot("a")}));
+}
+
+TEST_CASE("SceneDiff: insert parameter and bypass changes ramp in place") {
+    const Layout layout = twoSpeakers();
+    Scene a = sceneWith({manualSource(1)});
+    a.sources[0].inserts = {slot("p", "S", {{0, 0.2f}, {3, 0.5f}})};
+    SpeakerChainSpec chain;
+    chain.speakerId = 2;
+    chain.inserts = {slot("q", "", {{1, 0.0f}})};
+    a.speakerChains = {chain};
+
+    Scene b = a;
+    b.sources[0].inserts[0].params[0] = 0.8f;   // changed
+    b.sources[0].inserts[0].params[5] = 0.25f;  // only the target has it
+    b.sources[0].inserts[0].bypassed = true;
+    b.speakerChains[0].inserts[0].params[1] = 1.0f;
+
+    const SceneDiff d = diffScenes(a, b, layout);
+    CHECK_FALSE(d.structural());
+    CHECK(d.sourceInsertChanges.empty());
+    CHECK(d.speakerInsertChanges.empty());
+
+    int params = 0;
+    for (const Ramp& r : d.ramps) {
+        if (r.target == RampTarget::SourceInsertParam) {
+            ++params;
+            CHECK(r.id == 1);
+            CHECK(r.slot == 0);
+            if (r.param == 0) {
+                CHECK(r.from == Approx(0.2f));
+                CHECK(r.to == Approx(0.8f));
+            } else {
+                CHECK(r.param == 5);
+                CHECK(r.to == Approx(0.25f));
+            }
+        }
+    }
+    CHECK(params == 2);  // index 3 is unchanged
+    CHECK(get(d, RampTarget::SourceInsertBypass, 1).to == 1.0f);
+    const Ramp& sp = get(d, RampTarget::SpeakerInsertParam, 2);
+    CHECK(sp.slot == 0);
+    CHECK(sp.param == 1);
+    CHECK(sp.to == 1.0f);
+
+    Scene converged = a;
+    applyRamps(converged, d, layout);
+    CHECK(converged.sources == b.sources);
+    for (const auto& sp : layout.speakers) CHECK(effectiveChain(converged, sp) == effectiveChain(b, sp));
+}
+
+TEST_CASE("SceneDiff: a different plugin or state crossfades the source's inserts, not the source") {
+    const Layout layout = twoSpeakers();
+    Scene a = sceneWith({manualSource(1), manualSource(2)});
+    a.sources[0].inserts = {slot("p", "S1")};
+    Scene b = a;
+    b.sources[0].inserts[0].stateBase64 = "S2";
+    b.sources[0].gainDb = -6.0f;
+    b.sources[1].inserts = {slot("p")};
+
+    const SceneDiff d = diffScenes(a, b, layout);
+    CHECK(d.structural());
+    CHECK(d.replacedSources.empty());
+    CHECK(d.sourceInsertChanges == std::vector<int>{1, 2});
+    CHECK(has(d, RampTarget::SourceGainDb, 1));
+
+    // The intermediate scene has the target's inserts and the current gain.
+    const Scene mid = intermediateScene(a, b, d, layout);
+    CHECK(mid.sources[0].inserts == b.sources[0].inserts);
+    CHECK(mid.sources[0].gainDb == 0.0f);
+    CHECK(mid.sources[1].inserts == b.sources[1].inserts);
+}
+
+TEST_CASE("SceneDiff: the intermediate scene keeps live insert parameters when the structure is unchanged") {
+    const Layout layout = twoSpeakers();
+    Scene a = sceneWith({manualSource(1)});
+    a.sources[0].inserts = {slot("p", "", {{0, 0.1f}})};
+    SpeakerChainSpec chain;
+    chain.speakerId = 1;
+    chain.inserts = {slot("q", "", {{0, 0.3f}})};
+    a.speakerChains = {chain};
+    Scene b = a;
+    b.sources[0].inserts[0].params[0] = 0.9f;
+    b.speakerChains[0].inserts[0].params[0] = 0.7f;
+    b.sources.push_back(manualSource(2));  // forces a graph
+
+    const SceneDiff d = diffScenes(a, b, layout);
+    const Scene mid = intermediateScene(a, b, d, layout);
+    CHECK(mid.sources[0].inserts == a.sources[0].inserts);
+    CHECK(effectiveChain(mid, layout.speakers[0]).inserts == a.speakerChains[0].inserts);
 }

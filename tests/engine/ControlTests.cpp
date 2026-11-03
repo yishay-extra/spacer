@@ -714,3 +714,53 @@ TEST_CASE("ControlHub: OSC and MIDI reach the engine only through pump()") {
     CHECK(run(40) == Approx(before).margin(before * 0.01f));
     CHECK(hub.dispatcher().stats().commandsDropped == 0);
 }
+
+// ---- plugin parameters (WP10, SPEC §13) ---------------------------------------
+
+TEST_CASE("OscRouter: insert parameters of sources and speakers") {
+    const auto* s = route<ev::SetInsertParam>(msg("/spacer/source/3/insert/1/param/12", 0.25f));
+    REQUIRE(s);
+    CHECK(s->owner == InsertOwner::Source);
+    CHECK(s->target == EntityRef{3, {}});
+    CHECK(s->slot == 1);
+    CHECK(s->index == 12);
+    CHECK(s->value == 0.25f);
+    const auto* k = route<ev::SetInsertParam>(msg("/spacer/speaker/2/insert/0/param/0", 1));
+    REQUIRE(k);
+    CHECK(k->owner == InsertOwner::Speaker);
+    CHECK(k->value == 1.0f);
+    CHECK(malformed(msg("/spacer/source/3/insert/1/param/12")));
+    // Not an insert address (slot out of range): offered to cues as a trigger.
+    CHECK(route<ev::OscTrigger>(msg("/spacer/source/3/insert/9/param/0", 0.5f)));
+}
+
+TEST_CASE("controlpath: insert parameter paths") {
+    const auto e = controlpath::makeEvent("source.2.insert.0.param.4", 0.5f);
+    REQUIRE(e);
+    const auto& p = std::get<ev::SetInsertParam>(*e);
+    CHECK(p.owner == InsertOwner::Source);
+    CHECK(p.target.id == 2);
+    CHECK(p.index == 4);
+    CHECK(controlpath::isValid("speaker.1.insert.3.param.0"));
+    CHECK(std::get<ev::SetInsertParam>(*controlpath::makeEvent("insert.1.param.2", 0.0f)).target.id == 0);
+    CHECK_FALSE(controlpath::isValid("source.2.insert.0.param"));
+}
+
+TEST_CASE("ControlDispatcher: insert parameters become commands, clamped to 0..1") {
+    Rig rig;
+    dispatchOsc(rig, msg("/spacer/source/\"src2\"/insert/0/param/3", 1.5f));
+    const auto& c = rig.only<cmd::SetInsertParam>();
+    CHECK(c.owner == InsertOwner::Source);
+    CHECK(c.id == 2);
+    CHECK(c.slot == 0);
+    CHECK(c.index == 3);
+    CHECK(c.value == 1.0f);
+
+    Rig speakers;
+    dispatchOsc(speakers, msg("/spacer/speaker/2/insert/1/param/0", 0.3f));
+    CHECK(speakers.only<cmd::SetInsertParam>().owner == InsertOwner::Speaker);
+    Rig unknown;
+    dispatchOsc(unknown, msg("/spacer/speaker/7/insert/1/param/0", 0.3f));
+    CHECK(unknown.sent.empty());
+    CHECK(unknown.dispatcher.stats().unresolvedTarget == 1);
+}

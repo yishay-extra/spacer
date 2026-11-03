@@ -18,6 +18,7 @@
 #include "engine/EngineProcessor.h"
 #include "engine/Feedback.h"
 #include "engine/GraphBuilder.h"
+#include "engine/VirtualDeviceReceiver.h"
 
 namespace spacer {
 
@@ -36,8 +37,9 @@ public:
         double sampleRate{0.0};
         int bufferSize{0};
         int outputChannels{0};
-        int deviceLatencySamples{0};  // device input + output latency
-        int graphLatencySamples{0};   // limiter look-ahead (SPEC §5.6)
+        int deviceLatencySamples{0};         // device input + output latency
+        int graphLatencySamples{0};          // limiter look-ahead (SPEC §5.6)
+        int virtualDeviceLatencySamples{0};  // Spacer.driver hop when connected (SPEC §5.6, §14)
         int xruns{0};
         double cpuLoad{0.0};  // 0..1
         std::uint64_t droppedCommands{0};
@@ -65,6 +67,9 @@ public:
     void setInputFactory(GraphBuilder::InputFactory factory) { inputFactory_ = std::move(factory); }
     /// Base for project-relative file paths (the project file's directory).
     void setProjectDirectory(const juce::File& dir) { projectDirectory_ = dir; }
+    /// Plugin instances for insert slots (SPEC §13); null = inserts pass
+    /// through. Must outlive the engine. Its warnings join buildWarnings().
+    void setPluginHost(PluginHost* host) { pluginHost_ = host; }
     /// Non-fatal problems from the last graph build (e.g. missing files).
     const std::vector<std::string>& buildWarnings() const noexcept { return warnings_; }
 
@@ -86,6 +91,15 @@ public:
     /// directly (CueEngine). Same rule: message thread only.
     EngineProcessor& processor() noexcept { return processor_; }
 
+    /// Spacer.driver (SPEC §14): connection state, version, drift and
+    /// underrun counters. Polled at kFeedbackPollHz; without the driver the
+    /// engine runs normally and VirtualInput sources are silent.
+    VirtualDeviceReceiver::Status virtualDeviceStatus() const { return virtual_.status(); }
+    /// Called on the message thread when the driver connection changes.
+    std::function<void(const VirtualDeviceReceiver::Status&)> onVirtualDeviceChanged;
+    /// Added latency of the virtual device (SPEC §14: 128 / 256 / 512 frames).
+    void setVirtualDeviceLatency(int frames) { virtual_.setLatencyFrames(frames); }
+
 private:
     void audioDeviceIOCallbackWithContext(const float* const* inputChannelData, int numInputChannels,
                                           float* const* outputChannelData, int numOutputChannels,
@@ -100,8 +114,10 @@ private:
     juce::AudioDeviceManager deviceManager_;
     mutable DiskStreamer streamer_;  // before processor_: outlives the graphs' file players
     EngineProcessor processor_;
+    VirtualDeviceReceiver virtual_;
     std::optional<Project> project_;
     GraphBuilder::InputFactory inputFactory_;
+    PluginHost* pluginHost_{nullptr};
     ClockSelector clockSelector_;
     juce::File projectDirectory_;
     mutable std::vector<std::string> warnings_;

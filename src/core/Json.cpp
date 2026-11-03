@@ -535,13 +535,17 @@ void from_json(const Json& j, ModulatorSpec& v) {
 void to_json(Json& j, const PluginSlot& v) {
     Json params = Json::object();
     for (const auto& [index, value] : v.params) params[std::to_string(index)] = jf(value);
-    j = Json{{"pluginId", v.pluginId}, {"stateBase64", v.stateBase64}, {"params", params}};
+    j = Json{{"pluginId", v.pluginId},
+             {"stateBase64", v.stateBase64},
+             {"params", params},
+             {"bypassed", v.bypassed}};
 }
 void from_json(const Json& j, PluginSlot& v) {
     requireObject(j, "insert");
     v = {};
     field(j, "pluginId", v.pluginId);
     field(j, "stateBase64", v.stateBase64);
+    field(j, "bypassed", v.bypassed);
     if (auto it = j.find("params"); it != j.end()) {
         requireObject(*it, "params");
         for (const auto& [key, value] : it->items()) {

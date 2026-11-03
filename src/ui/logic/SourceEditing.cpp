@@ -393,9 +393,18 @@ std::vector<std::string> modulatorTargets(const SourceSpec& s) {
     return out;
 }
 
-std::vector<std::string> insertSummaries(const SourceSpec& s) {
-    std::vector<std::string> out;
-    for (const auto& slot : s.inserts) out.push_back(slot.pluginId.empty() ? "(empty)" : slot.pluginId);
+std::vector<InsertRow> insertRows(const SourceSpec& s) {
+    std::vector<InsertRow> out;
+    for (const auto& slot : s.inserts) {
+        std::string name = slot.pluginId;
+        if (name.empty()) {
+            name = "(empty)";
+        } else if (const auto cut = name.find_last_of("/:");
+                   cut != std::string::npos && cut + 1 < name.size()) {
+            name = name.substr(cut + 1);  // "AudioUnit:Effects/aufx,dely,appl" -> "aufx,dely,appl"
+        }
+        out.push_back({name, slot.bypassed});
+    }
     return out;
 }
 
@@ -586,6 +595,44 @@ std::optional<ProjectEdit> editMotionRemoveItem(const Project& project, int sour
         project, sourceId,
         [&](SourceSpec& s) { return removeMotionItem(mutableMotionOf(s, channel), index); }, "Remove " + item,
         "");
+}
+
+std::optional<ProjectEdit> editAddInsert(const Project& project, int sourceId, const std::string& pluginId) {
+    if (pluginId.empty()) return std::nullopt;
+    return editSource(
+        project, sourceId,
+        [&](SourceSpec& s) {
+            if (static_cast<int>(s.inserts.size()) >= kMaxInserts) return false;
+            PluginSlot slot;
+            slot.pluginId = pluginId;
+            s.inserts.push_back(slot);
+            return true;
+        },
+        "Add Insert", "");
+}
+
+std::optional<ProjectEdit> editRemoveInsert(const Project& project, int sourceId, int slot) {
+    return editSource(
+        project, sourceId,
+        [&](SourceSpec& s) {
+            if (slot < 0 || slot >= static_cast<int>(s.inserts.size())) return false;
+            s.inserts.erase(s.inserts.begin() + slot);
+            return true;
+        },
+        "Remove Insert", "");
+}
+
+std::optional<ProjectEdit> editInsertBypass(const Project& project, int sourceId, int slot, bool bypassed) {
+    auto edit = editSource(
+        project, sourceId,
+        [&](SourceSpec& s) {
+            if (slot < 0 || slot >= static_cast<int>(s.inserts.size())) return false;
+            s.inserts[static_cast<std::size_t>(slot)].bypassed = bypassed;
+            return true;
+        },
+        bypassed ? "Bypass Insert" : "Enable Insert", "");
+    if (edit) edit->effect = EngineEffect::insertBypass(sourceId, slot);  // a flag, not a new graph
+    return edit;
 }
 
 std::optional<ProjectEdit> editAddModulator(const Project& project, int sourceId) {

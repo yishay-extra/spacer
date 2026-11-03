@@ -14,11 +14,18 @@ include(Catch)
 file(GLOB SPACER_TEST_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp)
 # UI logic tests (src/ui/logic, no JUCE).
 file(GLOB SPACER_UI_TEST_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/ui/*.cpp)
+# Virtual-device shared-memory protocol (driver/protocol, no JUCE).
+file(GLOB SPACER_VDEV_TEST_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/vdev/*.cpp)
+find_package(Threads REQUIRED)
 
-add_executable(spacer_tests ${SPACER_TEST_SOURCES} ${SPACER_UI_TEST_SOURCES})
+add_executable(spacer_tests ${SPACER_TEST_SOURCES} ${SPACER_UI_TEST_SOURCES} ${SPACER_VDEV_TEST_SOURCES})
 target_include_directories(spacer_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_definitions(spacer_tests PRIVATE SPACER_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
-target_link_libraries(spacer_tests PRIVATE spacer_ui_logic Catch2::Catch2WithMain)  # + spacer_core
+target_link_libraries(spacer_tests PRIVATE spacer_ui_logic spacer_vdev_protocol Threads::Threads
+    Catch2::Catch2WithMain)  # + spacer_core
+# The protocol headers are also built into the driver with strict warnings.
+set_source_files_properties(${SPACER_VDEV_TEST_SOURCES} PROPERTIES COMPILE_OPTIONS
+    "$<$<CXX_COMPILER_ID:GNU,Clang,AppleClang>:-Wall;-Wextra;-Wpedantic;-Wshadow;-Wconversion;-Wno-sign-conversion>")
 catch_discover_tests(spacer_tests)
 
 # ---------------------------------------------------------------------------
@@ -27,6 +34,32 @@ catch_discover_tests(spacer_tests)
 # ---------------------------------------------------------------------------
 if(SPACER_WITH_ENGINE_TESTS)
     file(GLOB SPACER_ENGINE_TEST_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/engine/*.cpp)
+    # macOS: Spacer.driver loaded in-process with a fake HAL host.
+    if(APPLE AND TARGET SpacerDriver)
+        list(APPEND SPACER_ENGINE_TEST_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/driver/DriverHarnessTests.cpp)
+    endif()
+
+    # Out-of-process scanner for the fake "SpacerTest" plugin format, so the
+    # child-process scan path (crash / hang handling) is tested on any platform.
+    add_executable(spacer_test_plugin_scanner
+        ${CMAKE_CURRENT_SOURCE_DIR}/engine/scanner/TestPluginScannerMain.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/engine/TestPlugins.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/PluginScanProcess.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/PluginScanner.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/PluginScanCache.cpp)
+    target_include_directories(spacer_test_plugin_scanner PRIVATE ${PROJECT_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/engine)
+    target_compile_definitions(spacer_test_plugin_scanner PRIVATE
+        ${SPACER_ENGINE_JUCE_DEFINITIONS}
+        JUCE_STANDALONE_APPLICATION=1
+        JUCE_GLOBAL_MODULE_SETTINGS_INCLUDED=1)
+    target_link_libraries(spacer_test_plugin_scanner PRIVATE
+        juce::juce_core
+        juce::juce_events
+        juce::juce_audio_basics
+        juce::juce_audio_processors_headless
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_warning_flags)
 
     add_executable(spacer_engine_tests ${SPACER_ENGINE_TEST_SOURCES} ${SPACER_ENGINE_SOURCES}
         ${SPACER_CONTROL_SOURCES} ${SPACER_LINK_SOURCES})
@@ -39,18 +72,36 @@ if(SPACER_WITH_ENGINE_TESTS)
         ${SPACER_ENGINE_JUCE_DEFINITIONS}
         JUCE_STANDALONE_APPLICATION=1
         JUCE_GLOBAL_MODULE_SETTINGS_INCLUDED=1
-        SPACER_ALLOCATION_GUARD=1)
+        SPACER_ALLOCATION_GUARD=1
+        SPACER_TEST_PLUGIN_SCANNER="$<TARGET_FILE:spacer_test_plugin_scanner>")
+    add_dependencies(spacer_engine_tests spacer_test_plugin_scanner)
+    if(TARGET spacer_plugin_scanner)
+        # macOS: the real AudioUnit scanner, for the Apple-AU tests.
+        target_compile_definitions(spacer_engine_tests PRIVATE
+            SPACER_AU_PLUGIN_SCANNER="$<TARGET_FILE:spacer_plugin_scanner>")
+        add_dependencies(spacer_engine_tests spacer_plugin_scanner)
+    endif()
     target_link_libraries(spacer_engine_tests
         PRIVATE
             spacer_core
+            spacer_vdev_protocol
             Catch2::Catch2WithMain
             juce::juce_core
             juce::juce_audio_basics
             juce::juce_audio_formats
             juce::juce_dsp
             juce::juce_osc
+            juce::juce_audio_processors_headless
             juce::juce_recommended_config_flags
             juce::juce_recommended_warning_flags)
+    if(APPLE AND TARGET SpacerDriver)
+        add_dependencies(spacer_engine_tests SpacerDriver)
+        target_compile_definitions(spacer_engine_tests PRIVATE
+            SPACER_DRIVER_BINARY="$<TARGET_FILE:SpacerDriver>"
+            SPACER_DRIVER_BUNDLE="$<TARGET_BUNDLE_DIR:SpacerDriver>"
+            SPACER_VERSION="${PROJECT_VERSION}")
+        target_link_libraries(spacer_engine_tests PRIVATE "-framework CoreAudio" "-framework CoreFoundation")
+    endif()
     # JUCE's warning set applies to the engine sources; tests compare floats
     # exactly on purpose.
     set_source_files_properties(${SPACER_ENGINE_TEST_SOURCES} PROPERTIES COMPILE_OPTIONS

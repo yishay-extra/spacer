@@ -18,7 +18,7 @@ CI covers the logic behind the panel (Linux and macOS, `spacer_tests "[ui]"`):
   positions are commands for every motion kind; a continuous motion parameter
   of a moving motion is `EngineEffect::MotionParam` → `cmd::SetMotionParam`
   (undo and redo send the model value again); periods, motion kind,
-  modulators, inputs, spatializer and add / remove rebuild the graph.
+  modulators, inputs, spatializer, insert add / remove and add / remove sources rebuild the graph; insert bypass is a live `cmd::SetInsertBypass`.
 
 The macOS job also proves the components (`FieldList`, `SourceStrip`,
 `SourcePanel`) and the changed `AppContext` / `MainComponent` / `StageView`
@@ -59,7 +59,7 @@ is checked by hand.
 | 18 | List toolbar: **+ Add** → Generator, File, Virtual input, Hardware input | A new source appears and is selected. Generator plays a 440 Hz sine at the stage front; File asks for nothing until you press `...` next to the file row and choose an audio file | |
 | 19 | **Duplicate** a source; then **Remove** it (button and Delete key) | The copy appears right after the original named "… copy"; remove selects the neighbour; Cmd+Z brings the removed source back in the same list position | |
 | 20 | Select a stereo hardware/virtual source; switch **Stereo** off and on | The channel rows change (Channel vs Left/Right channel); channel numbers are 1-based in the UI | |
-| 21 | Insert section | Lists the source's insert slots read-only (or "No inserts…"); inserts cannot be edited yet | |
+| 21 | Inserts section: **Add insert...** and pick an effect (needs plug-ins scanned by WP10; an empty scan shows "No scanned plug-ins yet"); add up to 4; tick **Bypass** on one; remove one with its `x` | Each insert appears under its plug-in name; bypass crossfades without a rebuild or click (the sound keeps playing, orbit does not restart); the 5th add is disabled; remove/add rebuild the graph; Cmd+Z reverts each step | |
 | 22 | Undo/redo through a mix of the above (Cmd+Z several times) | Every edit reverts in order; the strip and the list always match the model; no crash when the selected source is removed or re-added | |
 | 23 | Open another project (toolbar Open…) | Selection falls back to the first source of the new project; the strip shows it | |
 | 24 | Debug build output | The allocation guard stays silent for all of the above | |
@@ -70,4 +70,4 @@ is checked by hand.
   asks for a re-anchored, continuous position; tracked in WP14).
 - Modulator edits rebuild the graph (there is no engine command for them), so
   an LFO's phase restarts.
-- Insert slots are read-only until WP10 / WP11e.
+- Plug-in editor windows (and scanning UI) are WP11e / WP11d; the add menu lists what the scan cache already knows.

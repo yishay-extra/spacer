@@ -62,9 +62,13 @@ bool removeModulator(SourceSpec& source, int index);
 /// spread, width (stereo), distance.* and the live parameters of its motion(s).
 std::vector<std::string> modulatorTargets(const SourceSpec& source);
 
-/// One line per insert slot for the read-only list: the plug-in id, or
-/// "(empty)". Hosting and bypass arrive with WP10 / WP11e.
-std::vector<std::string> insertSummaries(const SourceSpec& source);
+/// One row per insert slot of the strip (SPEC §13): a readable name and the
+/// bypass flag. Editor windows are WP11e.
+struct InsertRow {
+    std::string name;  // last path component / identifier of the plug-in, or "(empty)"
+    bool bypassed{false};
+};
+std::vector<InsertRow> insertRows(const SourceSpec& source);
 
 // ---- field tables -----------------------------------------------------------
 
@@ -100,6 +104,11 @@ std::optional<ProjectEdit> editMotionField(const Project& project, int sourceId,
 std::optional<ProjectEdit> editMotionKind(const Project& project, int sourceId, int channel, MotionKind kind);
 std::optional<ProjectEdit> editMotionAddItem(const Project& project, int sourceId, int channel);
 std::optional<ProjectEdit> editMotionRemoveItem(const Project& project, int sourceId, int channel, int index);
+/// Appends an insert running plug-in `pluginId` (<= kMaxInserts, non-empty id): rebuilds.
+std::optional<ProjectEdit> editAddInsert(const Project& project, int sourceId, const std::string& pluginId);
+std::optional<ProjectEdit> editRemoveInsert(const Project& project, int sourceId, int slot);
+/// Bypass on / off: live (cmd::SetInsertBypass, crossfaded), no rebuild.
+std::optional<ProjectEdit> editInsertBypass(const Project& project, int sourceId, int slot, bool bypassed);
 std::optional<ProjectEdit> editAddModulator(const Project& project, int sourceId);
 std::optional<ProjectEdit> editRemoveModulator(const Project& project, int sourceId, int index);
 

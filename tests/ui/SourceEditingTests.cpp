@@ -366,16 +366,64 @@ TEST_CASE("A modulator with a stale target still shows it", "[ui][sources]") {
     REQUIRE(target->text == "motion.radius");
 }
 
-TEST_CASE("Inserts are listed read-only", "[ui][sources]") {
+TEST_CASE("Insert rows show a readable name and the bypass flag", "[ui][sources]") {
     SourceSpec s;
-    REQUIRE(insertSummaries(s).empty());
+    REQUIRE(insertRows(s).empty());
     PluginSlot slot;
     slot.pluginId = "AudioUnit:Effects/aufx,dely,appl";
+    slot.bypassed = true;
     s.inserts = {slot, PluginSlot{}};
-    const auto lines = insertSummaries(s);
-    REQUIRE(lines.size() == 2);
-    REQUIRE(lines[0] == slot.pluginId);
-    REQUIRE(lines[1] == "(empty)");
+    const auto rows = insertRows(s);
+    REQUIRE(rows.size() == 2);
+    REQUIRE(rows[0].name == "aufx,dely,appl");
+    REQUIRE(rows[0].bypassed);
+    REQUIRE(rows[1].name == "(empty)");
+}
+
+TEST_CASE("Inserts: add up to four, remove, bypass without a rebuild", "[ui][sources]") {
+    Project p = makeProject();
+    ProjectHistory h;
+    for (int i = 0; i < kMaxInserts; ++i) {
+        auto edit = editAddInsert(p, 1, "AudioUnit:Effects/aufx,dely,appl");
+        REQUIRE(edit);
+        REQUIRE(edit->effect.kind == Kind::Structural);
+        h.perform(p, *edit);
+    }
+    REQUIRE_FALSE(editAddInsert(p, 1, "AudioUnit:Effects/aufx,dely,appl"));  // SPEC §1: 4 per source
+    REQUIRE_FALSE(editAddInsert(p, 1, ""));
+    REQUIRE(valid(p));
+
+    const auto bypass = editInsertBypass(p, 1, 2, true);
+    REQUIRE(bypass);
+    REQUIRE(bypass->effect.kind == Kind::InsertBypass);
+    const auto effect = h.perform(p, *bypass);
+    REQUIRE(p.sources[0].inserts[2].bypassed);
+    auto plan = planEngineSync(p, *effect);
+    REQUIRE_FALSE(plan.rebuildGraph);
+    const auto* c = commandOf<cmd::SetInsertBypass>(plan);
+    REQUIRE(c);
+    REQUIRE(c->owner == InsertOwner::Source);
+    REQUIRE(c->id == 1);
+    REQUIRE(c->slot == 2);
+    REQUIRE(c->bypassed);
+    REQUIRE_FALSE(editInsertBypass(p, 1, 2, true));  // unchanged
+    REQUIRE_FALSE(editInsertBypass(p, 1, 9, true));
+
+    // Undo sends the old flag through the same path.
+    plan = planEngineSync(p, *h.undo(p));
+    REQUIRE_FALSE(commandOf<cmd::SetInsertBypass>(plan)->bypassed);
+
+    REQUIRE(h.perform(p, *editRemoveInsert(p, 1, 0)));
+    REQUIRE(p.sources[0].inserts.size() == 3);
+    REQUIRE_FALSE(editRemoveInsert(p, 1, 3));
+    h.undo(p);
+    REQUIRE(p.sources[0].inserts.size() == 4);
+}
+
+TEST_CASE("A bypass effect for a vanished slot rebuilds", "[ui][sources]") {
+    Project p = makeProject();
+    REQUIRE(planEngineSync(p, EngineEffect::insertBypass(1, 0)).rebuildGraph);
+    REQUIRE(planEngineSync(p, EngineEffect::insertBypass(99, 0)).rebuildGraph);
 }
 
 // ---- edits and engine routing --------------------------------------------------------------

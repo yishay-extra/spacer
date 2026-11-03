@@ -3,6 +3,7 @@
 #include <juce_events/juce_events.h>
 
 #include <filesystem>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -14,6 +15,7 @@
 #include "control/InstallationMode.h"
 #include "control/device/MidiInputService.h"
 #include "core/Project.h"
+#include "engine/PluginHost.h"
 #include "engine/device/AudioEngine.h"
 #include "ui/logic/FeedbackState.h"
 #include "ui/logic/ProjectHistory.h"
@@ -66,6 +68,7 @@ public:
         SpeakerTest,    // speaker test started / stopped
         Panic,          // panic engaged / released
         Selection,      // the selected source changed (selectSource())
+        CueState,       // a cue list was armed (the model is untouched)
     };
 
     class Listener {
@@ -123,11 +126,24 @@ public:
 
     // ---- engine -------------------------------------------------------------
     AudioEngine& engine() noexcept { return engine_; }
+    /// Plug-in scan results and hosting (WP10); the Sources panel lists them for inserts.
+    PluginHost& plugins() noexcept { return *plugins_; }
     /// Live parameter change (not undoable, not stored in the model). False if dropped.
     bool send(const Command& command) { return engine_.send(command); }
     const FeedbackState& feedback() const noexcept { return feedback_; }
     const std::string& deviceError() const noexcept { return deviceError_; }
 
+    /// Spacer.driver (SPEC §14). Without it the app runs normally; the status
+    /// bar shows virtualDeviceWarning() and VirtualInput sources are silent.
+    VirtualDeviceReceiver::Status virtualDeviceStatus() const { return engine_.virtualDeviceStatus(); }
+    /// Non-empty when the driver is not connected; mentions the affected
+    /// sources when the project has VirtualInput sources.
+    std::string virtualDeviceWarning() const;
+    /// Version of the driver installed in /Library/Audio/Plug-Ins/HAL ("" if none).
+    std::string installedDriverVersion() const;
+    /// "Install virtual device…": admin prompt, copy, coreaudiod restart.
+    /// `done(error)` on the message thread, error empty on success.
+    void installVirtualDevice(std::function<void(std::string error)> done);
     /// External clock feeds and the active external clock's lock status.
     const ClockInputs& clockInputs() const noexcept { return clockInputs_; }
     /// Clock kind actually running (Internal after a fallback, e.g. Link not built).
@@ -151,6 +167,13 @@ public:
     /// Go / Back on the armed cue list (arms the first list if none is armed).
     bool go();
     bool back();
+    /// Arms the named cue list (position resets to "nothing fired"). False if
+    /// there is no such list.
+    bool armCueList(const std::string& name);
+    /// Fires cue `index` of the armed list directly (arms the first list if none is armed).
+    bool jumpToCue(int index);
+    /// Scene manager: recalls a stored scene outside any cue list.
+    bool recallScene(const std::string& name, float transitionSeconds, bool restartMotionPhase);
 
     const InstallationSettings& installationSettings() const noexcept { return installation_; }
 
@@ -166,12 +189,15 @@ private:
     void resetCueEngine();
     void resetControl();
     void modelChanged(Change change);
+    void notify(Change change);
+    void syncArmedList();
     void loadInstallationSettings();
     void rememberProjectPath();
 
     Project project_;
     ProjectHistory history_;
-    ClockInputs clockInputs_;  // before engine_: its clock factory refers to it
+    std::unique_ptr<PluginHost> plugins_;  // before engine_: outlives its graphs
+    ClockInputs clockInputs_;              // before engine_: its clock factory refers to it
     AudioEngine engine_;
     std::unique_ptr<CueEngine> cues_;
     std::unique_ptr<ControlHub> control_;  // after cues_: holds a pointer to it

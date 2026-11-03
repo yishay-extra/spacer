@@ -22,8 +22,7 @@ struct RecallPlan {
     float transitionSeconds{0.0f};
     bool restartMotionPhase{false};
 
-    /// Built from intermediateScene(); required iff diff.structural() (a
-    /// speaker-insert change alone needs none until WP10 gives it meaning).
+    /// Built from intermediateScene(); required iff diff.structural().
     std::unique_ptr<Graph> graph;
 
     /// >= 0: don't recall now; wait until the transport passes this beat (absolute,

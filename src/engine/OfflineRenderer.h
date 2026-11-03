@@ -13,6 +13,8 @@
 
 namespace spacer {
 
+class PluginHost;
+
 /// Renders a project without a device (SPEC §5.7), through the same
 /// EngineProcessor / Graph as the live engine: the output channel layout is
 /// the device's (speaker i → channel `outputChannel`; unassigned speakers are
@@ -28,6 +30,9 @@ struct OfflineRenderOptions {
     double sampleRate{0.0};        // 0 = project.devices.sampleRate
     int blockSize{0};              // 0 = project.devices.bufferSize
     std::string projectDirectory;  // base for project-relative file paths
+    /// Instantiates insert plugins (null: inserts pass through). Warnings
+    /// (e.g. missing plugins) stay in the host.
+    PluginHost* pluginHost{nullptr};
 };
 
 struct OfflineRenderResult {

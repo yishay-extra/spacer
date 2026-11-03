@@ -20,12 +20,13 @@ namespace spacer {
 /// What the engine must do after an edit (or its undo / redo) was applied.
 struct EngineEffect {
     enum class Kind {
-        None,         // model only (e.g. names)
-        Structural,   // rebuild the graph and SwapGraph (SPEC §5.2)
-        Source,       // parameters of source `id` changed
-        Speaker,      // chain parameters of speaker `id` changed
-        Master,       // master gain changed
-        MotionParam,  // one live motion parameter of source `id` (see below)
+        None,          // model only (e.g. names)
+        Structural,    // rebuild the graph and SwapGraph (SPEC §5.2)
+        Source,        // parameters of source `id` changed
+        Speaker,       // chain parameters of speaker `id` changed
+        Master,        // master gain changed
+        MotionParam,   // one live motion parameter of source `id` (see below)
+        InsertBypass,  // bypass flag of insert slot `channel` of source `id`
     };
     Kind kind{Kind::None};
     int id{0};
@@ -41,6 +42,10 @@ struct EngineEffect {
     static EngineEffect source(int sourceId) { return {Kind::Source, sourceId}; }
     static EngineEffect speaker(int speakerId) { return {Kind::Speaker, speakerId}; }
     static EngineEffect master() { return {Kind::Master, 0}; }
+    /// `channel` carries the slot index.
+    static EngineEffect insertBypass(int sourceId, int slot) {
+        return {Kind::InsertBypass, sourceId, slot, spacer::MotionParam::Radius};
+    }
     static EngineEffect motionParam(int sourceId, int channel, spacer::MotionParam param) {
         return {Kind::MotionParam, sourceId, channel, param};
     }
@@ -64,6 +69,14 @@ ProjectEdit setLayout(const Project& project, Layout after, std::string name = "
 /// Replace the source with `after.id`. nullopt-like empty edit (apply / revert
 /// unset) if the project has no such source.
 ProjectEdit setSource(const Project& project, SourceSpec after, std::string name = "Edit Source");
+
+/// Edit of the show data (scenes + cue lists, SPEC §11): `modify` runs on a
+/// copy of `project`; the edit stores the before / after of *only* those two
+/// collections, so undoing it never reverts live source / speaker state (a
+/// recall changes that outside the history). Invalid edit (apply / revert
+/// unset) if `modify` returns false or changes nothing. No engine effect: the
+/// armed cue list is re-synced by the app.
+ProjectEdit editShow(const Project& project, const std::function<bool(Project&)>& modify, std::string name);
 
 /// True if the edit can be performed (it has both functions).
 inline bool isValid(const ProjectEdit& e) {

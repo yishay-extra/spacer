@@ -27,6 +27,7 @@ Expected<OfflineRenderer::Result, std::string> OfflineRenderer::render(const Pro
     // Declared before the processor so it outlives the graphs' file players.
     DiskStreamer streamer;
     GraphBuilder builder(project);
+    builder.setPluginHost(options.pluginHost);
     builder.setDiskStreamer(&streamer);
     if (!options.projectDirectory.empty())
         builder.setProjectDirectory(

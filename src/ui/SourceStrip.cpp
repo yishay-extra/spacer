@@ -125,10 +125,24 @@ SourceStrip::SourceStrip(AppContext& context) : context_(context) {
     addModulator_.onClick = [this] { apply(sourceedit::editAddModulator(context_.project(), sourceId_)); };
     addAndMakeVisible(addModulator_);
 
-    insertsLabel_.setColour(juce::Label::textColourId, juce::Colour(0xffa0a7b0));
-    insertsLabel_.setFont(juce::FontOptions(12.0f));
-    insertsLabel_.setJustificationType(juce::Justification::topLeft);
-    addAndMakeVisible(insertsLabel_);
+    insertList_.onEdit = [this](const std::string& id, const std::string& text) {
+        // ids are "insert.<slot>.bypass"; the toggle sends 1 / 0
+        const auto first = id.find('.') + 1;
+        const int slot = std::stoi(id.substr(first, id.find('.', first) - first));
+        return apply(sourceedit::editInsertBypass(context_.project(), sourceId_, slot, text == "1"));
+    };
+    insertList_.onRemoveItem = [this](int slot) {
+        apply(sourceedit::editRemoveInsert(context_.project(), sourceId_, slot));
+    };
+    addAndMakeVisible(insertList_);
+    addInsert_.setButtonText("Add insert...");
+    addInsert_.setWantsKeyboardFocus(false);
+    addInsert_.onClick = [this] { showInsertMenu(); };
+    addAndMakeVisible(addInsert_);
+    insertsHint_.setColour(juce::Label::textColourId, juce::Colour(0xffa0a7b0));
+    insertsHint_.setFont(juce::FontOptions(12.0f));
+    insertsHint_.setText("No inserts.", juce::dontSendNotification);
+    addAndMakeVisible(insertsHint_);
 }
 
 SourceStrip::~SourceStrip() = default;
@@ -167,6 +181,23 @@ void SourceStrip::browseForFile(const std::string& fieldId) {
                           });
 }
 
+void SourceStrip::showInsertMenu() {
+    juce::PopupMenu menu;
+    std::vector<juce::String> ids;
+    for (const auto& d : context_.plugins().cache().known()) {
+        if (d.isInstrument) continue;  // inserts are effects (SPEC §13)
+        ids.push_back(d.fileOrIdentifier);
+        menu.addItem(static_cast<int>(ids.size()), d.name + "  (" + d.manufacturerName + ")");
+    }
+    if (ids.empty()) menu.addItem(-1, "No scanned plug-ins yet", false, false);
+    menu.showMenuAsync(
+        juce::PopupMenu::Options().withTargetComponent(&addInsert_), [this, ids, id = sourceId_](int result) {
+            if (result < 1 || result > static_cast<int>(ids.size())) return;
+            apply(sourceedit::editAddInsert(context_.project(), id,
+                                            ids[static_cast<std::size_t>(result - 1)].toStdString()));
+        });
+}
+
 void SourceStrip::refresh() {
     const juce::ScopedValueSetter<bool> guard(refreshing_, true);
     const SourceSpec* s = source();
@@ -174,7 +205,7 @@ void SourceStrip::refresh() {
     for (auto* c : std::initializer_list<juce::Component*>{
              &title_, &meter_, &inputTitle_, &levelTitle_, &spatialTitle_, &motionTitle_, &modulatorTitle_,
              &insertTitle_, &inputList_, &levelList_, &spatialList_, &motionList_, &modulatorList_,
-             &motionKind_, &addModulator_, &insertsLabel_})
+             &motionKind_, &addModulator_, &insertList_, &addInsert_, &insertsHint_})
         c->setVisible(has);
     if (!has) {
         channelLeft_.setVisible(false);
@@ -206,10 +237,22 @@ void SourceStrip::refresh() {
     addItem_.setVisible(!itemName.empty());
     addItem_.setButtonText("Add " + toJuce(itemName));
 
-    juce::String inserts;
-    for (const auto& line : sourceedit::insertSummaries(*s)) inserts << line << "\n";
-    if (inserts.isEmpty()) inserts = "No inserts. (Plug-in slots arrive with the plug-in UI.)";
-    insertsLabel_.setText(inserts.trimEnd(), juce::dontSendNotification);
+    std::vector<MotionField> insertFields;
+    const auto rows = sourceedit::insertRows(*s);
+    for (std::size_t i = 0; i < rows.size(); ++i) {
+        MotionField f;
+        f.id = "insert." + std::to_string(i) + ".bypass";
+        f.label = "Bypass";
+        f.group = rows[i].name;  // heading = the plug-in; the remove button sits on its first row
+        f.type = FieldType::Toggle;
+        f.on = rows[i].bypassed;
+        f.text = f.on ? "on" : "off";
+        f.item = static_cast<int>(i);
+        insertFields.push_back(std::move(f));
+    }
+    insertList_.setFields(std::move(insertFields));
+    insertsHint_.setVisible(rows.empty());
+    addInsert_.setEnabled(static_cast<int>(rows.size()) < kMaxInserts);
 
     resized();
     repaint();
@@ -288,10 +331,10 @@ void SourceStrip::layoutContent(int width, bool place) {
     gap();
 
     put(insertTitle_, kTitleHeight);
-    const int lines = std::max(1, insertsLabel_.getText().isEmpty()
-                                      ? 1
-                                      : insertsLabel_.getText().retainCharacters("\n").length() + 1);
-    put(insertsLabel_, lines * 16 + 6);
+    if (insertsHint_.isVisible()) put(insertsHint_, 20);
+    if (place) insertList_.setBounds(kMargin, y, inner, insertList_.idealHeight());
+    y += insertList_.idealHeight();
+    put(addInsert_, kButtonHeight, kMargin, std::min(inner, 140));
     contentHeight_ = y + kMargin;
 }
 

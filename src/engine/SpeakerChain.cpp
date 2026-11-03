@@ -26,6 +26,8 @@ void SpeakerChain::prepare(double sampleRate, int maxBlockSize) {
     }
     limiter_.prepare(sampleRate);
     gain_.prepare(sampleRate, 0.0f);
+    if (!inserts_) inserts_ = std::make_unique<InsertStage>();
+    inserts_->prepare(sampleRate, maxBlockSize, 1);
 }
 
 void SpeakerChain::configure(const SpeakerChainSettings& settings) {
@@ -99,7 +101,7 @@ void SpeakerChain::updateEqCoefficients() noexcept {
                                                  juce::Decibels::decibelsToGain(e.highGainDb));
 }
 
-void SpeakerChain::retargetTo(const SpeakerChain& fresh) noexcept {
+void SpeakerChain::retargetTo(SpeakerChain& fresh) noexcept {
     const auto& s = fresh.settings_;
     settings_.speakerId = s.speakerId;
     settings_.compensationDelayMs = s.compensationDelayMs;
@@ -111,6 +113,7 @@ void SpeakerChain::retargetTo(const SpeakerChain& fresh) noexcept {
     delayTarget_ = delaySamplesFor(s.compensationDelayMs, s.userDelayMs);
     gain_.setTarget(gainTarget());
     setEq(s.eq);
+    if (inserts_ && fresh.inserts_) inserts_->retargetTo(*fresh.inserts_);
 }
 
 void SpeakerChain::process(float* x, int n) noexcept {
@@ -143,7 +146,8 @@ void SpeakerChain::process(float* x, int n) noexcept {
     for (std::size_t b = 0; b < eq_.size(); ++b)
         if (eqActive_[b]) eq_[b].process(ctx);
 
-    // ---- insert slots: WP10 ----
+    // ---- insert slots ----
+    inserts_->process(channels, 1, n);
 
     // ---- limiter (always on) ----
     limiter_.process(x, n);
