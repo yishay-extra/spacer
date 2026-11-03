@@ -9,6 +9,7 @@
 #include <string>
 #include <vector>
 
+#include "control/ClockInputs.h"
 #include "control/ControlHub.h"
 #include "control/CueEngine.h"
 #include "control/InstallationMode.h"
@@ -28,6 +29,8 @@ namespace spacer {
 ///   - the AudioEngine (WP3) and the FeedbackState the UI draws from,
 ///   - the CueEngine (WP9) driving the engine's command queue,
 ///   - the ControlHub (WP8: OSC in/out, MIDI mapping) and MidiInputService,
+///   - the external-clock inputs (WP12: MIDI clock / MTC / OSC beat feeds,
+///     factory for the engine's clock; SPEC §9),
 ///   - installation-mode settings and the Autosaver (WP9, SPEC §11),
 ///   - the speaker-test overlay (SPEC §16).
 ///
@@ -126,6 +129,10 @@ public:
     /// "Install virtual device…": admin prompt, copy, coreaudiod restart.
     /// `done(error)` on the message thread, error empty on success.
     void installVirtualDevice(std::function<void(std::string error)> done);
+    /// External clock feeds and the active external clock's lock status.
+    const ClockInputs& clockInputs() const noexcept { return clockInputs_; }
+    /// Clock kind actually running (Internal after a fallback, e.g. Link not built).
+    ClockKind activeClockKind() const noexcept { return engine_.activeClockKind(); }
 
     void setPanic(bool engaged);
     bool panic() const noexcept { return panic_; }
@@ -165,6 +172,7 @@ private:
 
     Project project_;
     ProjectHistory history_;
+    ClockInputs clockInputs_;  // before engine_: its clock factory refers to it
     AudioEngine engine_;
     std::unique_ptr<CueEngine> cues_;
     std::unique_ptr<ControlHub> control_;  // after cues_: holds a pointer to it

@@ -34,6 +34,9 @@ AppContext::AppContext() : project_(defaultProject()) {
     installationSettingsPath_ = settingsDirectory() / "installation.json";
     loadInstallationSettings();
     engine_.onFeedback = [this](const Feedback& f) { onFeedback(f); };
+    // External clocks (SPEC §9) travel with the graph; AudioEngine asks for
+    // one whenever project.clock changes.
+    engine_.setClockFactory([this](const ClockConfig& c) { return clockInputs_.makeClock(c); });
     engine_.setProject(project_);
     resetCueEngine();
 }
@@ -89,10 +92,22 @@ void AppContext::resetCueEngine() {
 
 void AppContext::resetControl() {
     control_ = std::make_unique<ControlHub>(project_, engine_.processor(), cues_.get());
+    // OSC receive thread: /spacer/clock/beat (and /stop) feed an active
+    // OscClock directly, timestamped on arrival (WP12).
+    control_->osc().setClockTap([this](const ControlEvent& e, double hostTime) {
+        if (const auto* b = std::get_if<ev::ClockBeat>(&e))
+            return clockInputs_.handleOscBeat(b->beat, hostTime);
+        if (std::holds_alternative<ev::ClockStop>(e)) clockInputs_.handleOscStop(hostTime);
+        return false;  // stop still reaches the internal clock
+    });
     control_->applyProject();  // OSC port bind failure is visible in control().osc().stats()
     if (!midiIn_)
         midiIn_ = std::make_unique<MidiInputService>([this](const juce::MidiMessage& m) {
-            control_->submitMidi(m);  // MIDI thread: hand over only
+            // MIDI thread: hand over only. Beat clock / MTC go to the external
+            // clocks lock-free (timestamp = host seconds, JUCE MidiInput); the
+            // rest goes to the mapper through the hub.
+            if (clockInputs_.handleMidi(m.getRawData(), m.getRawDataSize(), m.getTimeStamp())) return;
+            control_->submitMidi(m);
         });
     midiIn_->openAll();
 }

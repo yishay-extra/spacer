@@ -42,7 +42,7 @@ public:
     /// Applies bpm, beatsPerBar and quantisedStart from the project file.
     void configure(const ClockConfig& config);
 
-    void setSampleRate(double sampleRate);
+    void setSampleRate(double sampleRate) override;
     /// Clamped to [kMinBpm, kMaxBpm]. Beat position is kept across the change.
     void setBpm(double bpm);
     /// Clamped to >= 1.

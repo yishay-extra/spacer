@@ -123,6 +123,14 @@ void MainComponent::feedbackUpdated() {
             static_cast<int>(std::floor(std::fmod(clock.beat, std::max(1, clock.beatsPerBar)))) + 1;
         text << "  |  " << juce::String(clock.bpm, 1) << " bpm  " << bar << "." << beat;
     }
+    // External clock source and lock (WP12).
+    if (const auto kind = context_.activeClockKind(); kind != ClockKind::Internal) {
+        static constexpr const char* kNames[] = {"Internal", "Link", "MIDI clock", "MTC", "OSC"};
+        const bool locked = context_.clockInputs().status().locked.load(std::memory_order_relaxed);
+        text << "  " << kNames[static_cast<int>(kind)] << (locked ? " (locked)" : " (unlocked)");
+    } else if (context_.project().clock.kind != ClockKind::Internal) {
+        text << "  (external clock unavailable: internal)";
+    }
     if (const auto& seq = context_.cues().sequencer(); context_.cues().armed())
         text << "  |  " << juce::String(seq.list().name);
     // Driver status (SPEC §14, §16.6).

@@ -55,6 +55,8 @@ public:
     /// Only while process() cannot run (device stopped / before start).
     void setGraphWhileStopped(std::unique_ptr<Graph> graph);
     /// Only while process() cannot run. Live changes go through commands.
+    /// Configures the internal clock; external clocks travel with a graph
+    /// (Graph::setClock, SPEC §9).
     void configureClock(const ClockConfig& config) { clock_.configure(config); }
 
     std::uint64_t droppedCommands() const noexcept { return commands_.dropped(); }
@@ -73,7 +75,11 @@ public:
     void reportXruns(int total) noexcept { xruns_ = total; }
     /// The graph in use (audio thread, or while stopped).
     Graph* currentGraph() noexcept { return graph_; }
-    ClockState clockState() const noexcept { return clock_.current(); }
+    /// State of the active clock (internal or the graph's external one) at
+    /// the start of the last block.
+    ClockState clockState() const noexcept { return clockState_; }
+    /// True while an external clock (from the graph) is active.
+    bool externalClockActive() const noexcept { return external_ != nullptr; }
 
 private:
     struct ActiveRamp {
@@ -95,6 +101,9 @@ private:
     void apply(const Command& c) noexcept;
     bool applyPendingSwap() noexcept;
     void adoptSampleRate(double sampleRate) noexcept;
+    /// After graph_ changed: make the graph's clock selection the active one.
+    void selectClock() noexcept;
+    ClockState advanceClock(int numSamples) noexcept;
     void publishFeedback() noexcept;
 
     SpscQueue<Command, kCommandCapacity> commands_;
@@ -110,6 +119,8 @@ private:
     int numRamps_{0};
     bool fadingOut_{false};
     InternalClock clock_;
+    ClockSource* external_{nullptr};  // graph_'s external clock, or null = clock_
+    ClockState clockState_;
     double sampleRate_{0.0};
     GainRamp master_;
     float masterGainDb_{0.0f};

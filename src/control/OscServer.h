@@ -5,6 +5,7 @@
 #include <atomic>
 #include <functional>
 #include <map>
+#include <mutex>
 #include <vector>
 
 #include "control/ControlEvent.h"
@@ -44,6 +45,15 @@ public:
 
     Stats stats() const noexcept;
 
+    /// Receiver-thread hook for OscClock (WP12): `/spacer/clock/beat` and
+    /// `/spacer/clock/stop` are offered with their host time (seconds on
+    /// juce::Time::getMillisecondCounterHiRes() / 1000: arrival time, or the
+    /// bundle timetag mapped onto that clock) before they are queued for the
+    /// message thread. Returning true consumes the event. Called on the
+    /// receiver thread: it must only hand the data over (ClockInputs).
+    using ClockTap = std::function<bool(const ControlEvent& event, double hostTime)>;
+    void setClockTap(ClockTap tap);
+
     // The receiver thread's entry points, public so tests can feed synthetic
     // packets without a socket.
     void handleMessage(const juce::OSCMessage& message, double dueEpochSeconds = 0.0);
@@ -61,6 +71,8 @@ private:
     void oscBundleReceived(const juce::OSCBundle& bundle) override;
     void handleBundle(const juce::OSCBundle& bundle, int depth);
 
+    std::mutex clockTapMutex_;  // receiver thread vs. setClockTap (never the audio thread)
+    ClockTap clockTap_;
     juce::OSCReceiver receiver_;
     bool running_{false};
     ControlInbox<Timed> inbox_;
