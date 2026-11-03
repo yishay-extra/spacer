@@ -12,6 +12,19 @@ const char* ownerName(InsertOwner o) {
 }
 }  // namespace
 
+PluginHost::Options PluginHost::Options::appDefaults() {
+    Options o;
+    o.cacheDirectory =
+        juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory).getChildFile("Spacer");
+#if JUCE_MAC
+    o.cacheDirectory = juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
+                           .getChildFile("Application Support/Spacer");
+#endif
+    o.scannerExecutable = juce::File::getSpecialLocation(juce::File::currentExecutableFile)
+                              .getSiblingFile("spacer-plugin-scanner");
+    return o;
+}
+
 PluginHost::PluginHost(Options options, FormatSetup setup)
     : options_(std::move(options)),
       cache_(options_.cacheDirectory),

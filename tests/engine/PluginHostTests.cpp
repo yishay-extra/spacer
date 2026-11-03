@@ -206,3 +206,11 @@ TEST_CASE("GraphBuilder: a project referencing a missing plugin still builds") {
     CHECK(graph->findInserts(InsertOwner::Speaker, 2)->chain().isMissing(0));
     CHECK(host.takeWarnings().size() == 2);
 }
+
+TEST_CASE("PluginHost: app defaults put the scanner next to the executable") {
+    const auto o = PluginHost::Options::appDefaults();
+    CHECK(o.scannerExecutable.getFileName() == "spacer-plugin-scanner");
+    CHECK(o.scannerExecutable.getParentDirectory() ==
+          juce::File::getSpecialLocation(juce::File::currentExecutableFile).getParentDirectory());
+    CHECK(o.cacheDirectory.getFileName() == "Spacer");
+}

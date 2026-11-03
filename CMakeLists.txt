@@ -134,6 +134,30 @@ if(SPACER_WITH_APP)
             juce::juce_recommended_lto_flags
             juce::juce_recommended_warning_flags)
 
+    # spacer-plugin-scanner: out-of-process AudioUnit scanner (SPEC §13),
+    # copied next to the app's executable (Contents/MacOS) where PluginHost
+    # looks for it.
+    juce_add_console_app(spacer_plugin_scanner PRODUCT_NAME "spacer-plugin-scanner")
+    target_sources(spacer_plugin_scanner PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/tools/PluginScanner.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/PluginScanProcess.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/PluginScanner.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/PluginScanCache.cpp)
+    target_include_directories(spacer_plugin_scanner PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_compile_definitions(spacer_plugin_scanner PRIVATE ${SPACER_ENGINE_JUCE_DEFINITIONS})
+    target_link_libraries(spacer_plugin_scanner
+        PRIVATE
+            juce::juce_audio_processors_headless
+            juce::juce_events
+        PUBLIC
+            juce::juce_recommended_config_flags
+            juce::juce_recommended_warning_flags)
+    add_dependencies(Spacer spacer_plugin_scanner)
+    add_custom_command(TARGET Spacer POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:spacer_plugin_scanner>
+                $<TARGET_BUNDLE_CONTENT_DIR:Spacer>/MacOS/spacer-plugin-scanner
+        VERBATIM)
+
     # spacer-engine-check: CLI that drives the real AudioEngine on a real
     # device (manual validation, docs/mac-validation/WP3.md).
     file(GLOB SPACER_ENGINE_DEVICE_SOURCES CONFIGURE_DEPENDS

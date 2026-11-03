@@ -50,6 +50,10 @@ public:
         int scanTimeoutMs{30000};
         /// Scan an identifier missing from the cache when a project asks for it.
         bool scanUnknownOnDemand{true};
+
+        /// The app's defaults: cache in <user app data>/Spacer, scanner next
+        /// to the running executable (Spacer.app/Contents/MacOS).
+        static Options appDefaults();
     };
     using FormatSetup = std::function<void(juce::AudioPluginFormatManager&)>;
 
