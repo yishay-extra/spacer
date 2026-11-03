@@ -350,7 +350,7 @@ mode relaunch, CI release job on tags, `docs/INSTALL.md`.
   each such WP writes `docs/mac-validation/WP<id>.md` (setup, steps, expected
   result, pass/fail) and its PR lists which acceptance criteria CI verified
   and which are deferred to that checklist. The owner runs those checklists
-  later in a local session.
+  later in a local session. Run order: `docs/mac-validation/README.md`.
 
 ## Status log
 
