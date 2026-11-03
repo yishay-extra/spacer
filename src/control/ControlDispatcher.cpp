@@ -11,7 +11,11 @@ ControlDispatcher::ControlDispatcher(const Project& project, CueEngine* cues, Co
     : project_(project), cues_(cues), config_(std::move(config)) {}
 
 bool ControlDispatcher::send(const Command& c) {
-    if (config_.push && config_.push(c)) return true;
+    if (due_ > 0.0 && config_.pushAt) {
+        if (config_.pushAt(c, due_)) return true;
+    } else if (config_.push && config_.push(c)) {
+        return true;
+    }
     ++stats_.commandsDropped;
     return false;
 }
@@ -114,9 +118,12 @@ bool ControlDispatcher::setSourceParam(const EntityRef& ref, const std::string& 
                                          : p.distance) = value;
         return setPosition(id, p);
     }
-    if (config_.motionParam && config_.motionParam(id, mp, value)) return true;
-    ++stats_.unsupported;
-    return false;
+    if (config_.motionParam) {
+        if (config_.motionParam(id, mp, value)) return true;
+        ++stats_.unsupported;
+        return false;
+    }
+    return send(cmd::SetMotionParam{id, -1, mp, value});
 }
 
 struct ControlDispatcher::Visitor {
@@ -138,8 +145,19 @@ struct ControlDispatcher::Visitor {
     bool operator()(const ev::SourceFile& e) const {
         const int id = d.resolveSource(e.source);
         if (id == 0) return false;
-        if (d.config_.fileTransport && d.config_.fileTransport(id, e.action, e.seconds)) return true;
-        ++d.stats_.unsupported;
+        if (d.config_.fileTransport) {
+            if (d.config_.fileTransport(id, e.action, e.seconds)) return true;
+            ++d.stats_.unsupported;
+            return false;
+        }
+        switch (e.action) {
+            case ev::SourceFile::Action::Play:
+                return d.send(cmd::FilePlay{id});
+            case ev::SourceFile::Action::Stop:
+                return d.send(cmd::FileStop{id});
+            case ev::SourceFile::Action::Seek:
+                return d.send(cmd::FileSeek{id, std::max(0.0, e.seconds)});
+        }
         return false;
     }
     bool operator()(const ev::SetSpeakerTrim& e) const {
@@ -236,9 +254,11 @@ struct ControlDispatcher::Visitor {
     }
 };
 
-void ControlDispatcher::dispatch(const ControlEvent& event) {
+void ControlDispatcher::dispatch(const ControlEvent& event, double dueEpochSeconds) {
     ++stats_.dispatched;
+    due_ = dueEpochSeconds;
     std::visit(Visitor{*this}, event);
+    due_ = 0.0;
 }
 
 }  // namespace spacer

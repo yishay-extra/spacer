@@ -110,6 +110,8 @@ void AudioEngine::audioDeviceIOCallbackWithContext(const float* const* in, int n
         allocguard::ScopedAudioThread audioThread;
         virtual_.pull(numSamples);
     }
+    // Callback host time for OSC timetags (EngineProcessor::sampleAtHostTime).
+    processor_.setBlockHostTime(juce::Time::getMillisecondCounterHiRes() * 0.001);
     processor_.process(in, numIn, out, numOut, numSamples, haveVirtual ? virtual_.channels() : nullptr,
                        haveVirtual ? VirtualDeviceReceiver::kNumChannels : 0);
 }

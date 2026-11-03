@@ -1,5 +1,8 @@
 #include "control/OscServer.h"
 
+#include <algorithm>
+#include <cstdint>
+
 #include "control/OscRouter.h"
 
 namespace spacer {
@@ -9,7 +12,11 @@ constexpr int kMaxBundleDepth = 8;
 
 double toEpochSeconds(const juce::OSCTimeTag& tag) {
     if (tag.isImmediately()) return 0.0;
-    return static_cast<double>(tag.toTime().toMilliseconds()) / 1000.0;
+    // NTP 32.32 fixed point since 1900, kept at full (sub-sample) resolution.
+    constexpr double kNtpToUnix = 2208988800.0;
+    const std::uint64_t raw = tag.getRawTimeTag();
+    return static_cast<double>(raw >> 32) - kNtpToUnix +
+           static_cast<double>(raw & 0xffffffffu) / 4294967296.0;
 }
 }  // namespace
 
@@ -80,7 +87,23 @@ void OscServer::oscBundleReceived(const juce::OSCBundle& bundle) {
     handleBundle(bundle);
 }
 
+namespace {
+/// Events that become engine commands (sample-accurate when timed); the rest
+/// (cues, scenes, triggers) act on the message thread when due.
+bool isEngineEvent(const ControlEvent& e) {
+    return !(std::holds_alternative<ev::CueGo>(e) || std::holds_alternative<ev::CueBack>(e) ||
+             std::holds_alternative<ev::CueJump>(e) || std::holds_alternative<ev::RecallScene>(e) ||
+             std::holds_alternative<ev::RecallSceneIndex>(e) || std::holds_alternative<ev::OscTrigger>(e) ||
+             std::holds_alternative<ev::MidiTrigger>(e));
+}
+}  // namespace
+
 void OscServer::pump(double nowEpochSeconds, const std::function<void(const ControlEvent&)>& deliver) {
+    pump(nowEpochSeconds, 0.0, [&deliver](const ControlEvent& e, double) { deliver(e); });
+}
+
+void OscServer::pump(double nowEpochSeconds, double lookaheadSeconds,
+                     const std::function<void(const ControlEvent&, double dueEpochSeconds)>& deliver) {
     scratch_.clear();
     inbox_.drainTo(scratch_);
     for (auto& t : scratch_) {
@@ -91,9 +114,18 @@ void OscServer::pump(double nowEpochSeconds, const std::function<void(const Cont
         scheduled_.emplace(t.due, std::move(t.event));  // multimap keeps arrival order within equal keys
     }
     scratch_.clear();
-    while (!scheduled_.empty() && scheduled_.begin()->first <= nowEpochSeconds) {
-        auto node = scheduled_.extract(scheduled_.begin());
-        deliver(node.mapped());
+    // Due events, plus engine events due within the look-ahead: those are
+    // handed over early with their timetag so the engine can apply them at
+    // the exact sample.
+    const double horizon = nowEpochSeconds + std::max(0.0, lookaheadSeconds);
+    for (auto it = scheduled_.begin(); it != scheduled_.end() && it->first <= horizon;) {
+        const double due = it->first;
+        if (due > nowEpochSeconds && !isEngineEvent(it->second)) {
+            ++it;
+            continue;
+        }
+        auto node = scheduled_.extract(it++);
+        deliver(node.mapped(), due);
     }
 }
 

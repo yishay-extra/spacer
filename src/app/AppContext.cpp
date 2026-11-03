@@ -110,7 +110,11 @@ void AppContext::resetCueEngine() {
 }
 
 void AppContext::resetControl() {
-    control_ = std::make_unique<ControlHub>(project_, engine_.processor(), cues_.get());
+    // Bare MIDI paths / OSC id 0 act on the UI-selected source; motion
+    // parameters and file transport use the engine commands (dispatcher defaults).
+    ControlDispatcher::Config config;
+    config.selectedSource = [this] { return selectedSourceId(); };
+    control_ = std::make_unique<ControlHub>(project_, engine_.processor(), cues_.get(), std::move(config));
     // OSC receive thread: /spacer/clock/beat (and /stop) feed an active
     // OscClock directly, timestamped on arrival (WP12).
     control_->osc().setClockTap([this](const ControlEvent& e, double hostTime) {

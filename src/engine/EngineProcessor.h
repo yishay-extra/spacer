@@ -11,6 +11,7 @@
 #include "engine/GainRamp.h"
 #include "engine/Graph.h"
 #include "engine/RecallPlan.h"
+#include "engine/Seqlock.h"
 #include "engine/SpscQueue.h"
 
 namespace spacer {
@@ -36,6 +37,21 @@ public:
     static constexpr int kMaxActiveRamps = 2048;
     /// Crossfade for discrete switches during a recall (SPEC §11).
     static constexpr float kRecallCrossfadeMs = 50.0f;
+    /// Timed commands (pushAt) waiting for their sample.
+    static constexpr int kMaxTimedCommands = 1024;
+
+    /// The engine timeline at the start of the last processed block, published
+    /// by the audio thread (seqlock: reads from the message thread are exact).
+    struct Snapshot {
+        ClockState clock;
+        /// Engine sample index of the block's first sample (samples processed
+        /// before it). The same timeline pushAt() uses.
+        std::int64_t blockStartSample{0};
+        /// Host time (seconds, juce::Time::getMillisecondCounterHiRes() / 1000)
+        /// of that block's callback, or < 0 if the driver gave none.
+        double hostTimeSeconds{-1.0};
+        double sampleRate{0.0};
+    };
 
     EngineProcessor();
     ~EngineProcessor();
@@ -45,6 +61,17 @@ public:
     // ---- control thread ----
     /// False if the queue was full (the command is dropped and counted).
     bool push(const Command& command) noexcept;
+    /// Like push(), but the command takes effect exactly at engine sample
+    /// `engineSample` (Snapshot::blockStartSample timeline): the block is
+    /// split there. A sample that has already passed applies at the next
+    /// block, like push(). Clock transport commands take effect at the start
+    /// of the block after their sample (SPEC §9: the clock advances first).
+    /// For OSC bundle timetags (SPEC §12.1).
+    bool pushAt(const Command& command, std::int64_t engineSample) noexcept;
+    /// Engine sample at host time `hostSeconds` (same clock as
+    /// Snapshot::hostTimeSeconds), extrapolated from the last block; -1 if
+    /// the engine has no host time yet (offline, or not started).
+    std::int64_t sampleAtHostTime(double hostSeconds) const noexcept;
     /// Hands `graph` to the audio thread. If the queue is full, the graph is
     /// deleted and false returned.
     bool swapGraph(std::unique_ptr<Graph> graph);
@@ -73,11 +100,17 @@ public:
                  int numVirtualInputs = 0) noexcept;
     /// Device overload count, forwarded as feedback when it changes.
     void reportXruns(int total) noexcept { xruns_ = total; }
+    /// Host time of the callback about to call process() (seconds on
+    /// juce::Time::getMillisecondCounterHiRes() / 1000). Optional; enables
+    /// sampleAtHostTime().
+    void setBlockHostTime(double hostSeconds) noexcept { nextHostTime_ = hostSeconds; }
     /// The graph in use (audio thread, or while stopped).
     Graph* currentGraph() noexcept { return graph_; }
     /// State of the active clock (internal or the graph's external one) at
-    /// the start of the last block.
-    ClockState clockState() const noexcept { return clockState_; }
+    /// the start of the last block. Any thread (seqlock).
+    ClockState clockState() const noexcept { return snapshot_.load().clock; }
+    /// Clock + timeline of the last block. Any thread (seqlock).
+    Snapshot snapshot() const noexcept { return snapshot_.load(); }
     /// True while an external clock (from the graph) is active.
     bool externalClockActive() const noexcept { return external_ != nullptr; }
 
@@ -97,7 +130,14 @@ private:
     void retirePlan(RecallPlan* plan) noexcept;
     void scheduleRecall(RecallPlan* plan) noexcept;
     int scheduledRecallOffset(const ClockState& clock, int numSamples) const noexcept;
+    struct QueuedCommand {
+        Command command;
+        std::int64_t atSample{-1};  // -1 = as soon as possible
+    };
     void applyCommands() noexcept;
+    void insertTimed(const QueuedCommand& q) noexcept;
+    void applyTimedUpTo(std::int64_t sample) noexcept;
+    int nextTimedOffset(std::int64_t blockStart, int numSamples) const noexcept;
     void apply(const Command& c) noexcept;
     bool applyPendingSwap() noexcept;
     void adoptSampleRate(double sampleRate) noexcept;
@@ -106,7 +146,7 @@ private:
     ClockState advanceClock(int numSamples) noexcept;
     void publishFeedback() noexcept;
 
-    SpscQueue<Command, kCommandCapacity> commands_;
+    SpscQueue<QueuedCommand, kCommandCapacity> commands_;
     SpscQueue<Feedback, kFeedbackCapacity> feedback_;
     SpscQueue<Graph*, kRetireCapacity> retired_;
     SpscQueue<RecallPlan*, kRetirePlanCapacity> retiredPlans_;
@@ -132,6 +172,12 @@ private:
     long long samplesToFeedback_{0};
     int xruns_{0}, xrunsReported_{0};
     std::uint64_t droppedReported_{0};
+
+    std::array<QueuedCommand, kMaxTimedCommands> timed_{};  // sorted by atSample
+    int numTimed_{0};
+    std::int64_t samplePosition_{0};
+    double nextHostTime_{-1.0};
+    Seqlock<Snapshot> snapshot_;
 
     std::atomic<int> latency_{0};
 };

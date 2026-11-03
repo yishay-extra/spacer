@@ -27,12 +27,17 @@ public:
         std::function<CueTick()> makeTick;
         /// Source a bare ParameterPath (no `source.<id>.` scope) applies to; 0 / unset = none.
         std::function<int()> selectedSource;
-        /// Motion parameters other than position have no engine command yet
-        /// (SPEC §5.2 lists SetMotionParam, Command.h does not). Receives the
-        /// request instead; return true if handled.
+        /// Optional override for motion parameters other than position. Unset
+        /// (the default), they become cmd::SetMotionParam (both control points
+        /// of a linkedPoints source). Return true if handled.
         std::function<bool(int sourceId, MotionParam param, float value)> motionParam;
-        /// File transport (WP4). Return true if handled.
+        /// Optional override for file transport. Unset (the default), it
+        /// becomes cmd::FilePlay / FileStop / FileSeek. Return true if handled.
         std::function<bool(int sourceId, ev::SourceFile::Action action, double seconds)> fileTransport;
+        /// Timed push (OSC bundle timetags, SPEC §12.1 "scheduled to the
+        /// sample"): `dueEpochSeconds` is the timetag (seconds since 1970).
+        /// Unset, timed events are pushed immediately through `push`.
+        std::function<bool(const Command&, double dueEpochSeconds)> pushAt;
     };
     struct Stats {
         std::uint64_t dispatched{0};
@@ -46,7 +51,10 @@ public:
     /// `cues` may be null (cue / scene events are then counted unsupported).
     ControlDispatcher(const Project& project, CueEngine* cues, Config config);
 
-    void dispatch(const ControlEvent& event);
+    /// `dueEpochSeconds` > 0: the event carries an OSC timetag. Engine
+    /// commands it produces go through Config::pushAt with that time; cue and
+    /// scene events ignore it (the caller delivers those when due).
+    void dispatch(const ControlEvent& event, double dueEpochSeconds = 0.0);
 
     /// Latest rendered position of a source (from fb::SourcePosition), used
     /// for single-component moves (`/az`, `/el`, `/dist`) of non-manual sources.
@@ -70,6 +78,7 @@ private:
     Stats stats_;
     std::unordered_map<int, Position> positions_;
     std::unordered_map<int, DistanceModel> distances_;
+    double due_{0.0};  // timetag of the event being dispatched (0 = now)
 };
 
 }  // namespace spacer

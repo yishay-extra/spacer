@@ -16,14 +16,23 @@ CueTick makeTick(const EngineProcessor& engine) {
 }
 }  // namespace
 
-ControlHub::ControlHub(const Project& project, EngineProcessor& engine, CueEngine* cues)
-    : project_(project),
-      dispatcher_(project, cues,
-                  ControlDispatcher::Config{[&engine](const Command& c) { return engine.push(c); },
-                                            [&engine] { return makeTick(engine); },
-                                            {},
-                                            {},
-                                            {}}) {}
+ControlHub::ControlHub(const Project& project, EngineProcessor& engine, CueEngine* cues,
+                       ControlDispatcher::Config config)
+    : project_(project), dispatcher_(project, cues, completeConfig(engine, std::move(config))) {}
+
+ControlDispatcher::Config ControlHub::completeConfig(EngineProcessor& engine,
+                                                     ControlDispatcher::Config config) {
+    if (!config.push) config.push = [&engine](const Command& c) { return engine.push(c); };
+    if (!config.makeTick) config.makeTick = [&engine] { return makeTick(engine); };
+    if (!config.pushAt)
+        config.pushAt = [this, &engine](const Command& c, double dueEpochSeconds) {
+            // Timetag (epoch) -> host time -> engine sample, via the pump's own clocks.
+            const double host = nowMonotonic_ + (dueEpochSeconds - nowEpoch_);
+            const std::int64_t sample = engine.sampleAtHostTime(host);
+            return sample >= 0 ? engine.pushAt(c, sample) : engine.push(c);
+        };
+    return config;
+}
 
 bool ControlHub::applyProject() {
     mapper_.setConfig(project_.midi);
@@ -45,7 +54,10 @@ void ControlHub::pump() {
 }
 
 void ControlHub::pump(double nowEpochSeconds, double monotonicSeconds) {
-    server_.pump(nowEpochSeconds, [this](const ControlEvent& e) { dispatcher_.dispatch(e); });
+    nowEpoch_ = nowEpochSeconds;
+    nowMonotonic_ = monotonicSeconds;
+    server_.pump(nowEpochSeconds, kTimetagLookaheadSeconds,
+                 [this](const ControlEvent& e, double due) { dispatcher_.dispatch(e, due); });
 
     midiScratch_.clear();
     midiInbox_.drainTo(midiScratch_);

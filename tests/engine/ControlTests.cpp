@@ -70,6 +70,7 @@ struct Rig {
                       {},
                       {},
                       {},
+                      {},
                       {}}) {}
 
     template <typename C>
@@ -332,15 +333,13 @@ TEST_CASE("ControlDispatcher: unknown targets and unsupported controls are count
     dispatchOsc(rig, msg("/spacer/source/99/gain", 0.0f));
     dispatchOsc(rig, msg("/spacer/speaker/99/trim", 0.0f));
     dispatchOsc(rig, msg("/spacer/source/1/motion/period", 4.0f));  // not a ParameterPath
-    dispatchOsc(rig, msg("/spacer/source/1/motion/radius", 4.0f));  // no engine command yet
-    dispatchOsc(rig, msg("/spacer/source/1/file/play"));            // WP4
     dispatchOsc(rig, msg("/spacer/cue/go"));                        // no cue engine
     dispatchOsc(rig, msg("/spacer/made/up"));
     CHECK(rig.sent.empty());
     const auto s = rig.dispatcher.stats();
     CHECK(s.unresolvedTarget == 2);
     CHECK(s.badPath == 1);
-    CHECK(s.unsupported == 3);
+    CHECK(s.unsupported == 1);
     CHECK(s.unknownAddress == 1);
 }
 
@@ -358,7 +357,8 @@ TEST_CASE("ControlDispatcher: unsupported controls reach their hooks when provid
                          [&](int id, ev::SourceFile::Action a, double) {
                              file = id;
                              return a == ev::SourceFile::Action::Play;
-                         }});
+                         },
+                         {}});
     d.dispatch(ev::SetSourceParam{{2, {}}, "motion.radius", 4.0f});
     d.dispatch(ev::SourceFile{{2, {}}, ev::SourceFile::Action::Play, 0.0});
     CHECK(motion == 2);
@@ -411,8 +411,12 @@ struct CueRig {
         cues->armFirst(CueTick{});
         dispatcher = std::make_unique<ControlDispatcher>(
             project, cues.get(),
-            ControlDispatcher::Config{
-                [this](const Command& c) { return engine.push(c); }, [] { return CueTick{}; }, {}, {}, {}});
+            ControlDispatcher::Config{[this](const Command& c) { return engine.push(c); },
+                                      [] { return CueTick{}; },
+                                      {},
+                                      {},
+                                      {},
+                                      {}});
     }
     float gain() const { return project.sources[0].gainDb; }
 };
@@ -763,4 +767,201 @@ TEST_CASE("ControlDispatcher: insert parameters become commands, clamped to 0..1
     dispatchOsc(unknown, msg("/spacer/speaker/7/insert/1/param/0", 0.3f));
     CHECK(unknown.sent.empty());
     CHECK(unknown.dispatcher.stats().unresolvedTarget == 1);
+}
+
+// ---- WP14: motion parameters, file transport, ControlHub config, timetags ----
+
+TEST_CASE("ControlDispatcher: motion parameters become SetMotionParam (WP14)") {
+    Rig rig;
+    dispatchOsc(rig, msg("/spacer/source/1/motion/radius", 4.0f));
+    const auto& c = rig.only<cmd::SetMotionParam>();
+    CHECK(c.sourceId == 1);
+    CHECK(c.channel == -1);
+    CHECK(c.param == MotionParam::Radius);
+    CHECK(c.value == 4.0f);
+    CHECK(rig.dispatcher.stats().unsupported == 0);
+}
+
+TEST_CASE("ControlDispatcher: file transport becomes FilePlay / FileStop / FileSeek (WP14)") {
+    Rig rig;
+    dispatchOsc(rig, msg("/spacer/source/2/file/play"));
+    dispatchOsc(rig, msg("/spacer/source/2/file/stop"));
+    dispatchOsc(rig, msg("/spacer/source/2/file/seek", 1.5f));
+    REQUIRE(rig.sent.size() == 3);
+    CHECK(std::get<cmd::FilePlay>(rig.sent[0]).sourceId == 2);
+    CHECK(std::get<cmd::FileStop>(rig.sent[1]).sourceId == 2);
+    CHECK(std::get<cmd::FileSeek>(rig.sent[2]).sourceId == 2);
+    CHECK(std::get<cmd::FileSeek>(rig.sent[2]).seconds == Approx(1.5));
+    CHECK(rig.dispatcher.stats().unsupported == 0);
+}
+
+TEST_CASE("ControlDispatcher: timed events use pushAt, untimed ones push (WP14)") {
+    Project project = testProject();
+    std::vector<Command> now;
+    std::vector<std::pair<Command, double>> timed;
+    ControlDispatcher::Config cfg;
+    cfg.push = [&](const Command& c) {
+        now.push_back(c);
+        return true;
+    };
+    cfg.pushAt = [&](const Command& c, double due) {
+        timed.emplace_back(c, due);
+        return true;
+    };
+    ControlDispatcher d(project, nullptr, cfg);
+    d.dispatch(ev::SetMasterGain{-6.0f}, 1234.5);
+    d.dispatch(ev::SetMasterGain{-3.0f});
+    REQUIRE(timed.size() == 1);
+    CHECK(timed[0].second == Approx(1234.5));
+    CHECK(std::get<cmd::SetMasterGain>(timed[0].first).gainDb == -6.0f);
+    REQUIRE(now.size() == 1);
+    CHECK(std::get<cmd::SetMasterGain>(now[0]).gainDb == -3.0f);
+}
+
+TEST_CASE("ControlHub: takes the composition root's Config (selected source, push) (WP14)") {
+    Project project = testProject();
+    project.midi = config({{MidiMessageType::Cc, 1, 7, "gain", -60.0f, 0.0f, MidiCurve::Linear}});
+    EngineProcessor engine;
+    std::vector<Command> sent;
+    ControlDispatcher::Config cfg;
+    cfg.selectedSource = [] { return 2; };
+    cfg.push = [&](const Command& c) {
+        sent.push_back(c);
+        return true;
+    };
+    ControlHub hub(project, engine, nullptr, cfg);
+    hub.midi().setConfig(project.midi);
+    hub.submitMidi(MidiMessage::controllerEvent(1, 7, 127));  // bare "gain" -> selected source
+    hub.osc().handleMessage(msg("/spacer/source/1/motion/radius", 2.0f));
+    hub.pump(1.0, 1.0);
+    REQUIRE(sent.size() == 2);
+    const auto* motion = std::get_if<cmd::SetMotionParam>(&sent[0]);
+    REQUIRE(motion != nullptr);
+    CHECK(motion->sourceId == 1);
+    const auto* gain = std::get_if<cmd::SetSourceGain>(&sent[1]);
+    REQUIRE(gain != nullptr);
+    CHECK(gain->sourceId == 2);
+    CHECK(gain->gainDb == Approx(0.0f));
+}
+
+TEST_CASE("OscServer: look-ahead pump hands engine events over early with their timetag (WP14)") {
+    OscServer server;
+    juce::OSCBundle b(juce::OSCTimeTag(juce::Time(10'000)));
+    b.addElement(msg("/spacer/master/gain", -6.0f));
+    b.addElement(msg("/spacer/cue/go"));
+    server.handleBundle(b);
+    std::vector<std::pair<int, double>> got;  // (variant index, due)
+    auto deliver = [&](const ControlEvent& e, double due) {
+        got.emplace_back(static_cast<int>(e.index()), due);
+    };
+    server.pump(9.0, 0.5, deliver);
+    CHECK(got.empty());
+    server.pump(9.6, 0.5, deliver);  // master gain within the look-ahead, cue not yet due
+    REQUIRE(got.size() == 1);
+    CHECK(got[0].first == static_cast<int>(ControlEvent{ev::SetMasterGain{}}.index()));
+    CHECK(got[0].second == Approx(10.0));
+    server.pump(10.0, 0.5, deliver);
+    REQUIRE(got.size() == 2);
+    CHECK(got[1].first == static_cast<int>(ControlEvent{ev::CueGo{}}.index()));
+}
+
+namespace {
+/// Constant 0.5 on source 1 (manual, at speaker 1), 48 kHz / 128.
+struct TimedRig {
+    Project project = testProject();
+    EngineProcessor engine;
+    std::vector<float> out;  // speaker 1 output, all blocks
+    TimedRig() {
+        project.sources.resize(1);
+        project.sources[0].motion.value = ManualMotion{{-90.0f, 0.0f, 2.0f}, 0.0f};
+        project.sources[0].distance = {};
+        GraphBuilder builder(project);
+        builder.setInputFactory([](const SourceSpec&) -> std::unique_ptr<SourceInput> {
+            juce::AudioBuffer<float> b(1, 48000 * 5);
+            for (int i = 0; i < b.getNumSamples(); ++i) b.setSample(0, i, 0.5f);
+            return std::make_unique<BufferInput>(std::move(b));
+        });
+        engine.setGraphWhileStopped(builder.build(48000.0, 128));
+    }
+    void run(int blocks, double hostStart = -1.0) {
+        juce::AudioBuffer<float> buf(2, 128);
+        float* p[] = {buf.getWritePointer(0), buf.getWritePointer(1)};
+        for (int i = 0; i < blocks; ++i) {
+            if (hostStart >= 0.0) engine.setBlockHostTime(hostStart + i * 128.0 / 48000.0);
+            engine.process(nullptr, 0, p, 2, 128);
+            out.insert(out.end(), p[0], p[0] + 128);
+        }
+    }
+    /// First sample index in `out` that differs from `steady`.
+    std::int64_t firstChange(float steady) const {
+        for (std::size_t i = 0; i < out.size(); ++i)
+            if (std::abs(out[i] - steady) > 1e-6f) return static_cast<std::int64_t>(i);
+        return static_cast<std::int64_t>(out.size());
+    }
+    float steady() const { return out.back(); }
+};
+}  // namespace
+
+TEST_CASE("EngineProcessor: pushAt applies a command at its exact sample (WP14)") {
+    TimedRig rig;
+    rig.run(40);  // fade-in done, steady
+    const std::int64_t start = rig.engine.snapshot().blockStartSample + 128;
+    REQUIRE(start == 40 * 128);
+    // Master gain / panic is applied after the speaker chains, so there is
+    // no limiter look-ahead between the command and the output.
+    for (const std::int64_t offset : {37, 128 + 5, 3 * 128}) {
+        const std::int64_t base = rig.engine.snapshot().blockStartSample + 128;
+        rig.engine.pushAt(cmd::SetPanic{true}, base + offset);
+        const float steady = rig.steady();
+        REQUIRE(steady > 0.1f);
+        rig.out.clear();
+        rig.run(8);
+        CHECK(std::abs(rig.firstChange(steady) - offset) <= 1);
+        rig.engine.push(cmd::SetPanic{false});
+        rig.run(40);
+    }
+}
+
+TEST_CASE("EngineProcessor: a pushAt sample in the past applies at the next block (WP14)") {
+    TimedRig rig;
+    rig.run(40);
+    rig.engine.pushAt(cmd::SetPanic{true}, 5);
+    const float steady = rig.steady();
+    rig.out.clear();
+    rig.run(4);
+    CHECK(rig.firstChange(steady) <= 1);
+}
+
+TEST_CASE("EngineProcessor: host time maps to engine samples through the last block (WP14)") {
+    TimedRig rig;
+    CHECK(rig.engine.sampleAtHostTime(1.0) == -1);  // no host time yet
+    rig.run(3, 100.0);
+    const auto snap = rig.engine.snapshot();
+    CHECK(snap.blockStartSample == 256);
+    CHECK(snap.hostTimeSeconds == Approx(100.0 + 256.0 / 48000.0));
+    CHECK(rig.engine.sampleAtHostTime(snap.hostTimeSeconds + 1000.0 / 48000.0) == 256 + 1000);
+}
+
+TEST_CASE("ControlHub: an OSC bundle timetag is applied at its sample (WP14)") {
+    TimedRig rig;
+    ControlHub hub(rig.project, rig.engine, nullptr);
+    rig.run(40, 100.0);
+    const auto snap = rig.engine.snapshot();
+    // Now: epoch 5000 s == host time of the last block. Timetag 1000 samples later.
+    const double epochNow = 5000.0;
+    const double due = epochNow + 1000.0 / 48000.0;
+    constexpr double kNtpToUnix = 2208988800.0;
+    const double ntp = due + kNtpToUnix;
+    const auto secs = static_cast<std::uint64_t>(ntp);
+    const auto frac = static_cast<std::uint64_t>((ntp - static_cast<double>(secs)) * 4294967296.0);
+    juce::OSCBundle b(juce::OSCTimeTag((secs << 32) | frac));
+    b.addElement(msg("/spacer/panic"));
+    hub.osc().handleBundle(b);
+    hub.pump(epochNow, snap.hostTimeSeconds);
+    const float steady = rig.steady();
+    rig.out.clear();
+    const std::int64_t base = snap.blockStartSample + 128;
+    rig.run(16, snap.hostTimeSeconds + 128.0 / 48000.0);
+    const std::int64_t expected = snap.blockStartSample + 1000 - base;
+    CHECK(std::abs(rig.firstChange(steady) - expected) <= 1);
 }
