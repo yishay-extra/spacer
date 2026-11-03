@@ -173,9 +173,15 @@ TEST_CASE("Offline render: renders from WAV files and writes a WAV") {
     REQUIRE_FALSE(OfflineRenderer::writeWav(*r, outFile).has_value());
     CHECK(outFile.getSize() > 4800 * 2 * 4);
 
-    SECTION("a file at another rate is refused") {
-        auto bad = OfflineRenderer::renderFiles(p, {{7, inFile}}, 0.1, {44100.0, 128});
-        CHECK_FALSE(bad.hasValue());
+    SECTION("a file at another rate is resampled to the render rate") {
+        auto other = OfflineRenderer::renderFiles(p, {{7, inFile}}, 0.1, {44100.0, 128, {}});
+        REQUIRE(other.hasValue());
+        CHECK(other->sampleRate == 44100.0);
+        CHECK(rms(other->audio.getReadPointer(0, 1000), 2205) ==
+              Approx(0.5f / std::sqrt(2.0f)).epsilon(0.01));
+    }
+    SECTION("an unreadable file is an error") {
+        CHECK_FALSE(OfflineRenderer::renderFiles(p, {{7, dir.getChildFile("missing.wav")}}, 0.1).hasValue());
     }
     dir.deleteRecursively();
 }

@@ -14,6 +14,7 @@
 #include "core/Position.h"
 #include "core/Source.h"
 #include "core/SpeakerChain.h"
+#include "core/motion/MotionParam.h"
 
 namespace spacer {
 
@@ -52,6 +53,45 @@ struct SetSourceWidth {
 struct SetSourceDistance {
     int sourceId{0};
     DistanceModel model;
+};
+
+/// Live absolute value of a motion parameter (SPEC §5.2 `SetMotionParam`,
+/// OSC `/source/{id}/motion/{param}`), in the parameter's units. Applied as
+/// an offset over the source's motion spec, so the phase is not restarted;
+/// parameters the motion kind does not have are ignored. `channel` as in
+/// SetSourcePosition. Not carried across SwapGraph: the control side writes
+/// the value into the model it builds the next graph from.
+struct SetMotionParam {
+    int sourceId{0};
+    int channel{-1};
+    MotionParam param{MotionParam::Radius};
+    float value{0.0f};
+};
+/// Restart the source's motion (and modulator LFO) phase at the next block
+/// (SPEC §10 `reset()`, cue `restartMotionPhase`).
+struct ResetMotion {
+    int sourceId{0};
+};
+/// Value of an external (osc / midi) modulator source (SPEC §10): OSC values
+/// as received, MIDI CC normalised to 0..1 by the sender.
+struct SetModulatorValue {
+    int sourceId{0};
+    int index{0};
+    float value{0.0f};
+};
+
+/// File transport (SPEC §8, OSC `/source/{id}/file/play | stop | seek`).
+/// `play` at the end of a non-looping file restarts it from `startSeconds`.
+struct FilePlay {
+    int sourceId{0};
+};
+struct FileStop {
+    int sourceId{0};
+};
+/// Seek to `seconds` of file time; playback continues if it was playing.
+struct FileSeek {
+    int sourceId{0};
+    double seconds{0.0};
 };
 
 struct SetSpeakerTrim {
@@ -133,11 +173,12 @@ struct CancelScheduledRecall {};
 
 using Command =
     std::variant<cmd::SetSourceGain, cmd::SetSourceMute, cmd::SetSourcePosition, cmd::SetSourceSpread,
-                 cmd::SetSourceWidth, cmd::SetSourceDistance, cmd::SetSpeakerTrim, cmd::SetSpeakerMute,
-                 cmd::SetSpeakerDelay, cmd::SetSpeakerPolarity, cmd::SetSpeakerEq, cmd::SetInsertParam,
-                 cmd::SetInsertBypass, cmd::SetMasterGain, cmd::SetPanic, cmd::ClockPlay, cmd::ClockStop,
-                 cmd::ClockContinue, cmd::ClockSetBpm, cmd::ClockSetBeat, cmd::ClockTap, cmd::SwapGraph,
-                 cmd::RecallScene, cmd::CancelScheduledRecall>;
+                 cmd::SetSourceWidth, cmd::SetSourceDistance, cmd::SetMotionParam, cmd::ResetMotion,
+                 cmd::SetModulatorValue, cmd::FilePlay, cmd::FileStop, cmd::FileSeek, cmd::SetSpeakerTrim,
+                 cmd::SetSpeakerMute, cmd::SetSpeakerDelay, cmd::SetSpeakerPolarity, cmd::SetSpeakerEq,
+                 cmd::SetInsertParam, cmd::SetInsertBypass, cmd::SetMasterGain, cmd::SetPanic, cmd::ClockPlay,
+                 cmd::ClockStop, cmd::ClockContinue, cmd::ClockSetBpm, cmd::ClockSetBeat, cmd::ClockTap,
+                 cmd::SwapGraph, cmd::RecallScene, cmd::CancelScheduledRecall>;
 
 static_assert(std::is_trivially_copyable_v<Command>);
 

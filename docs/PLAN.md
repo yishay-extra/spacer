@@ -282,6 +282,33 @@ unit tests for the PLL with synthetic jitter.
 
 ---
 
+## WP14 — Integration pass · **macOS · M**
+
+After WP4, WP8, WP10, WP11a (run before or alongside the last UI WPs).
+Collects cross-WP follow-ups reported in PRs:
+- Route `ControlDispatcher` motion-param and file-transport hooks (WP8) to
+  the `SetMotionParam` / transport commands added by WP4.
+- Sample-accurate OSC bundle timetags: add a sample offset/timestamp to
+  `Command` and apply it in the engine (WP8 issue 1).
+- Live motion parameter edits without phase restart (WP7 open point;
+  needed by WP11b), `motionRight.*` modulation paths for linked stereo.
+- File sources across a node-replacing scene recall: true crossfade instead
+  of hand-over + 50 ms fade-in (WP4 note).
+- `ControlHub` must accept a `ControlDispatcher::Config` (selected source,
+  motion-param and file-transport hooks) from `AppContext` (WP11a note).
+- An OSC/MIDI scene recall that does not move the cue index must notify the
+  UI/model observers (WP11a note).
+- Re-anchor motion phase on a live period change (SPEC §8 last bullet;
+  WP4 issue 1).
+- `AudioEngine` must keep its project copy current after cue recalls
+  without rebuilding the graph (so a later device restart rebuilds from the
+  live state), and `CueEngine::setConfig()` so a device change keeps the
+  sequencer state (WP11a issues 1–2).
+- Any other "follow-up" items listed in merged PR descriptions.
+Acceptance: each item has a test; no open follow-ups left in the status log.
+
+---
+
 ## WP13 — Packaging · **macOS · M**
 
 Signed + notarized `.app` and `.driver`, DMG, LaunchAgent for installation
@@ -312,7 +339,9 @@ mode relaunch, CI release job on tags, `docs/INSTALL.md`.
 | WP3 | done | Engine (`EngineProcessor`, `Graph`/`GraphBuilder`, `SwapGraph` with state carry-over, `SpeakerChain`: Lagrange delay → gain → 3-band EQ → inserts → limiter), `OfflineRenderer`, `AllocationGuard`, `spatial/Direct`; macOS `AudioEngine` + `AggregateDevice` + `spacer-engine-check` CLI. `LookaheadLimiter` gain computer is hand-written (juce::dsp::Limiter has no look-ahead); its delay is `juce::dsp::DelayLine`. Mac checks: `docs/mac-validation/WP3.md`. Details: PR #11 |
 | WP6 | done | `InternalClock` (tempo, play/resume/stop, setBeat, tap tempo, quantised start). Decisions and open points: see "WP6 notes" below |
 | WP7 | done | `src/core/motion/`: all §10 trajectory kinds, `MotionFactory`, `ModulatorBank` (LFO/OSC/MIDI), `ParameterPath`, seeded `Rng`; shared test `AllocationCounter`. Phase-origin and Orbit decisions now in SPEC §10; other decisions in PR #9. Open: live param edits without phase restart (WP11b), `motionRight.*` modulation paths |
+| WP8 | done | `src/control`: `OscRouter`/`OscServer`/`OscSender`, `MidiMapper` (learn, 7/14-bit CC, NRPN, pitch bend, curves, note→cue, PC→scene), `ControlPath` over `ParameterPath`, `ControlDispatcher`, `ControlHub` (single producer: `pump()` on the message thread), `MidiInputService`; `MidiConfig::programChangeChannel`. Follow-ups in WP14. Mac checks: `docs/mac-validation/WP8.md`. Details: PR #18 |
 | WP9 | done | `SceneDiff`, `CueSequencer` (core); `RecallScene{RecallPlan*}` with linear ramps / 50 ms ghost-node crossfades / sample-accurate `AtBeat` scheduling (engine); `CueEngine`, `InstallationMode`, `Autosaver` (control; wired into the app by WP11a). `ClockState::startOffset`/`startBeat`. Mac checks: `docs/mac-validation/WP9.md`. Details: PR #14 |
+| WP11a | done | `AppContext` composition root (project + `ProjectHistory` scoped undo, `AudioEngine`, `CueEngine`, installation mode, `ControlHub` + `MidiInputService`, 30 Hz feedback tick); `src/ui/logic` (no-JUCE, tested: `StageTransform`, hit-test, drag rules, trajectory preview, `LayoutEditing`, `EngineSync`, `SpeakerTest`, `FeedbackState`); `StageView`, `LayoutEditor`, `MainComponent`. Follow-ups in WP14. Mac checks: `docs/mac-validation/WP11a.md`. Details: PR #19 |
 | WP2c | done | `spacer::Dbap` (`src/core/spatial/Dbap.h/.cpp`): §6.2 gains, Σg²=1 over panned speakers, `r_s = 0.2 + 3·spread`, LFE speakers excluded from gains, normalisation and render (§7). Tests in `tests/DbapTests.cpp`. Open spec issue: see "WP2c notes" below |
 
 ### WP2c notes

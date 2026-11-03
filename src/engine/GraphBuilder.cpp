@@ -2,8 +2,10 @@
 
 #include <algorithm>
 #include <utility>
+#include <variant>
 
 #include "engine/PluginHost.h"
+#include "engine/SourceInputFactory.h"
 #include "engine/SpatializerFactory.h"
 
 namespace spacer {
@@ -35,6 +37,16 @@ std::unique_ptr<InsertChain> buildInserts(PluginHost* host, InsertOwner owner, i
 
 }  // namespace
 
+GraphBuilder& GraphBuilder::setDiskStreamer(DiskStreamer* streamer) {
+    streamer_ = streamer;
+    return *this;
+}
+
+GraphBuilder& GraphBuilder::setProjectDirectory(const juce::File& directory) {
+    projectDirectory_ = directory;
+    return *this;
+}
+
 GraphBuilder& GraphBuilder::setNumOutputChannels(int numChannels) {
     numOutputChannels_ = numChannels;
     return *this;
@@ -43,6 +55,14 @@ GraphBuilder& GraphBuilder::setNumOutputChannels(int numChannels) {
 int GraphBuilder::requiredOutputChannels(const Layout& layout) {
     int n = 0;
     for (const auto& s : layout.speakers) n = std::max(n, s.outputChannel + 1);
+    return n;
+}
+
+int GraphBuilder::requiredInputChannels(const Project& project) {
+    int n = 0;
+    for (const auto& s : project.sources)
+        if (const auto* hw = std::get_if<HardwareInputSpec>(&s.input.value))
+            n = std::max({n, hw->left + 1, hw->right + 1});
     return n;
 }
 
@@ -79,7 +99,8 @@ std::vector<SpeakerChainSettings> GraphBuilder::chainSettings(const Project& pro
     return out;
 }
 
-std::unique_ptr<Graph> GraphBuilder::build(double sampleRate, int maxBlockSize) const {
+std::unique_ptr<Graph> GraphBuilder::build(double sampleRate, int maxBlockSize,
+                                           std::vector<std::string>* warnings) const {
     const Layout& layout = project_.layout;
     const int outputs = numOutputChannels_ >= 0 ? numOutputChannels_ : requiredOutputChannels(layout);
     auto graph =
@@ -98,10 +119,15 @@ std::unique_ptr<Graph> GraphBuilder::build(double sampleRate, int maxBlockSize) 
                                 : nullptr);
     }
 
+    SourceInputFactory liveInputs;
+    liveInputs.setDiskStreamer(streamer_);
+    liveInputs.setProjectDirectory(projectDirectory_);
+
     const auto numSources = std::min<std::size_t>(project_.sources.size(), kMaxSources);
     for (std::size_t i = 0; i < numSources; ++i) {
         const SourceSpec& spec = project_.sources[i];
         auto input = inputFactory_ ? inputFactory_(spec) : nullptr;
+        if (!input) input = liveInputs.create(spec, warnings);
         auto node = std::make_unique<SourceNode>(spec, makeSpatializer(spec), std::move(input));
         node->setInserts(std::make_unique<InsertStage>(buildInserts(pluginHost_, InsertOwner::Source, spec.id,
                                                                     spec.inserts, spec.stereo ? 2 : 1,

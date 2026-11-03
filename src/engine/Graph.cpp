@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <utility>
 
+#include "core/SpecEquality.h"
+
 namespace spacer {
 
 Graph::Graph(const Layout& layout, double sampleRate, int maxBlockSize, int numOutputChannels,
@@ -105,7 +107,8 @@ SpeakerChain* Graph::findSpeaker(int id) noexcept {
     return nullptr;
 }
 
-void Graph::process(const InputContext& ctx, float* const* outputs, int numOutputs, int n) noexcept {
+void Graph::process(const InputContext& ctx, const ClockState& clock, float* const* outputs, int numOutputs,
+                    int n) noexcept {
     const int numSpeakers = static_cast<int>(chains_.size());
     for (int s = 0; s < bus_.getNumChannels(); ++s)
         std::fill(busPointers_[static_cast<std::size_t>(s)], busPointers_[static_cast<std::size_t>(s)] + n,
@@ -119,9 +122,9 @@ void Graph::process(const InputContext& ctx, float* const* outputs, int numOutpu
     bus.ambisonicOrder = ambisonicOrder_;
     bus.numSamples = n;
 
-    for (auto& s : sources_) s->process(ctx, n, bus);
+    for (auto& s : sources_) s->process(ctx, clock, n, bus);
     for (auto& g : ghosts_)
-        if (!g->isSilent()) g->process(ctx, n, bus);
+        if (!g->isSilent()) g->process(ctx, clock, n, bus);
 
     // Ambisonic decode into the speaker bus: WP2d (AmbisonicDecoder).
 
@@ -136,8 +139,9 @@ void Graph::process(const InputContext& ctx, float* const* outputs, int numOutpu
 }
 
 void Graph::takeStateFrom(Graph& old) noexcept {
+    const bool sameLayout = specEqual(layout_, old.layout_);
     for (auto& s : sources_)
-        if (SourceNode* o = old.findSource(s->id())) s->takeStateFrom(*o);
+        if (SourceNode* o = old.findSource(s->id())) s->takeStateFrom(*o, sameLayout);
 
     takeSpeakerStateFrom(old);
     claimInserts();
@@ -174,6 +178,7 @@ void Graph::takeStateForRecall(Graph& old, const SceneDiff& diff, int crossfadeS
         return std::find(ids.begin(), ids.end(), id) != ids.end();
     };
     const int slowFade = std::max(crossfadeSamples, transitionSamples);
+    const bool sameLayout = specEqual(layout_, old.layout_);
 
     for (auto& s : sources_) {
         const int id = s->id();
@@ -185,7 +190,7 @@ void Graph::takeStateForRecall(Graph& old, const SceneDiff& diff, int crossfadeS
             s->fadeIn(crossfadeSamples);
             adoptGhost(old, id, crossfadeSamples);
         } else {
-            s->takeStateFrom(*previous);
+            s->takeStateFrom(*previous, sameLayout);
         }
     }
     for (int id : diff.removedSources) adoptGhost(old, id, slowFade);

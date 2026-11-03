@@ -7,6 +7,7 @@
 namespace spacer {
 
 AudioEngine::AudioEngine() {
+    streamer_.start();
     deviceManager_.addAudioCallback(this);
     startTimerHz(kFeedbackPollHz);
 }
@@ -15,6 +16,7 @@ AudioEngine::~AudioEngine() {
     stopTimer();
     deviceManager_.removeAudioCallback(this);
     deviceManager_.closeAudioDevice();
+    streamer_.stop();
 }
 
 juce::String AudioEngine::openDevice(const DeviceMapping& devices, int numInputChannels) {
@@ -44,10 +46,12 @@ void AudioEngine::closeDevice() {
 std::unique_ptr<Graph> AudioEngine::buildGraph(double sampleRate, int blockSize, int numOutputs) const {
     if (!project_ || sampleRate <= 0.0 || blockSize <= 0) return nullptr;
     GraphBuilder builder(*project_);
-    // Live source inputs (hardware, file, generator, virtual device) are WP4 / WP5.
     if (inputFactory_) builder.setInputFactory(inputFactory_);
+    builder.setDiskStreamer(&streamer_);
+    builder.setProjectDirectory(projectDirectory_);
     builder.setNumOutputChannels(numOutputs);
-    return builder.build(sampleRate, blockSize);
+    warnings_.clear();
+    return builder.build(sampleRate, blockSize, &warnings_);
 }
 
 void AudioEngine::setProject(const Project& project) {

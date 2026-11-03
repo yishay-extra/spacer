@@ -12,9 +12,13 @@ include(Catch)
 # Core tests: pure C++, no JUCE.
 # ---------------------------------------------------------------------------
 file(GLOB SPACER_TEST_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp)
+# UI logic tests (src/ui/logic, no JUCE).
+file(GLOB SPACER_UI_TEST_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/ui/*.cpp)
 
-add_executable(spacer_tests ${SPACER_TEST_SOURCES})
-target_link_libraries(spacer_tests PRIVATE spacer_core Catch2::Catch2WithMain)
+add_executable(spacer_tests ${SPACER_TEST_SOURCES} ${SPACER_UI_TEST_SOURCES})
+target_include_directories(spacer_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_definitions(spacer_tests PRIVATE SPACER_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
+target_link_libraries(spacer_tests PRIVATE spacer_ui_logic Catch2::Catch2WithMain)  # + spacer_core
 catch_discover_tests(spacer_tests)
 
 # ---------------------------------------------------------------------------

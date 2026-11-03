@@ -3,9 +3,11 @@
 #include <juce_audio_formats/juce_audio_formats.h>
 
 #include <cmath>
+#include <variant>
 #include <vector>
 
 #include "engine/BufferInput.h"
+#include "engine/DiskStreamer.h"
 #include "engine/EngineProcessor.h"
 #include "engine/GraphBuilder.h"
 
@@ -22,20 +24,29 @@ Expected<OfflineRenderer::Result, std::string> OfflineRenderer::render(const Pro
     const int numOutputs = GraphBuilder::requiredOutputChannels(project.layout);
     if (numOutputs <= 0) return Unexpected(std::string("no speaker has an output channel"));
 
+    // Declared before the processor so it outlives the graphs' file players.
+    DiskStreamer streamer;
     GraphBuilder builder(project);
     builder.setPluginHost(options.pluginHost);
+    builder.setDiskStreamer(&streamer);
+    if (!options.projectDirectory.empty())
+        builder.setProjectDirectory(
+            juce::File(juce::String(juce::CharPointer_UTF8(options.projectDirectory.c_str()))));
     builder.setInputFactory([&inputs](const SourceSpec& spec) -> std::unique_ptr<SourceInput> {
         const auto it = inputs.find(spec.id);
         if (it == inputs.end()) return nullptr;
         return std::make_unique<BufferInput>(it->second);
     });
 
+    Result result;
     auto processor = std::make_unique<EngineProcessor>();
     processor->configureClock(project.clock);
-    processor->setGraphWhileStopped(builder.build(sampleRate, blockSize));
+    processor->setGraphWhileStopped(builder.build(sampleRate, blockSize, &result.warnings));
     processor->push(cmd::ClockContinue{});
+    for (const auto& s : project.sources)
+        if (std::holds_alternative<FileInputSpec>(s.input.value) && inputs.find(s.id) == inputs.end())
+            processor->push(cmd::FilePlay{s.id});
 
-    Result result;
     result.sampleRate = sampleRate;
     result.latencySamples = processor->latencySamples();
     const auto total = static_cast<int>(std::llround(seconds * sampleRate));
@@ -48,6 +59,7 @@ Expected<OfflineRenderer::Result, std::string> OfflineRenderer::render(const Pro
         const int n = std::min(blockSize, total - pos);
         for (int c = 0; c < numOutputs; ++c)
             out[static_cast<std::size_t>(c)] = result.audio.getWritePointer(c, pos);
+        streamer.serviceAll();
         processor->process(nullptr, 0, out.data(), numOutputs, n);
         while (processor->popFeedback(discard)) {
         }
@@ -58,23 +70,20 @@ Expected<OfflineRenderer::Result, std::string> OfflineRenderer::render(const Pro
 
 Expected<OfflineRenderer::Result, std::string> OfflineRenderer::renderFiles(
     const Project& project, const std::map<int, juce::File>& files, double seconds, const Options& options) {
-    const double sampleRate = options.sampleRate > 0.0 ? options.sampleRate : project.devices.sampleRate;
+    Project p = project;
     juce::AudioFormatManager formats;
     formats.registerBasicFormats();
-    Inputs inputs;
     for (const auto& [id, file] : files) {
-        std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(file));
-        if (!reader) return Unexpected("cannot read " + file.getFullPathName().toStdString());
-        if (std::abs(reader->sampleRate - sampleRate) > 0.5)
-            return Unexpected(file.getFileName().toStdString() + ": sample rate " +
-                              std::to_string(reader->sampleRate) +
-                              " does not match the render rate (resampling is WP4)");
-        juce::AudioBuffer<float> audio(static_cast<int>(reader->numChannels),
-                                       static_cast<int>(reader->lengthInSamples));
-        reader->read(&audio, 0, audio.getNumSamples(), 0, true, true);
-        inputs.emplace(id, std::move(audio));
+        if (std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(file)); !reader)
+            return Unexpected("cannot read " + file.getFullPathName().toStdString());
+        for (auto& s : p.sources) {
+            if (s.id != id) continue;
+            FileInputSpec in;
+            in.path = file.getFullPathName().toStdString();
+            s.input.value = in;
+        }
     }
-    return render(project, inputs, seconds, options);
+    return render(p, {}, seconds, options);
 }
 
 std::optional<std::string> OfflineRenderer::writeWav(const Result& result, const juce::File& file) {

@@ -34,6 +34,13 @@ public:
     /// Whether this kind reads the given modulation target.
     virtual bool supports(MotionParam) const { return false; }
 
+    /// Adopt `other`'s time origin, so that this motion continues at the
+    /// phase `other` had reached instead of starting at phase 0 (an edited
+    /// motion of the same kind replacing a running one). State-machine kinds
+    /// (StepSequence, RandomWalk targets, Manual glides) keep their own
+    /// state. RT-safe.
+    void continueTimelineFrom(const Trajectory& other) { timeline_ = other.timeline_; }
+
 protected:
     /// Return the position at the end of the block described by `t`.
     virtual Position compute(const MotionTime& t) = 0;
