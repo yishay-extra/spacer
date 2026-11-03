@@ -298,8 +298,6 @@ Collects cross-WP follow-ups reported in PRs:
   of hand-over + 50 ms fade-in (WP4 note).
 - `ControlHub` must accept a `ControlDispatcher::Config` (selected source,
   motion-param and file-transport hooks) from `AppContext` (WP11a note).
-- An OSC/MIDI scene recall that does not move the cue index must notify the
-  UI/model observers (WP11a note).
 - Re-anchor motion phase on a live period change (SPEC §8 last bullet;
   WP4 issue 1).
 - `AudioEngine` must keep its project copy current after cue recalls
@@ -355,6 +353,7 @@ mode relaunch, CI release job on tags, `docs/INSTALL.md`.
 | WP12 | done | `src/core/clock/` (`TimeDll`, `MidiClockTracker`, `MtcDecoder`/`MtcTracker`, `OscBeatTracker`, `ClockFollower`); `MidiClock`/`MtcClock`/`OscClock` (+ `LinkClock` behind `SPACER_WITH_LINK`, default OFF — Link is GPLv2+/proprietary, needs an Ableton licence or an AGPL release); clock owned by `Graph`, switched via `SwapGraph`. Latency compensation in WP14, clock UI in WP11d. Mac checks: `docs/mac-validation/WP12.md`. Details: PR #22 |
 | WP10 | done | `HostedPlugin`, `InsertChain` (4 slots, bypass fade, latency padding), `InsertStage` in `SourceNode`/`SpeakerChain`, `Graph::alignInsertLatencies`, `PluginHost` (registry, state capture, missing → bypass+warning), out-of-process `spacer-plugin-scanner` with cache/blacklist/dead-man's pedal; `SetInsertParam`/`SetInsertBypass`; OSC insert param address; scene insert diffs ramp params, crossfade structure. CI: fake test plugins on Linux, Apple AUDelay on macOS. Mac checks: `docs/mac-validation/WP10.md`. Details: PR #23 |
 | WP11a | done | `AppContext` composition root (project + `ProjectHistory` scoped undo, `AudioEngine`, `CueEngine`, installation mode, `ControlHub` + `MidiInputService`, 30 Hz feedback tick); `src/ui/logic` (no-JUCE, tested: `StageTransform`, hit-test, drag rules, trajectory preview, `LayoutEditing`, `EngineSync`, `SpeakerTest`, `FeedbackState`); `StageView`, `LayoutEditor`, `MainComponent`. Follow-ups in WP14. Mac checks: `docs/mac-validation/WP11a.md`. Details: PR #19 |
+| WP11c | done | `CuesPanel` + `SceneManager` (right panel); `src/ui/logic`: `TriggerText` (all six trigger kinds as text), `CueListEditing`, `SceneEditing`, `CueListView`, scoped `edits::editShow` undo; armed list follows edits (`CueSequencer::updateList`); recall counter fixes OSC-recall UI notification. Mac checks: `docs/mac-validation/WP11c.md`. Details: PR #26 |
 | WP2c | done | `spacer::Dbap` (`src/core/spatial/Dbap.h/.cpp`): §6.2 gains, Σg²=1 over panned speakers, `r_s = 0.2 + 3·spread`, LFE speakers excluded from gains, normalisation and render (§7). Tests in `tests/DbapTests.cpp`. Open spec issue: see "WP2c notes" below |
 
 ### WP2c notes
