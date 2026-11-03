@@ -54,6 +54,14 @@ ProjectEdit setLayout(const Project& project, Layout after, std::string name = "
 /// unset) if the project has no such source.
 ProjectEdit setSource(const Project& project, SourceSpec after, std::string name = "Edit Source");
 
+/// Edit of the show data (scenes + cue lists, SPEC §11): `modify` runs on a
+/// copy of `project`; the edit stores the before / after of *only* those two
+/// collections, so undoing it never reverts live source / speaker state (a
+/// recall changes that outside the history). Invalid edit (apply / revert
+/// unset) if `modify` returns false or changes nothing. No engine effect: the
+/// armed cue list is re-synced by the app.
+ProjectEdit editShow(const Project& project, const std::function<bool(Project&)>& modify, std::string name);
+
 /// True if the edit can be performed (it has both functions).
 inline bool isValid(const ProjectEdit& e) {
     return static_cast<bool>(e.apply) && static_cast<bool>(e.revert);

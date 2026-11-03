@@ -17,6 +17,8 @@ bool CueEngine::arm(const std::string& name, const CueTick& tick) {
         sequencer_.setList(list);
         sequencer_.arm(tick);
         armed_ = true;
+        armedIndex_ = static_cast<int>(&list - project_.cueLists.data());
+        armedCount_ = project_.cueLists.size();
         scheduleBeatTrigger(tick);
         return true;
     }
@@ -25,6 +27,36 @@ bool CueEngine::arm(const std::string& name, const CueTick& tick) {
 
 bool CueEngine::armFirst(const CueTick& tick) {
     return !project_.cueLists.empty() && arm(project_.cueLists.front().name, tick);
+}
+
+bool CueEngine::refreshArmedList(const CueTick& tick) {
+    if (!armed_) return false;
+    const CueList* found = nullptr;
+    for (std::size_t i = 0; i < project_.cueLists.size(); ++i)
+        if (project_.cueLists[i].name == sequencer_.list().name) {
+            found = &project_.cueLists[i];
+            armedIndex_ = static_cast<int>(i);
+            break;
+        }
+    if (found == nullptr && armedIndex_ >= 0 && project_.cueLists.size() == armedCount_ &&
+        static_cast<std::size_t>(armedIndex_) < project_.cueLists.size())
+        found = &project_.cueLists[static_cast<std::size_t>(armedIndex_)];  // renamed
+    armedCount_ = project_.cueLists.size();
+    if (found == nullptr) {
+        if (beatScheduled_) engine_.push(cmd::CancelScheduledRecall{});
+        beatScheduled_ = false;
+        armed_ = false;
+        armedIndex_ = -1;
+        return true;
+    }
+    if (*found == sequencer_.list()) return false;
+    sequencer_.updateList(*found, tick);
+    if (beatScheduled_) {
+        engine_.push(cmd::CancelScheduledRecall{});
+        beatScheduled_ = false;
+    }
+    scheduleBeatTrigger(tick);
+    return true;
 }
 
 bool CueEngine::recall(const Scene& scene, float seconds, bool restart, double atBeat, int token) {
@@ -61,6 +93,8 @@ bool CueEngine::fire(int cueIndex, const CueTick& tick) {
         const Scene target = *scene;  // the recall must not alias the live model
         recall(target, cue.transitionSeconds, cue.restartMotionPhase, -1.0, 0);
         applyScene(project_, target);
+        ++recallCount_;
+        lastRecalled_ = target.name;
     } else {
         lastError_ = "cue \"" + cue.name + "\": scene \"" + cue.sceneName + "\" not found";
     }
@@ -121,7 +155,11 @@ bool CueEngine::onEngineCueFired(int token, const CueTick& t) {
     if (!sequencer_.beatFired(index, t)) return false;  // stale: a Go got there first
     beatScheduled_ = false;
     const Cue& cue = sequencer_.list().cues[static_cast<std::size_t>(index)];
-    if (const Scene* scene = findScene(project_, cue.sceneName)) applyScene(project_, *scene);
+    if (const Scene* scene = findScene(project_, cue.sceneName)) {
+        applyScene(project_, *scene);
+        ++recallCount_;
+        lastRecalled_ = scene->name;
+    }
     scheduleBeatTrigger(t);
     return true;
 }
@@ -131,7 +169,11 @@ bool CueEngine::recallScene(const std::string& sceneName, float seconds, bool re
     if (scene == nullptr) return false;
     const Scene target = *scene;
     const bool ok = recall(target, seconds, restart, -1.0, 0);
-    if (ok) applyScene(project_, target);
+    if (ok) {
+        applyScene(project_, target);
+        ++recallCount_;
+        lastRecalled_ = target.name;
+    }
     return ok;
 }
 

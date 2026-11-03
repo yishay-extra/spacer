@@ -34,6 +34,7 @@ MainComponent::MainComponent(AppContext& context) : context_(context) {
     tabs_.addTab("Layout", tabColour, new LayoutEditor(context_), true);
     tabs_.setTabBarDepth(28);
     addAndMakeVisible(tabs_);
+    addAndMakeVisible(cuesPanel_);
 
     setWantsKeyboardFocus(true);
     context_.addListener(this);
@@ -68,6 +69,7 @@ void MainComponent::resized() {
     backButton_.setBounds(bar.removeFromRight(64));
     bar.removeFromRight(12);
     statusLabel_.setBounds(bar.withTrimmedLeft(12));
+    cuesPanel_.setBounds(area.removeFromRight(CuesPanel::kPreferredWidth));
     tabs_.setBounds(area);
 }
 
