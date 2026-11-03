@@ -105,6 +105,7 @@ TEST_CASE("TimeOfDay uses HH:MM") {
 TEST_CASE("Project configuration types round-trip") {
     ROUND_TRIP((DeviceMapping{"Dev", 44100.0, 512, 331.0f}));
     ROUND_TRIP(AmbisonicsConfig{4});
+    ROUND_TRIP((AmbisonicsConfig{2, false}));  // maxRe (WP14)
     ROUND_TRIP((OscConfig{9005, {"example.local", 9006, true}}));
     ROUND_TRIP((MidiMapping{MidiMessageType::Nrpn, 2, 100, "gain", 0.0f, 1.0f, MidiCurve::Log}));
     ROUND_TRIP((MidiConfig{{MidiMapping{MidiMessageType::Cc, 1, 7, "gain"}}, 16}));
@@ -162,4 +163,8 @@ TEST_CASE("ClockConfig::latencyTrimMs round-trips, is optional and validated (WP
     bool flagged = false;
     for (const auto& issue : validate(p)) flagged = flagged || issue.path == "clock.latencyTrimMs";
     CHECK(flagged);
+}
+
+TEST_CASE("AmbisonicsConfig::maxRe is optional and defaults to on (WP14)") {
+    CHECK(Json::parse(R"({"order":3})").get<AmbisonicsConfig>().maxRe);
 }

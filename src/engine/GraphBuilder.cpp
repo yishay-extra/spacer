@@ -112,7 +112,7 @@ std::unique_ptr<Graph> GraphBuilder::build(double sampleRate, int maxBlockSize,
     // is a matrix multiply in Graph::process.
     AmbisonicDecoder decoder;
     if (busOrder > 0) {
-        decoder.prepare(layout, busOrder);
+        decoder.prepare(layout, busOrder, project_.ambisonics.maxRe);
         graph->setAmbisonicDecoder(decoder);
     }
 

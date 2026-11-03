@@ -25,6 +25,9 @@ struct DeviceMapping {
 
 struct AmbisonicsConfig {
     int order{3};  // 1..5
+    /// Max-rE weighting in the project decoder (SPEC §6.3 "by default").
+    /// JSON key optional, default true.
+    bool maxRe{true};
     bool operator==(const AmbisonicsConfig&) const = default;
 };
 
