@@ -316,6 +316,11 @@ Collects cross-WP follow-ups reported in PRs:
 - Ambisonic vs VBAP/DBAP level match on horizontal layouts (an in-plane
   ambisonic source decodes ≈ +0.7–1.1 dB vs Σg² = 1; WP3b note) and a
   project setting for max-rE.
+- Plugin editor edits mark the project dirty; installation-mode autosave
+  captures plugin state first (WP11e notes).
+- UI makes the SPEC §7 override visible: when a speaker chain overrides the
+  layout's trim/delay/polarity, the layout editor shows the effective values
+  and that they come from the chain (WP11e note).
 - Any other "follow-up" items listed in merged PR descriptions.
 Acceptance: each item has a test; no open follow-ups left in the status log.
 
@@ -356,6 +361,8 @@ mode relaunch, CI release job on tags, `docs/INSTALL.md`.
 | WP7 | done | `src/core/motion/`: all §10 trajectory kinds, `MotionFactory`, `ModulatorBank` (LFO/OSC/MIDI), `ParameterPath`, seeded `Rng`; shared test `AllocationCounter`. Phase-origin and Orbit decisions now in SPEC §10; other decisions in PR #9. Open: live param edits without phase restart (WP11b), `motionRight.*` modulation paths |
 | WP8 | done | `src/control`: `OscRouter`/`OscServer`/`OscSender`, `MidiMapper` (learn, 7/14-bit CC, NRPN, pitch bend, curves, note→cue, PC→scene), `ControlPath` over `ParameterPath`, `ControlDispatcher`, `ControlHub` (single producer: `pump()` on the message thread), `MidiInputService`; `MidiConfig::programChangeChannel`. Follow-ups in WP14. Mac checks: `docs/mac-validation/WP8.md`. Details: PR #18 |
 | WP9 | done | `SceneDiff`, `CueSequencer` (core); `RecallScene{RecallPlan*}` with linear ramps / 50 ms ghost-node crossfades / sample-accurate `AtBeat` scheduling (engine); `CueEngine`, `InstallationMode`, `Autosaver` (control; wired into the app by WP11a). `ClockState::startOffset`/`startBeat`. Mac checks: `docs/mac-validation/WP9.md`. Details: PR #14 |
+| WP11d | done | Modal `SettingsPanel` (device/rate/buffer, aggregate, driver install + latency, OSC/MIDI, PC channel, clock source + lock, installation mode) and `StatusBar`; `SettingsModel`/`StatusBarModel`/`AppSettings` in `src/ui/logic`; undoable `edits::setSettings` + `AppContext::applyRuntimeSettings`. Device change restarts the cue position (WP14). Mac checks: `docs/mac-validation/WP11d.md`. Details: PR #30 |
+| WP11e | done | Plugin editor windows that follow instances across swaps/recalls, speaker-chain insert slots, background `scanAll` with progress/cancel and blacklist view, Update-scene captures plugin state first. Follow-ups in WP14. Mac checks: `docs/mac-validation/WP11e.md`. Details: PR #32 |
 | WP12 | done | `src/core/clock/` (`TimeDll`, `MidiClockTracker`, `MtcDecoder`/`MtcTracker`, `OscBeatTracker`, `ClockFollower`); `MidiClock`/`MtcClock`/`OscClock` (+ `LinkClock` behind `SPACER_WITH_LINK`, default OFF — Link is GPLv2+/proprietary, needs an Ableton licence or an AGPL release); clock owned by `Graph`, switched via `SwapGraph`. Latency compensation in WP14, clock UI in WP11d. Mac checks: `docs/mac-validation/WP12.md`. Details: PR #22 |
 | WP10 | done | `HostedPlugin`, `InsertChain` (4 slots, bypass fade, latency padding), `InsertStage` in `SourceNode`/`SpeakerChain`, `Graph::alignInsertLatencies`, `PluginHost` (registry, state capture, missing → bypass+warning), out-of-process `spacer-plugin-scanner` with cache/blacklist/dead-man's pedal; `SetInsertParam`/`SetInsertBypass`; OSC insert param address; scene insert diffs ramp params, crossfade structure. CI: fake test plugins on Linux, Apple AUDelay on macOS. Mac checks: `docs/mac-validation/WP10.md`. Details: PR #23 |
 | WP11a | done | `AppContext` composition root (project + `ProjectHistory` scoped undo, `AudioEngine`, `CueEngine`, installation mode, `ControlHub` + `MidiInputService`, 30 Hz feedback tick); `src/ui/logic` (no-JUCE, tested: `StageTransform`, hit-test, drag rules, trajectory preview, `LayoutEditing`, `EngineSync`, `SpeakerTest`, `FeedbackState`); `StageView`, `LayoutEditor`, `MainComponent`. Follow-ups in WP14. Mac checks: `docs/mac-validation/WP11a.md`. Details: PR #19 |
