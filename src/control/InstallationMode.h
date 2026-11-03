@@ -42,6 +42,10 @@ Expected<LoadedProject, Error> autoload(const InstallationSettings& settings, bo
 /// Arms the default (or first) cue list and fires its first cue. False if
 /// there is nothing to arm or fire.
 bool startShow(CueEngine& cues, const InstallationSettings& settings, const CueTick& tick);
+/// Arms the default cue list (`settings.defaultCueList`), or the first list
+/// when that is empty. False if there is no such list. Used by startShow
+/// and by Go with nothing armed (WP14).
+bool armDefault(CueEngine& cues, const InstallationSettings& settings, const CueTick& tick);
 
 }  // namespace installation
 

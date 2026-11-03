@@ -76,10 +76,12 @@ Expected<LoadedProject, Error> autoload(const InstallationSettings& settings, bo
     return main;  // report the original failure
 }
 
+bool armDefault(CueEngine& cues, const InstallationSettings& settings, const CueTick& tick) {
+    return settings.defaultCueList.empty() ? cues.armFirst(tick) : cues.arm(settings.defaultCueList, tick);
+}
+
 bool startShow(CueEngine& cues, const InstallationSettings& settings, const CueTick& tick) {
-    const bool armed =
-        settings.defaultCueList.empty() ? cues.armFirst(tick) : cues.arm(settings.defaultCueList, tick);
-    return armed && cues.go(tick);
+    return armDefault(cues, settings, tick) && cues.go(tick);
 }
 
 }  // namespace installation

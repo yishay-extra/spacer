@@ -440,7 +440,9 @@ CueTick AppContext::cueTick() const {
 
 bool AppContext::go() {
     const auto tick = cueTick();
-    if (!cues_->armed() && !cues_->armFirst(tick)) return false;
+    // Nothing armed: the default cue list (installation settings), else the first.
+    if (!cues_->armed() && !installation::armDefault(*cues_, installation_, tick) && !cues_->armFirst(tick))
+        return false;
     // A recall rebuilds the engine graph from the model: the test overlay ends.
     if (speakerTest_) stopSpeakerTest();
     if (!cues_->go(tick)) return false;

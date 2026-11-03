@@ -387,3 +387,19 @@ TEST_CASE("Installation mode: autosave runs beforeSave (plugin state capture) on
     CHECK(loaded->project.name == "captured");
     std::filesystem::remove_all(dir);
 }
+
+TEST_CASE("Installation mode: armDefault arms the default cue list, else the first (WP14)") {
+    Show show({cue("a", "B", 0.0f)});
+    CueList other;
+    other.name = "Other";
+    other.cues = {cue("x", "C", 0.0f)};
+    show.project.cueLists.push_back(other);
+    InstallationSettings s;
+    CHECK(installation::armDefault(*show.cues, s, show.tick()));
+    CHECK(show.cues->armedName() == "Show");
+    s.defaultCueList = "Other";
+    CHECK(installation::armDefault(*show.cues, s, show.tick()));
+    CHECK(show.cues->armedName() == "Other");
+    s.defaultCueList = "Missing";
+    CHECK_FALSE(installation::armDefault(*show.cues, s, show.tick()));
+}
