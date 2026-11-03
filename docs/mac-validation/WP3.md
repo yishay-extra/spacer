@@ -46,7 +46,7 @@ The only exception is check 6, which deliberately disturbs the device.
 | 6 | Run `check tone --seconds 60`. Meanwhile, in Audio MIDI Setup, change the output's sample rate (48 k → 44.1 k → 96 k), then unplug the interface (if you are using one). | After each rate change the status line shows the new rate and the tone continues at the same pitch. After an unplug, the tool keeps running without crashing. | No crash or hang. The pitch stays 440 Hz at every rate. A short glitch at the moment of change is acceptable. |
 | 7 | `check aggregate-create "Spacer Test" org.spacer.test <UID-A> <UID-B>` with two UIDs from check 1. Then run `check devices`, then `check tone --device "Spacer Test" --seconds 10`, then `check aggregate-destroy org.spacer.test`, then `check devices` again. | It prints `created aggregate device id N`. "Spacer Test" is listed with in/out = the sum of both devices, and also appears in Audio MIDI Setup. The tone plays on its first two outputs (device A's channels 1–2). Destroy prints `destroyed`, after which the device is gone from both lists. | Every step behaves as described; nothing is left over in Audio MIDI Setup. |
 | 8 | Debug build: the `spacer-engine-check` under `build-debug/spacer_engine_check_artefacts/`, run as `… pan --seconds 30`. Also launch `build-debug/Spacer_artefacts/Debug/Spacer.app` and leave it open for 1 min. | Same behaviour as the Release build. The allocation guard is active (the tool has it in every build, the app only in Debug): if the audio callback allocates or frees, the process prints `spacer: operator new on the audio thread (allocation guard)` and aborts. | The process runs to the end and the app stays open; that message never appears. |
-| 9 | Launch `Spacer.app` (Release). | The window shows "Spacer", with a status line below it: device name, rate / buffer, `2 out` or more, latency, CPU and xruns. The output is silent, because live sources only arrive in WP4. | The status line is shown and no error is shown. CPU is well under 5 %. Xruns stay at 0 for 1 min. |
+| 9 | Launch `Spacer.app` (Release). | The window shows "Spacer", with a status line below it: device name, rate / buffer, CPU, xruns, latency, clock (bpm, bar.beat). The output is silent, because live sources only arrive in WP4. | The status line is shown and no error is shown. CPU is well under 5 %. Xruns stay at 0 for 1 min. |
 | 10 | `check tone --rate 48000 --buffer 128 --seconds 10`, then the same with `--buffer 32` and `--buffer 2048`. | The status line shows the requested buffer size, where the device supports it. | The tone is clean at every buffer size. Xruns stay at 0 at 128 and 2048; at 32, a few at start-up are acceptable. Graph latency reads 72 smp at 48 kHz (the limiter's 1.5 ms). |
 
 ## What is not checked here
@@ -61,7 +61,7 @@ The only exception is check 6, which deliberately disturbs the device.
 Run by an agent: everything measurable was measured (status lines, mic
 capture through AVAudioEngine with a 440 Hz afplay control reading exactly
 440.0 Hz, frame counts confirming the capture rate); "by ear" columns are
-still open for the owner. Tool binary is `spacer_engine_check` (#38).
+still open for the owner. Results were taken with the binary then named `spacer_engine_check` (#38); it is now `spacer-engine-check`.
 
 | # | Result | Notes |
 |---|--------|-------|

@@ -235,7 +235,8 @@ if(SPACER_WITH_APP)
     file(GLOB SPACER_ENGINE_DEVICE_SOURCES CONFIGURE_DEPENDS
         ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/device/*.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/device/*.h)
-    juce_add_console_app(spacer_engine_check PRODUCT_NAME "spacer-engine-check")
+    juce_add_console_app(spacer_engine_check)
+    set_target_properties(spacer_engine_check PROPERTIES OUTPUT_NAME spacer-engine-check)
     target_sources(spacer_engine_check PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/tools/EngineCheck.cpp
         ${SPACER_ENGINE_SOURCES}
