@@ -41,6 +41,16 @@ void OscServer::handleMessage(const juce::OSCMessage& message, double dueEpochSe
         malformedMessages_.fetch_add(1, std::memory_order_relaxed);
         return;
     }
+    if (std::holds_alternative<ev::ClockBeat>(*routed.event) ||
+        std::holds_alternative<ev::ClockStop>(*routed.event)) {
+        const std::lock_guard<std::mutex> lock(clockTapMutex_);
+        if (clockTap_) {
+            double hostTime = juce::Time::getMillisecondCounterHiRes() * 0.001;
+            if (dueEpochSeconds > 0.0)
+                hostTime += dueEpochSeconds - static_cast<double>(juce::Time::currentTimeMillis()) * 0.001;
+            if (clockTap_(*routed.event, hostTime)) return;
+        }
+    }
     inbox_.push(Timed{dueEpochSeconds, std::move(*routed.event)});
 }
 
@@ -85,6 +95,11 @@ void OscServer::pump(double nowEpochSeconds, const std::function<void(const Cont
         auto node = scheduled_.extract(scheduled_.begin());
         deliver(node.mapped());
     }
+}
+
+void OscServer::setClockTap(ClockTap tap) {
+    const std::lock_guard<std::mutex> lock(clockTapMutex_);
+    clockTap_ = std::move(tap);
 }
 
 OscServer::Stats OscServer::stats() const noexcept {

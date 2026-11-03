@@ -51,7 +51,11 @@ if(SPACER_WITH_ENGINE_TESTS)
         juce::juce_recommended_warning_flags)
 
     add_executable(spacer_engine_tests ${SPACER_ENGINE_TEST_SOURCES} ${SPACER_ENGINE_SOURCES}
-        ${SPACER_CONTROL_SOURCES})
+        ${SPACER_CONTROL_SOURCES} ${SPACER_LINK_SOURCES})
+    if(SPACER_WITH_LINK)
+        target_compile_definitions(spacer_engine_tests PRIVATE SPACER_WITH_LINK=1)
+        target_link_libraries(spacer_engine_tests PRIVATE Ableton::Link)
+    endif()
     target_include_directories(spacer_engine_tests PRIVATE ${PROJECT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR})
     target_compile_definitions(spacer_engine_tests PRIVATE
         ${SPACER_ENGINE_JUCE_DEFINITIONS}
