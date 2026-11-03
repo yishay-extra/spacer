@@ -247,8 +247,14 @@ void AppContext::rememberProjectPath() {
     installation::saveSettings(installation_, installationSettingsPath_);
 }
 
+void AppContext::selectSource(int sourceId) {
+    if (!selection_.select(sourceId)) return;
+    notify(Change::Selection);
+}
+
 void AppContext::modelChanged(Change change) {
     ++revision_;
+    selection_.reconcile(project_);
     notify(change);
 }
 
