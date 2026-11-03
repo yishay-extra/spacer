@@ -10,6 +10,8 @@
 
 namespace spacer {
 
+class PluginHost;
+
 /// Builds a ready-to-run Graph from a Project (SPEC §5.2). Non-RT: runs on
 /// the message thread (or the offline renderer's thread).
 ///
@@ -19,6 +21,11 @@ namespace spacer {
 /// the layout Speaker's fields (the chain is the live, scene-recallable
 /// state; the Speaker fields are the defaults); mute and EQ come only from
 /// the chain.
+///
+/// Insert slots (SPEC §13) are instantiated through the PluginHost given with
+/// setPluginHost(), which reuses the running instances of unchanged slots.
+/// Without a host every slot is a pass-through (as for a missing plugin). The
+/// built graph pads all chains to a common latency (Graph::alignInsertLatencies).
 class GraphBuilder {
 public:
     using InputFactory = std::function<std::unique_ptr<SourceInput>(const SourceSpec&)>;
@@ -27,6 +34,9 @@ public:
 
     /// Creates the input for each source; null (or no factory) = silence.
     GraphBuilder& setInputFactory(InputFactory factory);
+    /// Plugin instances for insert slots. Must outlive the built graphs' use
+    /// of it (build() only; instances are shared, not owned by the host).
+    GraphBuilder& setPluginHost(PluginHost* host);
     /// Device channels the graph writes; default requiredOutputChannels().
     GraphBuilder& setNumOutputChannels(int numChannels);
 
@@ -45,6 +55,7 @@ public:
 private:
     Project project_;
     InputFactory inputFactory_;
+    PluginHost* pluginHost_{nullptr};
     int numOutputChannels_{-1};
 };
 

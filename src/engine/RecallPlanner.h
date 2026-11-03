@@ -21,6 +21,11 @@ struct RecallRequest {
     int maxBlockSize{128};
     /// Same factory the live graph was built with (inputs of added sources).
     GraphBuilder::InputFactory inputFactory;
+    /// Plugin instances for the new graph (the same host as the live graph's;
+    /// unchanged slots keep their instances). The caller should have written
+    /// the live plugin state into `project` first (PluginHost::captureState),
+    /// so that edits made in plugin editors count as the current state.
+    PluginHost* pluginHost{nullptr};
     int numOutputChannels{-1};  // -1 = the layout's
     double atBeat{-1.0};        // >= 0: schedule for that beat
     int token{0};

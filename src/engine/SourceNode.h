@@ -11,11 +11,12 @@
 #include "core/Spatializer.h"
 #include "core/spatial/DistanceModel.h"
 #include "engine/GainRamp.h"
+#include "engine/InsertStage.h"
 #include "engine/SourceInput.h"
 
 namespace spacer {
 
-/// One source in the graph (SPEC §5.3): input → [inserts, WP10] → gain ramp
+/// One source in the graph (SPEC §5.3): input → inserts (InsertStage) → gain ramp
 /// → position (per block, interpolated by the spatializer) → distance model
 /// → spatializer into the speaker bus. Stereo sources render two channels at
 /// centre ± width/2 (or two independent points when `linkedPoints`).
@@ -32,6 +33,11 @@ public:
 
     SourceNode(const SourceSpec& spec, std::unique_ptr<Spatializer> spatializer,
                std::unique_ptr<SourceInput> input);
+
+    /// Non-RT, before prepare(): the source's insert slots (SPEC §13). Without
+    /// one the node gets an empty stage.
+    void setInserts(std::unique_ptr<InsertStage> inserts) { inserts_ = std::move(inserts); }
+    InsertStage& inserts() noexcept { return *inserts_; }
 
     /// Non-RT. Prepares spatializer and input, allocates buffers, and sets the
     /// gain ramp to start at 0 so a new source fades in.
@@ -108,6 +114,7 @@ private:
 
     std::unique_ptr<Spatializer> spatializer_;
     std::unique_ptr<SourceInput> input_;
+    std::unique_ptr<InsertStage> inserts_;
     std::unique_ptr<Motion> motion_;  // WP7
 
     double sampleRate_{48000.0};

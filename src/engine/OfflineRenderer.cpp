@@ -23,6 +23,7 @@ Expected<OfflineRenderer::Result, std::string> OfflineRenderer::render(const Pro
     if (numOutputs <= 0) return Unexpected(std::string("no speaker has an output channel"));
 
     GraphBuilder builder(project);
+    builder.setPluginHost(options.pluginHost);
     builder.setInputFactory([&inputs](const SourceSpec& spec) -> std::unique_ptr<SourceInput> {
         const auto it = inputs.find(spec.id);
         if (it == inputs.end()) return nullptr;

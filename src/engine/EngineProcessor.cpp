@@ -167,6 +167,12 @@ void EngineProcessor::apply(const Command& command) noexcept {
                     if (auto* s = graph_->findSpeaker(c.speakerId)) s->setPolarityInverted(c.inverted);
                 } else if constexpr (std::is_same_v<C, cmd::SetSpeakerEq>) {
                     if (auto* s = graph_->findSpeaker(c.speakerId)) s->setEq(c.eq);
+                } else if constexpr (std::is_same_v<C, cmd::SetInsertParam>) {
+                    if (auto* st = graph_->findInserts(c.owner, c.id))
+                        st->chain().setParameter(c.slot, c.index, c.value);
+                } else if constexpr (std::is_same_v<C, cmd::SetInsertBypass>) {
+                    if (auto* st = graph_->findInserts(c.owner, c.id))
+                        st->chain().setBypassed(c.slot, c.bypassed);
                 } else {
                     static_assert(sizeof(C) == 0, "unhandled command");
                 }
@@ -377,13 +383,31 @@ void EngineProcessor::startRamp(const Ramp& r, int totalSamples, float rampMs) n
         return;
     }
 
+    // Insert slots: bypass is a discrete, crossfaded switch; parameters ramp
+    // from the plugin's live value.
+    const bool insertParam = t == RampTarget::SourceInsertParam || t == RampTarget::SpeakerInsertParam;
+    const bool insertBypass = t == RampTarget::SourceInsertBypass || t == RampTarget::SpeakerInsertBypass;
+    InsertStage* inserts = nullptr;
+    if (insertParam || insertBypass) {
+        const bool speaker = t == RampTarget::SpeakerInsertParam || t == RampTarget::SpeakerInsertBypass;
+        inserts = graph_->findInserts(speaker ? InsertOwner::Speaker : InsertOwner::Source, r.id);
+        if (inserts == nullptr) return;
+        if (insertBypass) {
+            inserts->chain().setBypassed(r.slot, r.to > 0.5f);
+            return;
+        }
+    }
+
     // Everything else is stepped once per chunk, linearly from the live value.
     ActiveRamp a;
     a.ramp = r;
     a.total = totalSamples;
     a.from = r.from;
     a.fromPosition = r.fromPosition;
-    if (auto* s = graph_->findSource(r.id)) {
+    if (inserts != nullptr) {
+        if (inserts->chain().plugin(r.slot) == nullptr) return;  // missing plugin
+        a.from = inserts->chain().parameter(r.slot, r.param);
+    } else if (auto* s = graph_->findSource(r.id)) {
         if (t == RampTarget::SourceSpread)
             a.from = s->spread();
         else if (t == RampTarget::SourceWidth)
@@ -410,7 +434,8 @@ void EngineProcessor::startRamp(const Ramp& r, int totalSamples, float rampMs) n
     // A newer ramp for the same parameter replaces the older one.
     for (int i = 0; i < numRamps_; ++i) {
         ActiveRamp& old = ramps_[static_cast<std::size_t>(i)];
-        if (old.ramp.target == t && old.ramp.id == r.id && old.ramp.channel == r.channel) {
+        if (old.ramp.target == t && old.ramp.id == r.id && old.ramp.channel == r.channel &&
+            old.ramp.slot == r.slot && old.ramp.param == r.param) {
             old = a;
             return;
         }
@@ -425,6 +450,11 @@ void EngineProcessor::startRamp(const Ramp& r, int totalSamples, float rampMs) n
 void EngineProcessor::applyRampValue(const Ramp& r, float v, const Position& position) noexcept {
     if (graph_ == nullptr) return;
     const RampTarget t = r.target;
+    if (t == RampTarget::SourceInsertParam || t == RampTarget::SpeakerInsertParam) {
+        const auto owner = t == RampTarget::SpeakerInsertParam ? InsertOwner::Speaker : InsertOwner::Source;
+        if (auto* st = graph_->findInserts(owner, r.id)) st->chain().setParameter(r.slot, r.param, v);
+        return;
+    }
     if (auto* s = graph_->findSource(r.id)) {
         if (t == RampTarget::SourceSpread) {
             s->setSpread(v);

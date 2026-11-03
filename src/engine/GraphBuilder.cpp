@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <utility>
 
+#include "engine/PluginHost.h"
 #include "engine/SpatializerFactory.h"
 
 namespace spacer {
@@ -13,6 +14,26 @@ GraphBuilder& GraphBuilder::setInputFactory(InputFactory factory) {
     inputFactory_ = std::move(factory);
     return *this;
 }
+
+GraphBuilder& GraphBuilder::setPluginHost(PluginHost* host) {
+    pluginHost_ = host;
+    return *this;
+}
+
+namespace {
+
+std::unique_ptr<InsertChain> buildInserts(PluginHost* host, InsertOwner owner, int id,
+                                          const std::vector<PluginSlot>& slots, int numChannels,
+                                          double sampleRate, int maxBlockSize) {
+    if (slots.empty()) return nullptr;
+    if (host != nullptr) return host->buildChain(owner, id, slots, numChannels, sampleRate, maxBlockSize);
+    auto chain = std::make_unique<InsertChain>();  // no host: every slot passes through
+    for (std::size_t i = 0; i < slots.size() && i < static_cast<std::size_t>(kMaxInserts); ++i)
+        chain->addSlot(nullptr, slots[i].pluginId, slots[i].bypassed);
+    return chain;
+}
+
+}  // namespace
 
 GraphBuilder& GraphBuilder::setNumOutputChannels(int numChannels) {
     numOutputChannels_ = numChannels;
@@ -66,15 +87,28 @@ std::unique_ptr<Graph> GraphBuilder::build(double sampleRate, int maxBlockSize) 
 
     const auto chains = chainSettings(project_);
     const auto numSpeakers = std::min<std::size_t>(chains.size(), kMaxSpeakers);
-    for (std::size_t i = 0; i < numSpeakers; ++i)
-        graph->addSpeaker(chains[i], layout.speakers[i].outputChannel);
+    for (std::size_t i = 0; i < numSpeakers; ++i) {
+        const int speakerId = layout.speakers[i].id;
+        const std::vector<PluginSlot>* slots = nullptr;
+        for (const auto& c : project_.speakerChains)
+            if (c.speakerId == speakerId) slots = &c.inserts;
+        graph->addSpeaker(chains[i], layout.speakers[i].outputChannel,
+                          slots ? buildInserts(pluginHost_, InsertOwner::Speaker, speakerId, *slots, 1,
+                                               sampleRate, maxBlockSize)
+                                : nullptr);
+    }
 
     const auto numSources = std::min<std::size_t>(project_.sources.size(), kMaxSources);
     for (std::size_t i = 0; i < numSources; ++i) {
         const SourceSpec& spec = project_.sources[i];
         auto input = inputFactory_ ? inputFactory_(spec) : nullptr;
-        graph->addSource(std::make_unique<SourceNode>(spec, makeSpatializer(spec), std::move(input)));
+        auto node = std::make_unique<SourceNode>(spec, makeSpatializer(spec), std::move(input));
+        node->setInserts(std::make_unique<InsertStage>(buildInserts(pluginHost_, InsertOwner::Source, spec.id,
+                                                                    spec.inserts, spec.stereo ? 2 : 1,
+                                                                    sampleRate, maxBlockSize)));
+        graph->addSource(std::move(node));
     }
+    graph->alignInsertLatencies();
     return graph;
 }
 

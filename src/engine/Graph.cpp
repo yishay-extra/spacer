@@ -38,8 +38,10 @@ void Graph::addSource(std::unique_ptr<SourceNode> node) {
     sources_.push_back(std::move(node));
 }
 
-void Graph::addSpeaker(const SpeakerChainSettings& settings, int outputChannel) {
+void Graph::addSpeaker(const SpeakerChainSettings& settings, int outputChannel,
+                       std::unique_ptr<InsertChain> inserts) {
     auto chain = std::make_unique<SpeakerChain>();
+    chain->setInserts(std::make_unique<InsertStage>(std::move(inserts)));
     chain->prepare(sampleRate_, maxBlockSize_);
     chain->configure(settings);
     chains_.push_back(std::move(chain));
@@ -47,7 +49,48 @@ void Graph::addSpeaker(const SpeakerChainSettings& settings, int outputChannel) 
 }
 
 int Graph::latencySamples() const noexcept {
-    return chains_.empty() ? 0 : chains_.front()->limiterLatencySamples();
+    const int limiter = chains_.empty() ? 0 : chains_.front()->limiterLatencySamples();
+    return limiter + sourceInsertLatency_ + speakerInsertLatency_;
+}
+
+void Graph::alignInsertLatencies() {
+    bool sourceInserts = false, speakerInserts = false;
+    sourceInsertLatency_ = speakerInsertLatency_ = 0;
+    for (auto& s : sources_) {
+        sourceInserts = sourceInserts || !s->inserts().chain().empty();
+        sourceInsertLatency_ = std::max(sourceInsertLatency_, s->inserts().pluginLatency());
+    }
+    for (auto& c : chains_) {
+        speakerInserts = speakerInserts || !c->inserts().chain().empty();
+        speakerInsertLatency_ = std::max(speakerInsertLatency_, c->inserts().pluginLatency());
+    }
+    // Chains of a graph without any inserts of that kind need no padding at
+    // all; otherwise every chain gets room to absorb later latency changes.
+    const auto capacity = [](bool any, int maxLatency) {
+        return any ? std::max(InsertChain::kMinPadCapacity, maxLatency) : 0;
+    };
+    for (auto& s : sources_)
+        s->inserts().configurePad(sourceInsertLatency_ - s->inserts().pluginLatency(),
+                                  capacity(sourceInserts, sourceInsertLatency_));
+    for (auto& c : chains_)
+        c->inserts().configurePad(speakerInsertLatency_ - c->inserts().pluginLatency(),
+                                  capacity(speakerInserts, speakerInsertLatency_));
+}
+
+InsertStage* Graph::findInserts(InsertOwner owner, int id) noexcept {
+    if (owner == InsertOwner::Source) {
+        SourceNode* s = findSource(id);
+        return s != nullptr ? &s->inserts() : nullptr;
+    }
+    SpeakerChain* c = findSpeaker(id);
+    return c != nullptr ? &c->inserts() : nullptr;
+}
+
+void Graph::claimInserts() noexcept {
+    // The new graph's chains process the shared plugin instances from now on;
+    // ghosts and outgoing chains holding the same instances pass through.
+    for (auto& s : sources_) s->inserts().claim();
+    for (auto& c : chains_) c->inserts().claim();
 }
 
 SourceNode* Graph::findSource(int id) noexcept {
@@ -97,6 +140,7 @@ void Graph::takeStateFrom(Graph& old) noexcept {
         if (SourceNode* o = old.findSource(s->id())) s->takeStateFrom(*o);
 
     takeSpeakerStateFrom(old);
+    claimInserts();
 }
 
 void Graph::takeSpeakerStateFrom(Graph& old) noexcept {
@@ -151,6 +195,7 @@ void Graph::takeStateForRecall(Graph& old, const SceneDiff& diff, int crossfadeS
         if (g && !g->isSilent() && ghosts_.size() < ghosts_.capacity()) ghosts_.push_back(std::move(g));
 
     takeSpeakerStateFrom(old);
+    claimInserts();
 }
 
 int Graph::fadeOutSourcesMissingFrom(Graph& next, int numSamples) noexcept {

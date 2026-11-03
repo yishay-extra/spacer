@@ -76,9 +76,16 @@ file(GLOB SPACER_ENGINE_SOURCES CONFIGURE_DEPENDS
 file(GLOB SPACER_CONTROL_SOURCES CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_SOURCE_DIR}/src/control/*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/control/*.h)
+# Plugin hosting (SPEC §13): AudioUnit v2 on macOS only; no other formats.
 set(SPACER_ENGINE_JUCE_DEFINITIONS
     JUCE_WEB_BROWSER=0
-    JUCE_USE_CURL=0)
+    JUCE_USE_CURL=0
+    JUCE_PLUGINHOST_VST=0
+    JUCE_PLUGINHOST_VST3=0
+    JUCE_PLUGINHOST_LV2=0
+    JUCE_PLUGINHOST_LADSPA=0
+    JUCE_PLUGINHOST_ARA=0
+    $<IF:$<BOOL:${APPLE}>,JUCE_PLUGINHOST_AU=1,JUCE_PLUGINHOST_AU=0>)
 
 # ---------------------------------------------------------------------------
 # Spacer app: JUCE. macOS only for phase 1.
@@ -108,8 +115,6 @@ if(SPACER_WITH_APP)
     target_compile_definitions(Spacer PRIVATE
         ${SPACER_ENGINE_JUCE_DEFINITIONS}
         $<$<CONFIG:Debug>:SPACER_ALLOCATION_GUARD=1>
-        JUCE_PLUGINHOST_AU=1
-        JUCE_PLUGINHOST_VST3=0
         JUCE_APPLICATION_NAME_STRING="$<TARGET_PROPERTY:Spacer,JUCE_PRODUCT_NAME>"
         JUCE_APPLICATION_VERSION_STRING="$<TARGET_PROPERTY:Spacer,JUCE_VERSION>")
 
@@ -149,6 +154,7 @@ if(SPACER_WITH_APP)
             spacer_core
             juce::juce_audio_devices
             juce::juce_audio_formats
+            juce::juce_audio_processors_headless
             juce::juce_dsp
             juce::juce_events
             "-framework CoreAudio"
