@@ -150,6 +150,7 @@ bool AppContext::perform(ProjectEdit edit) {
     const auto effect = history_.perform(project_, std::move(edit));
     if (!effect) return false;
     syncEngine(*effect);
+    syncArmedList();
     modelChanged(Change::Edited);
     return true;
 }
@@ -168,6 +169,7 @@ bool AppContext::undo() {
     if (!effect) return false;
     syncEngine(*effect);
     if (rebuildPending_) rebuildGraph();
+    syncArmedList();
     modelChanged(Change::UndoRedo);
     return true;
 }
@@ -177,6 +179,7 @@ bool AppContext::redo() {
     if (!effect) return false;
     syncEngine(*effect);
     if (rebuildPending_) rebuildGraph();
+    syncArmedList();
     modelChanged(Change::UndoRedo);
     return true;
 }
@@ -246,8 +249,17 @@ void AppContext::rememberProjectPath() {
 
 void AppContext::modelChanged(Change change) {
     ++revision_;
+    notify(change);
+}
+
+void AppContext::notify(Change change) {
     const auto copy = listeners_;  // listeners may remove themselves
     for (auto* l : copy) l->projectChanged(change);
+}
+
+void AppContext::syncArmedList() {
+    // The armed cue list is a copy: follow edits / undo of the project's lists.
+    cues_->refreshArmedList(cueTick());
 }
 
 // ---- engine -------------------------------------------------------------------
@@ -316,6 +328,28 @@ bool AppContext::back() {
     return true;
 }
 
+bool AppContext::armCueList(const std::string& name) {
+    if (!cues_->arm(name, cueTick())) return false;
+    notify(Change::CueState);
+    return true;
+}
+
+bool AppContext::jumpToCue(int index) {
+    const auto tick = cueTick();
+    if (!cues_->armed() && !cues_->armFirst(tick)) return false;
+    if (speakerTest_) stopSpeakerTest();
+    if (!cues_->jump(index, tick)) return false;
+    modelChanged(Change::SceneRecalled);
+    return true;
+}
+
+bool AppContext::recallScene(const std::string& name, float transitionSeconds, bool restartMotionPhase) {
+    if (speakerTest_) stopSpeakerTest();
+    if (!cues_->recallScene(name, transitionSeconds, restartMotionPhase)) return false;
+    modelChanged(Change::SceneRecalled);
+    return true;
+}
+
 // ---- observers ----------------------------------------------------------------
 
 void AppContext::addListener(Listener* listener) {
@@ -337,9 +371,11 @@ void AppContext::timerCallback() {
     if (plugins_->takeLatencyChanged()) rebuildGraph();
 
     // OSC / MIDI. A cue fired from there changes the live model (SPEC §11).
-    const int cueBefore = cues_->sequencer().current();
+    // Any recall counts, also an OSC / MIDI scene recall that leaves the cue
+    // index alone (PLAN WP14 item, fixed here because the Cues panel shows it).
+    const auto recallsBefore = cues_->recallCount();
     control_->pump();
-    if (cues_->sequencer().current() != cueBefore) modelChanged(Change::SceneRecalled);
+    if (cues_->recallCount() != recallsBefore) modelChanged(Change::SceneRecalled);
 
     // Automatic cue triggers are held while a speaker test runs: a recall
     // rebuilds the engine from the model and would end the test half-way.

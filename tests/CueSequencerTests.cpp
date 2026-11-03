@@ -263,3 +263,37 @@ TEST_CASE("CueSequencer: setList resets the position") {
     CHECK(s.current() == -1);
     CHECK(s.next() == 0);
 }
+
+TEST_CASE("CueSequencer: updateList keeps the position and re-times only a changed next cue") {
+    CueSequencer s(listOf({cue("a"), cue("b", after(10)), cue("c")}));
+    s.arm(at(0));
+    REQUIRE(s.go(at(0)) == 0);
+    CHECK(s.current() == 0);
+
+    // Editing a cue that is not next leaves the countdown (due at t = 10) alone.
+    auto edited = s.list();
+    edited.cues[2].name = "cc";
+    s.updateList(edited, at(5));
+    CHECK(s.current() == 0);
+    CHECK_FALSE(s.update(at(9.9)));
+    CHECK(s.update(at(10.0)) == 1);
+
+    // Changing the next cue's delay re-times it from "now".
+    s.arm(at(20));
+    REQUIRE(s.go(at(20)) == 0);
+    edited = s.list();
+    edited.cues[1].trigger = after(3);
+    s.updateList(edited, at(21));
+    CHECK_FALSE(s.update(at(23.9)));
+    CHECK(s.update(at(24.0)) == 1);
+
+    // Inserting a cue shifts "next"; removing the current cue clamps.
+    edited = s.list();
+    edited.cues.erase(edited.cues.begin() + 1, edited.cues.end());
+    s.updateList(edited, at(30));
+    CHECK(s.current() == 0);
+    CHECK(s.next() == -1);
+    s.updateList(listOf({}), at(30));
+    CHECK(s.current() == -1);
+    CHECK(s.next() == -1);
+}
