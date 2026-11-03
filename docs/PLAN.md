@@ -323,6 +323,14 @@ Collects cross-WP follow-ups reported in PRs:
   and that they come from the chain (WP11e note).
 - Any other "follow-up" items listed in merged PR descriptions.
 Acceptance: each item has a test; no open follow-ups left in the status log.
+**Done in PR #34.** Left open (need a spec decision, tracked for v1.1):
+recall during an unfinished transition snaps non-gain values of structurally
+changed sources; 7.1.4 zenith uses 2 of 4 top speakers (symmetric split rule);
+distance low-pass not transparent ≤ 1 m with q > 0 (§6.5 curve); OSC
+`/motion/period` (periods are structural, needs a model-edit path);
+`/spacer/clock/beat` meaning with an internal clock. Known flaky test:
+`PluginScanCache: known plugins and the blacklist survive save / load`
+(once, in a parallel run).
 
 ---
 
@@ -364,6 +372,7 @@ mode relaunch, CI release job on tags, `docs/INSTALL.md`.
 | WP11d | done | Modal `SettingsPanel` (device/rate/buffer, aggregate, driver install + latency, OSC/MIDI, PC channel, clock source + lock, installation mode) and `StatusBar`; `SettingsModel`/`StatusBarModel`/`AppSettings` in `src/ui/logic`; undoable `edits::setSettings` + `AppContext::applyRuntimeSettings`. Device change restarts the cue position (WP14). Mac checks: `docs/mac-validation/WP11d.md`. Details: PR #30 |
 | WP11e | done | Plugin editor windows that follow instances across swaps/recalls, speaker-chain insert slots, background `scanAll` with progress/cancel and blacklist view, Update-scene captures plugin state first. Follow-ups in WP14. Mac checks: `docs/mac-validation/WP11e.md`. Details: PR #32 |
 | WP12 | done | `src/core/clock/` (`TimeDll`, `MidiClockTracker`, `MtcDecoder`/`MtcTracker`, `OscBeatTracker`, `ClockFollower`); `MidiClock`/`MtcClock`/`OscClock` (+ `LinkClock` behind `SPACER_WITH_LINK`, default OFF — Link is GPLv2+/proprietary, needs an Ableton licence or an AGPL release); clock owned by `Graph`, switched via `SwapGraph`. Latency compensation in WP14, clock UI in WP11d. Mac checks: `docs/mac-validation/WP12.md`. Details: PR #22 |
+| WP14 | done | All WP14 bullets with tests: OSC/MIDI → `SetMotionParam`/file transport/insert params; sample-accurate timetags (`pushAt`, host-time anchor via seqlock); `motionRight.*` paths; true file crossfade on recall; `ControlHub` Config; period re-anchor; `AudioEngine::updateProject` + `CueEngine::setConfig`; external-clock latency compensation + `latencyTrimMs`; modulators → plugin params; live `SetModulator`; horizontal ambisonic level match + `maxRe`; plugin edits mark dirty, autosave captures plugins; chain overrides shown in the layout table; osc/midi modulator sources fed; motion-param ramps on recall; default cue list for Go. Mac checks: `docs/mac-validation/WP14.md`. Details: PR #34 |
 | WP10 | done | `HostedPlugin`, `InsertChain` (4 slots, bypass fade, latency padding), `InsertStage` in `SourceNode`/`SpeakerChain`, `Graph::alignInsertLatencies`, `PluginHost` (registry, state capture, missing → bypass+warning), out-of-process `spacer-plugin-scanner` with cache/blacklist/dead-man's pedal; `SetInsertParam`/`SetInsertBypass`; OSC insert param address; scene insert diffs ramp params, crossfade structure. CI: fake test plugins on Linux, Apple AUDelay on macOS. Mac checks: `docs/mac-validation/WP10.md`. Details: PR #23 |
 | WP11a | done | `AppContext` composition root (project + `ProjectHistory` scoped undo, `AudioEngine`, `CueEngine`, installation mode, `ControlHub` + `MidiInputService`, 30 Hz feedback tick); `src/ui/logic` (no-JUCE, tested: `StageTransform`, hit-test, drag rules, trajectory preview, `LayoutEditing`, `EngineSync`, `SpeakerTest`, `FeedbackState`); `StageView`, `LayoutEditor`, `MainComponent`. Follow-ups in WP14. Mac checks: `docs/mac-validation/WP11a.md`. Details: PR #19 |
 | WP11b | done | `SourcePanel`/`SourceStrip` (left): list with meters, add/duplicate/remove, input, level, spatializer, distance, motion editors for all kinds, modulators, inserts add/remove/bypass; `src/ui/logic`: `SourceSelection`, `ValueFormat`, `MotionFields`, `SourceEditing`; live `SetMotionParam`/`SetInsertBypass` routing; `AppContext::selection()`. Follow-ups in WP14. Mac checks: `docs/mac-validation/WP11b.md`. Details: PR #27 |
