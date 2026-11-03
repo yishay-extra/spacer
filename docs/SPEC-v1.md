@@ -401,7 +401,8 @@ Each source (or each channel when `linkedPoints`) has one `MotionSpec`:
   default cue list, Go; suppress dialogs; autosave; relaunch on crash via a
   LaunchAgent (WP13).
 - Editing a scene while live: changes are applied immediately and marked
-  "modified"; **Update scene** writes back; **Revert** recalls.
+  "modified"; **Update scene** writes back (capturing live plugin state
+  first, §13); **Revert** recalls.
 
 ## 12. Control: OSC and MIDI
 
@@ -422,6 +423,7 @@ Address space (`{id}` = integer source id or quoted name):
 /spacer/source/{id}/file/play    (none) | /stop | /seek f
 /spacer/speaker/{id}/trim        f
 /spacer/speaker/{id}/mute        i
+/spacer/{source|speaker}/{id}/insert/{slot}/param/{index}  f  (0..1)
 /spacer/master/gain              f
 /spacer/panic                    (none)
 /spacer/cue/go                   (none)
@@ -457,22 +459,32 @@ addresses are ignored and counted.
 - State stored in scenes as `{pluginId, stateBase64, params: {index: value}}`.
   Missing plugin → slot bypassed, warning shown, project still loads.
 - Reported plugin latency is compensated (§5.6).
-- Plugin parameter paths: `source.{id}.insert.{slot}.param.{index}` — usable
-  by modulators, OSC, MIDI.
+- Plugin parameter paths: `source.{id}.insert.{slot}.param.{index}` and
+  `speaker.{id}.insert.{slot}.param.{index}` (normalised 0..1) — usable by
+  OSC, MIDI and (WP14) modulators. Slots may be `bypassed` (20 ms fade,
+  latency kept).
+- Scene capture (**Update scene**, save, before a recall) first captures live
+  plugin state into the model (`PluginHost::captureState`).
+- Full scans run off the message thread; each plugin is still scanned in its
+  own process.
 
 ## 14. Virtual device (`Spacer.driver`)
 
 - CoreAudio `AudioServerPlugIn`, bundle id `org.spacer.driver`, one device
   "Spacer" with **64 output channels** (as seen by sender apps), 44.1–96 kHz,
   float32, following the sample rate the Spacer app sets.
-- Transport: a POSIX shared-memory ring (per channel interleaved frames,
-  ≥ 8192 frames) + a sequence counter; the app reads it in its callback.
+- Transport: a POSIX shared-memory ring (interleaved 64-channel frames,
+  ≥ 8192 frames; created by the driver, opened by the app) + a sequence counter; the app reads it in its callback.
   Rate mismatch between driver and app is handled by the app resampling
   (slow drift expected; use a simple fill-level-steered resampler).
 - The driver has no UI. Installed by the app ("Install virtual device…")
   with admin prompt; the app detects and reports driver version.
-- Added latency: one driver buffer (default 512 frames at 48 kHz ≈ 10.7 ms;
-  user-selectable 128/256/512).
+- Added latency: target buffering of max(selected, sender IO buffer) frames
+  (selected default 512 at 48 kHz ≈ 10.7 ms; user-selectable 128/256/512,
+  an app setting, not stored in the project).
+- Open risk (verify on a Mac, docs/mac-validation/WP5.md): coreaudiod's
+  sandbox may refuse `shm_open`; if so the transport moves to a mach shared
+  memory handle (e.g. via XPC) with the same ring layout.
 
 ## 15. Project file
 
