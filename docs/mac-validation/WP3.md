@@ -55,3 +55,25 @@ The only exception is check 6, which deliberately disturbs the device.
 - Motion: WP7.
 - DBAP and ambisonics: WP2c and WP2d. Until then they fall back to VBAP.
 - UI: WP11.
+
+## Results — 2026-11-03 (MacBook Air, built-in speakers/mic, macOS 26.6.2, Xcode 27.2)
+
+Run by an agent: everything measurable was measured (status lines, mic
+capture through AVAudioEngine with a 440 Hz afplay control reading exactly
+440.0 Hz, frame counts confirming the capture rate); "by ear" columns are
+still open for the owner. Tool binary is `spacer_engine_check` (#38).
+
+| # | Result | Notes |
+|---|--------|-------|
+| 1 | pass | Microphone (in 1) and Speakers (out 2) listed with UIDs; matches Audio MIDI Setup. |
+| 2 | pass (objective) | 440.0 Hz on the mic, xruns 0, dropped 0, graph latency 72 smp. Mic reads the left tone ~4–10 dB louder than the right one (mic sits nearer the left speaker). Right-channel silence not verifiable by mic — **listener**. |
+| 3 | pass (objective) | As 2, az 90. **Listener** for left-channel silence. |
+| 4 | pass (objective) | 20 s, xruns 0, dropped 0. Zipper noise / constant power — **listener**. |
+| 5 | pass (objective) | 10 s, xruns 0. −6 dB / 140-sample offset needs a loopback (no second interface on this Mac) — **open**. |
+| 6 | **FAIL** → #37 | Status line follows 48 k → 44.1 k → 96 k → 48 k at once, xruns 0, no crash; but the tone measured 880.0 Hz at 96 kHz (samples for 48 kHz played at 96 kHz), 404 Hz at 44.1 kHz on another run, and went silent after the third change. Opening at 44.1/96 kHz from the start (`--rate`) is fine. No interface to unplug — **open**. |
+| 7 | pass | Aggregate of Speakers + Microphone: `created aggregate device id 119`, listed as in 1 / out 2, tone on it xruns 0, `destroyed`, gone from `devices` and `system_profiler`. Which outputs carried the tone — **listener**. |
+| 8 | pass | Debug tool `pan --seconds 30`: no guard message, xruns 0, cpu 3.2 %. Debug app open 60 s: alive, no guard message. |
+| 9 | pass (text differs, #39) | Release app 60 s: status bar `MacBook Air Speakers 48 kHz / 128  CPU 1%  xruns 0  Latency 4.2 ms  120.0 bpm 1.1`; no error dialog. No "N out" field. Title shows `Untitled *` at launch (#41). |
+| 10 | pass (objective) | Buffer 128 / 32 / 2048 honoured (device latency 792 / 696 / 2712 smp), graph latency 72 smp at every size, xruns 0 at all three including 32. Cleanliness — **listener**. |
+
+Build: Release and Debug each 20 warnings with this clang (#40); ctest 723/723.
