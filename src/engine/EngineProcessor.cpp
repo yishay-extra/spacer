@@ -564,6 +564,11 @@ void EngineProcessor::startRamp(const Ramp& r, int totalSamples, float rampMs) n
             a.from = s->distanceModel().q;
         else if (t == RampTarget::SourcePosition)
             a.fromPosition = s->controlPosition(std::max(0, r.channel));
+        else if (t == RampTarget::SourceMotionParam) {
+            const auto live = s->motionParamLive(r.channel, static_cast<MotionParam>(r.param));
+            if (!live) return;  // the kind has no such parameter (any more)
+            a.from = *live;
+        }
     } else if (auto* sp = graph_->findSpeaker(r.id)) {
         Eq3 e = sp->settings().eq;
         if (const float* field = eqField(e, t)) a.from = *field;
@@ -619,6 +624,8 @@ void EngineProcessor::applyRampValue(const Ramp& r, float v, const Position& pos
             s->setDistanceModel(m);
         } else if (t == RampTarget::SourcePosition) {
             s->setPosition(r.channel, position, 0.0f);
+        } else if (t == RampTarget::SourceMotionParam) {
+            s->setMotionParam(r.channel, static_cast<MotionParam>(r.param), v);
         }
     } else if (auto* sp = graph_->findSpeaker(r.id)) {
         Eq3 e = sp->settings().eq;

@@ -12,6 +12,7 @@
 #include "engine/EngineProcessor.h"
 #include "engine/GraphBuilder.h"
 #include "engine/OfflineRenderer.h"
+#include "engine/RecallPlanner.h"
 
 using Catch::Approx;
 using namespace spacer;
@@ -514,4 +515,29 @@ TEST_CASE("Source modulators: motionRight.* drives the right point of a linked p
     rig.run(3);
     CHECK(rig.pos(1, 0).distance == Approx(2.5f).margin(1e-3));
     CHECK(rig.pos(1, 1).distance == Approx(3.0f).margin(1e-3));
+}
+
+TEST_CASE("Source motion: a scene recall ramps orbit parameters without restarting the phase (WP14)") {
+    Project p = quad();
+    p.sources = {orbitSource(Period::seconds(1.0), 2.0f)};
+    Rig rig(p);
+    rig.run(25);  // 90 degrees
+    Scene target = captureScene(p, "wide");
+    std::get<OrbitMotion>(target.sources[0].motion.value).radius = 4.0f;
+    RecallRequest r;
+    r.project = &p;
+    r.target = &target;
+    r.transitionSeconds = 1.0f;
+    r.sampleRate = kSr;
+    r.maxBlockSize = kBlock;
+    auto plan = buildRecallPlan(r);
+    REQUIRE(plan);
+    REQUIRE(plan->diff.replacedSources.empty());
+    REQUIRE(rig.proc.push(cmd::RecallScene{plan.release()}));
+    rig.run(50);  // half the transition
+    CHECK(rig.pos().distance == Approx(3.0f).margin(0.05f));
+    // Phase kept: 75 blocks = 0.75 s of a 1 s orbit -> 270 degrees.
+    CHECK(std::abs(Position::wrapAzimuth(rig.pos().azimuth - wrapDeg(3.6 * 75))) < 0.5f);
+    rig.run(60);
+    CHECK(rig.pos().distance == Approx(4.0f).margin(1e-3));
 }

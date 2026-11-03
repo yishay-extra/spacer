@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <utility>
 
+#include "core/motion/MotionParamValue.h"
+
 namespace spacer {
 
 namespace {
@@ -26,8 +28,26 @@ const ManualMotion* asManual(const MotionSpec& m) {
     return std::get_if<ManualMotion>(&m.value);
 }
 
+/// Continuous parameters of a running motion: same kind, not Manual (whose
+/// position has its own ramp).
+bool rampableMotion(const MotionSpec& a, const MotionSpec& b) {
+    return a.value.index() == b.value.index() && asManual(a) == nullptr;
+}
+
+void copyMotionParams(MotionSpec& base, const MotionSpec& from) {
+    if (!rampableMotion(base, from)) return;
+    MotionSpec src = from;
+    for (std::size_t i = 0; i < kNumMotionParams; ++i) {
+        const auto p = static_cast<MotionParam>(i);
+        float* dst = motionParamField(base, p);
+        const float* v = motionParamField(src, p);
+        if (dst != nullptr && v != nullptr) *dst = *v;
+    }
+}
+
 /// `base` with its continuous values replaced by those of `from`, where the two
-/// are comparable (Manual positions only when both sides are Manual).
+/// are comparable (Manual positions only when both sides are Manual; the
+/// continuous parameters of other motions when both have the same kind).
 SourceSpec withContinuousFrom(SourceSpec base, const SourceSpec& from) {
     base.gainDb = from.gainDb;
     base.mute = from.mute;
@@ -40,6 +60,8 @@ SourceSpec withContinuousFrom(SourceSpec base, const SourceSpec& from) {
     if (base.motionRight && from.motionRight)
         if (auto* m = asManual(*base.motionRight))
             if (const auto* f = asManual(*from.motionRight)) m->position = f->position;
+    copyMotionParams(base.motion, from.motion);
+    if (base.motionRight && from.motionRight) copyMotionParams(*base.motionRight, *from.motionRight);
     return base;
 }
 
@@ -74,6 +96,25 @@ void addPosition(std::vector<Ramp>& out, int id, int channel, const ManualMotion
     out.push_back(r);
 }
 
+void addMotionParams(std::vector<Ramp>& out, int id, int channel, const MotionSpec& from,
+                     const MotionSpec& to) {
+    if (!rampableMotion(from, to)) return;
+    for (std::size_t i = 0; i < kNumMotionParams; ++i) {
+        const auto p = static_cast<MotionParam>(i);
+        const auto a = motionParamValue(from, p);
+        const auto b = motionParamValue(to, p);
+        if (!a || !b || *a == *b) continue;
+        Ramp r;
+        r.target = RampTarget::SourceMotionParam;
+        r.id = id;
+        r.channel = channel;
+        r.param = static_cast<int>(i);
+        r.from = *a;
+        r.to = *b;
+        out.push_back(r);
+    }
+}
+
 void diffSource(std::vector<Ramp>& out, const SourceSpec& a, const SourceSpec& b) {
     addScalar(out, RampTarget::SourceGainDb, b.id, a.gainDb, b.gainDb);
     addScalar(out, RampTarget::SourceMute, b.id, a.mute ? 1.0f : 0.0f, b.mute ? 1.0f : 0.0f);
@@ -86,6 +127,10 @@ void diffSource(std::vector<Ramp>& out, const SourceSpec& a, const SourceSpec& b
     addPosition(out, b.id, linked ? 0 : -1, asManual(a.motion), asManual(b.motion));
     if (linked && a.motionRight && b.motionRight)
         addPosition(out, b.id, 1, asManual(*a.motionRight), asManual(*b.motionRight));
+    // Without its own motionRight, the right point shares `motion` (channel -1).
+    addMotionParams(out, b.id, linked && b.motionRight ? 0 : -1, a.motion, b.motion);
+    if (linked && a.motionRight && b.motionRight)
+        addMotionParams(out, b.id, 1, *a.motionRight, *b.motionRight);
 }
 
 /// Parameter ramps and bypass switches between two inserts lists of the same

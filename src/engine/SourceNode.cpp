@@ -192,6 +192,13 @@ void SourceNode::setMotionParam(int channel, MotionParam param, float value) noe
     }
 }
 
+std::optional<float> SourceNode::motionParamLive(int channel, MotionParam param) const noexcept {
+    const auto k = static_cast<std::size_t>(std::clamp(channel, 0, 1));
+    const auto base = motionParamValue(motionSpec_[k], param);
+    if (!base) return std::nullopt;
+    return *base + paramOffsets_[k][param];
+}
+
 void SourceNode::resetMotion() noexcept {
     for (auto& m : motion_)
         if (m) m->reset();

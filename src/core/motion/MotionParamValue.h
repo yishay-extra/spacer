@@ -13,6 +13,10 @@ namespace spacer {
 /// `/motion/{param}`) be turned into an additive offset over the spec.
 std::optional<float> motionParamValue(const MotionSpec& spec, MotionParam param);
 
+/// The field holding `param` in `spec` (same rules as motionParamValue), or
+/// null. Lets a scene diff carry continuous motion values across (WP14).
+float* motionParamField(MotionSpec& spec, MotionParam param);
+
 /// The period that sets the phase of a time-driven motion kind (Orbit, Line,
 /// Lissajous, Path: `period`; RandomWalk: `stepPeriod`); nullopt for Manual
 /// and StepSequence (state machines). Used to re-anchor a live period edit.

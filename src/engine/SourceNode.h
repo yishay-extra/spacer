@@ -4,6 +4,7 @@
 
 #include <array>
 #include <memory>
+#include <optional>
 #include <vector>
 
 #include "core/Clock.h"
@@ -74,6 +75,9 @@ public:
     void setDistanceModel(const DistanceModel& model) noexcept { distanceModel_ = model; }
     /// Absolute live value of a motion parameter (see cmd::SetMotionParam).
     void setMotionParam(int channel, MotionParam param, float value) noexcept;
+    /// Live value of a motion parameter (spec + SetMotionParam offset) of
+    /// control point `channel` (-1 = the first); nullopt if the kind has none.
+    std::optional<float> motionParamLive(int channel, MotionParam param) const noexcept;
     /// Phase 0 at the next block for the motion(s) and modulator LFOs.
     void resetMotion() noexcept;
     void setModulatorValue(int index, float value) noexcept { modulators_.setExternal(index, value); }
