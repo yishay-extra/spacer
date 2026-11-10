@@ -334,6 +334,15 @@ distance low-pass not transparent ≤ 1 m with q > 0 (§6.5 curve); OSC
 
 ---
 
+## WP15 — 3D stage view · **macOS · M**
+
+Owner-requested change to §16.1: the stage becomes a rotatable 3D view and
+sources are drawn as coloured clouds linked to the speakers carrying them.
+Design: `docs/superpowers/specs/2026-11-10-stage-3d-view-design.md`. Plan:
+`docs/superpowers/plans/2026-11-10-stage-3d-view.md`.
+
+---
+
 ## WP13 — Packaging · **macOS · M**
 
 Signed + notarized `.app` and `.driver`, DMG, LaunchAgent for installation
@@ -378,6 +387,7 @@ mode relaunch, CI release job on tags, `docs/INSTALL.md`.
 | WP11b | done | `SourcePanel`/`SourceStrip` (left): list with meters, add/duplicate/remove, input, level, spatializer, distance, motion editors for all kinds, modulators, inserts add/remove/bypass; `src/ui/logic`: `SourceSelection`, `ValueFormat`, `MotionFields`, `SourceEditing`; live `SetMotionParam`/`SetInsertBypass` routing; `AppContext::selection()`. Follow-ups in WP14. Mac checks: `docs/mac-validation/WP11b.md`. Details: PR #27 |
 | WP11c | done | `CuesPanel` + `SceneManager` (right panel); `src/ui/logic`: `TriggerText` (all six trigger kinds as text), `CueListEditing`, `SceneEditing`, `CueListView`, scoped `edits::editShow` undo; armed list follows edits (`CueSequencer::updateList`); recall counter fixes OSC-recall UI notification. Mac checks: `docs/mac-validation/WP11c.md`. Details: PR #26 |
 | WP2c | done | `spacer::Dbap` (`src/core/spatial/Dbap.h/.cpp`): §6.2 gains, Σg²=1 over panned speakers, `r_s = 0.2 + 3·spread`, LFE speakers excluded from gains, normalisation and render (§7). Tests in `tests/DbapTests.cpp`. Open spec issue: see "WP2c notes" below |
+| WP15 | built, Mac checks open | Orbit camera in `StageTransform` (Top/Side snaps identical to the old views), `StageDepth`, `StageShares` (core panners' `gainsFor`), `StageCloud`, `StagePalette`, `PaintStats`; `StageView` 3D drawing. Mac checks: `docs/mac-validation/WP15.md`. |
 
 ### WP2c notes
 

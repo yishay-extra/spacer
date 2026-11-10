@@ -1,0 +1,3115 @@
+{
+  "ambisonics": {
+    "order": 3
+  },
+  "clock": {
+    "beatsPerBar": 4,
+    "bpm": 120.0,
+    "kind": "Internal",
+    "quantisedStart": false
+  },
+  "cueLists": [],
+  "devices": {
+    "bufferSize": 128,
+    "outputDeviceName": "",
+    "sampleRate": 48000.0,
+    "speedOfSound": 343.0
+  },
+  "layout": {
+    "name": "Stress 32",
+    "speakers": [
+      {
+        "id": 1,
+        "lfe": false,
+        "name": "S01",
+        "outputChannel": -1,
+        "polarityInverted": false,
+        "position": {
+          "az": 0.0,
+          "dist": 2.0,
+          "el": 0.0
+        },
+        "trimDb": -60.0,
+        "userDelayMs": 0.0
+      },
+      {
+        "id": 2,
+        "lfe": false,
+        "name": "S02",
+        "outputChannel": -1,
+        "polarityInverted": false,
+        "position": {
+          "az": 22.5,
+          "dist": 2.0,
+          "el": 0.0
+        },
+        "trimDb": -60.0,
+        "userDelayMs": 0.0
+      },
+      {
+        "id": 3,
+        "lfe": false,
+        "name": "S03",
+        "outputChannel": -1,
+        "polarityInverted": false,
+        "position": {
+          "az": 45.0,
+          "dist": 2.0,
+          "el": 0.0
+        },
+        "trimDb": -60.0,
+        "userDelayMs": 0.0
+      },
+      {
+        "id": 4,
+        "lfe": false,
+        "name": "S04",
+        "outputChannel": -1,
+        "polarityInverted": false,
+        "position": {
+          "az": 67.5,
+          "dist": 2.0,
+          "el": 0.0
+        },
+        "trimDb": -60.0,
+        "userDelayMs": 0.0
+      },
+      {
+        "id": 5,
+        "lfe": false,
+        "name": "S05",
+        "outputChannel": -1,
+        "polarityInverted": false,
+        "position": {
+          "az": 90.0,
+          "dist": 2.0,
+          "el": 0.0
+        },
+        "trimDb": -60.0,
+        "userDelayMs": 0.0
+      },
+      {
+        "id": 6,
+        "lfe": false,
+        "name": "S06",
+        "outputChannel": -1,
+        "polarityInverted": false,
+        "position": {
+          "az": 112.5,
+          "dist": 2.0,
+          "el": 0.0
+        },
+        "trimDb": -60.0,
+        "userDelayMs": 0.0
+      },
+      {
+        "id": 7,
+        "lfe": false,
+        "name": "S07",
+        "outputChannel": -1,
+        "polarityInverted": false,
+        "position": {
+          "az": 135.0,
+          "dist": 2.0,
+          "el": 0.0
+        },
+        "trimDb": -60.0,
+        "userDelayMs": 0.0
+      },
+      {
+        "id": 8,
+        "lfe": false,
+        "name": "S08",
+        "outputChannel": -1,
+        "polarityInverted": false,
+        "position": {
+          "az": 157.5,
+          "dist": 2.0,
+          "el": 0.0
+        },
+        "trimDb": -60.0,
+        "userDelayMs": 0.0
+      },
+      {
+        "id": 9,
+        "lfe": false,
+        "name": "S09",
+        "outputChannel": -1,
+        "polarityInverted": false,
+        "position": {
+          "az": 180.0,
+          "dist": 2.0,
+          "el": 0.0
+        },
+        "trimDb": -60.0,
+        "userDelayMs": 0.0
+      },
+      {
+        "id": 10,
+        "lfe": false,
+        "name": "S10",
+        "outputChannel": -1,
+        "polarityInverted": false,
+        "position": {
+          "az": -157.5,
+          "dist": 2.0,
+          "el": 0.0
+        },
+        "trimDb": -60.0,
+        "userDelayMs": 0.0
+      },
+      {
+        "id": 11,
+        "lfe": false,
+        "name": "S11",
+        "outputChannel": -1,
+        "polarityInverted": false,
+        "position": {
+          "az": -135.0,
+          "dist": 2.0,
+          "el": 0.0
+        },
+        "trimDb": -60.0,
+        "userDelayMs": 0.0
+      },
+      {
+        "id": 12,
+        "lfe": false,
+        "name": "S12",
+        "outputChannel": -1,
+        "polarityInverted": false,
+        "position": {
+          "az": -112.5,
+          "dist": 2.0,
+          "el": 0.0
+        },
+        "trimDb": -60.0,
+        "userDelayMs": 0.0
+      },
+      {
+        "id": 13,
+        "lfe": false,
+        "name": "S13",
+        "outputChannel": -1,
+        "polarityInverted": false,
+        "position": {
+          "az": -90.0,
+          "dist": 2.0,
+          "el": 0.0
+        },
+        "trimDb": -60.0,
+        "userDelayMs": 0.0
+      },
+      {
+        "id": 14,
+        "lfe": false,
+        "name": "S14",
+        "outputChannel": -1,
+        "polarityInverted": false,
+        "position": {
+          "az": -67.5,
+          "dist": 2.0,
+          "el": 0.0
+        },
+        "trimDb": -60.0,
+        "userDelayMs": 0.0
+      },
+      {
+        "id": 15,
+        "lfe": false,
+        "name": "S15",
+        "outputChannel": -1,
+        "polarityInverted": false,
+        "position": {
+          "az": -45.0,
+          "dist": 2.0,
+          "el": 0.0
+        },
+        "trimDb": -60.0,
+        "userDelayMs": 0.0
+      },
+      {
+        "id": 16,
+        "lfe": false,
+        "name": "S16",
+        "outputChannel": -1,
+        "polarityInverted": false,
+        "position": {
+          "az": -22.5,
+          "dist": 2.0,
+          "el": 0.0
+        },
+        "trimDb": -60.0,
+        "userDelayMs": 0.0
+      },
+      {
+        "id": 17,
+        "lfe": false,
+        "name": "S17",
+        "outputChannel": -1,
+        "polarityInverted": false,
+        "position": {
+          "az": 0.0,
+          "dist": 2.0,
+          "el": 35.0
+        },
+        "trimDb": -60.0,
+        "userDelayMs": 0.0
+      },
+      {
+        "id": 18,
+        "lfe": false,
+        "name": "S18",
+        "outputChannel": -1,
+        "polarityInverted": false,
+        "position": {
+          "az": 30.0,
+          "dist": 2.0,
+          "el": 35.0
+        },
+        "trimDb": -60.0,
+        "userDelayMs": 0.0
+      },
+      {
+        "id": 19,
+        "lfe": false,
+        "name": "S19",
+        "outputChannel": -1,
+        "polarityInverted": false,
+        "position": {
+          "az": 60.0,
+          "dist": 2.0,
+          "el": 35.0
+        },
+        "trimDb": -60.0,
+        "userDelayMs": 0.0
+      },
+      {
+        "id": 20,
+        "lfe": false,
+        "name": "S20",
+        "outputChannel": -1,
+        "polarityInverted": false,
+        "position": {
+          "az": 90.0,
+          "dist": 2.0,
+          "el": 35.0
+        },
+        "trimDb": -60.0,
+        "userDelayMs": 0.0
+      },
+      {
+        "id": 21,
+        "lfe": false,
+        "name": "S21",
+        "outputChannel": -1,
+        "polarityInverted": false,
+        "position": {
+          "az": 120.0,
+          "dist": 2.0,
+          "el": 35.0
+        },
+        "trimDb": -60.0,
+        "userDelayMs": 0.0
+      },
+      {
+        "id": 22,
+        "lfe": false,
+        "name": "S22",
+        "outputChannel": -1,
+        "polarityInverted": false,
+        "position": {
+          "az": 150.0,
+          "dist": 2.0,
+          "el": 35.0
+        },
+        "trimDb": -60.0,
+        "userDelayMs": 0.0
+      },
+      {
+        "id": 23,
+        "lfe": false,
+        "name": "S23",
+        "outputChannel": -1,
+        "polarityInverted": false,
+        "position": {
+          "az": 180.0,
+          "dist": 2.0,
+          "el": 35.0
+        },
+        "trimDb": -60.0,
+        "userDelayMs": 0.0
+      },
+      {
+        "id": 24,
+        "lfe": false,
+        "name": "S24",
+        "outputChannel": -1,
+        "polarityInverted": false,
+        "position": {
+          "az": -150.0,
+          "dist": 2.0,
+          "el": 35.0
+        },
+        "trimDb": -60.0,
+        "userDelayMs": 0.0
+      },
+      {
+        "id": 25,
+        "lfe": false,
+        "name": "S25",
+        "outputChannel": -1,
+        "polarityInverted": false,
+        "position": {
+          "az": -120.0,
+          "dist": 2.0,
+          "el": 35.0
+        },
+        "trimDb": -60.0,
+        "userDelayMs": 0.0
+      },
+      {
+        "id": 26,
+        "lfe": false,
+        "name": "S26",
+        "outputChannel": -1,
+        "polarityInverted": false,
+        "position": {
+          "az": -90.0,
+          "dist": 2.0,
+          "el": 35.0
+        },
+        "trimDb": -60.0,
+        "userDelayMs": 0.0
+      },
+      {
+        "id": 27,
+        "lfe": false,
+        "name": "S27",
+        "outputChannel": -1,
+        "polarityInverted": false,
+        "position": {
+          "az": -60.0,
+          "dist": 2.0,
+          "el": 35.0
+        },
+        "trimDb": -60.0,
+        "userDelayMs": 0.0
+      },
+      {
+        "id": 28,
+        "lfe": false,
+        "name": "S28",
+        "outputChannel": -1,
+        "polarityInverted": false,
+        "position": {
+          "az": -30.0,
+          "dist": 2.0,
+          "el": 35.0
+        },
+        "trimDb": -60.0,
+        "userDelayMs": 0.0
+      },
+      {
+        "id": 29,
+        "lfe": false,
+        "name": "S29",
+        "outputChannel": -1,
+        "polarityInverted": false,
+        "position": {
+          "az": 45.0,
+          "dist": 2.0,
+          "el": 70.0
+        },
+        "trimDb": -60.0,
+        "userDelayMs": 0.0
+      },
+      {
+        "id": 30,
+        "lfe": false,
+        "name": "S30",
+        "outputChannel": -1,
+        "polarityInverted": false,
+        "position": {
+          "az": 135.0,
+          "dist": 2.0,
+          "el": 70.0
+        },
+        "trimDb": -60.0,
+        "userDelayMs": 0.0
+      },
+      {
+        "id": 31,
+        "lfe": false,
+        "name": "S31",
+        "outputChannel": -1,
+        "polarityInverted": false,
+        "position": {
+          "az": -135.0,
+          "dist": 2.0,
+          "el": 70.0
+        },
+        "trimDb": -60.0,
+        "userDelayMs": 0.0
+      },
+      {
+        "id": 32,
+        "lfe": false,
+        "name": "S32",
+        "outputChannel": -1,
+        "polarityInverted": false,
+        "position": {
+          "az": -45.0,
+          "dist": 2.0,
+          "el": 70.0
+        },
+        "trimDb": -60.0,
+        "userDelayMs": 0.0
+      }
+    ]
+  },
+  "master": {
+    "gainDb": 0.0
+  },
+  "midi": {
+    "mappings": []
+  },
+  "name": "Stage stress (64 sources, 32 speakers)",
+  "osc": {
+    "inPort": 9000,
+    "out": {
+      "enabled": false,
+      "host": "127.0.0.1",
+      "port": 9001
+    }
+  },
+  "scenes": [],
+  "schemaVersion": 1,
+  "sources": [
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 1,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": 1,
+        "elevationWobble": 20.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 11.0
+        },
+        "phaseOffset": 5.625,
+        "radius": 1.467,
+        "wobblePeriod": {
+          "beats": 11.0
+        }
+      },
+      "mute": false,
+      "name": "S01",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 2,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": -1,
+        "elevationWobble": 40.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 14.0
+        },
+        "phaseOffset": 11.25,
+        "radius": 1.067,
+        "wobblePeriod": {
+          "beats": 16.0
+        }
+      },
+      "mute": false,
+      "name": "S02",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 3,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": 1,
+        "elevationWobble": 16.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 17.0
+        },
+        "phaseOffset": 16.875,
+        "radius": 1.533,
+        "wobblePeriod": {
+          "beats": 8.0
+        }
+      },
+      "mute": false,
+      "name": "S03",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 4,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": -1,
+        "elevationWobble": 36.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 20.0
+        },
+        "phaseOffset": 22.5,
+        "radius": 1.133,
+        "wobblePeriod": {
+          "beats": 13.0
+        }
+      },
+      "mute": false,
+      "name": "S04",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 5,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": 1,
+        "elevationWobble": 12.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 23.0
+        },
+        "phaseOffset": 28.125,
+        "radius": 1.6,
+        "wobblePeriod": {
+          "beats": 18.0
+        }
+      },
+      "mute": false,
+      "name": "S05",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 6,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": -1,
+        "elevationWobble": 32.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 9.0
+        },
+        "phaseOffset": 33.75,
+        "radius": 1.2,
+        "wobblePeriod": {
+          "beats": 10.0
+        }
+      },
+      "mute": false,
+      "name": "S06",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 7,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": 1,
+        "elevationWobble": 8.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 12.0
+        },
+        "phaseOffset": 39.375,
+        "radius": 1.667,
+        "wobblePeriod": {
+          "beats": 15.0
+        }
+      },
+      "mute": false,
+      "name": "S07",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 8,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": -1,
+        "elevationWobble": 28.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 15.0
+        },
+        "phaseOffset": 45.0,
+        "radius": 1.267,
+        "wobblePeriod": {
+          "beats": 7.0
+        }
+      },
+      "mute": false,
+      "name": "S08",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 9,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": 1,
+        "elevationWobble": 4.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 18.0
+        },
+        "phaseOffset": 50.625,
+        "radius": 1.733,
+        "wobblePeriod": {
+          "beats": 12.0
+        }
+      },
+      "mute": false,
+      "name": "S09",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 10,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": -1,
+        "elevationWobble": 24.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 21.0
+        },
+        "phaseOffset": 56.25,
+        "radius": 1.333,
+        "wobblePeriod": {
+          "beats": 17.0
+        }
+      },
+      "mute": false,
+      "name": "S10",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 11,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": 1,
+        "elevationWobble": 0.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 24.0
+        },
+        "phaseOffset": 61.875,
+        "radius": 1.8,
+        "wobblePeriod": {
+          "beats": 9.0
+        }
+      },
+      "mute": false,
+      "name": "S11",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 12,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": -1,
+        "elevationWobble": 20.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 10.0
+        },
+        "phaseOffset": 67.5,
+        "radius": 1.4,
+        "wobblePeriod": {
+          "beats": 14.0
+        }
+      },
+      "mute": false,
+      "name": "S12",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 13,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": 1,
+        "elevationWobble": 40.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 13.0
+        },
+        "phaseOffset": 73.125,
+        "radius": 1.0,
+        "wobblePeriod": {
+          "beats": 6.0
+        }
+      },
+      "mute": false,
+      "name": "S13",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 14,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": -1,
+        "elevationWobble": 16.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 16.0
+        },
+        "phaseOffset": 78.75,
+        "radius": 1.467,
+        "wobblePeriod": {
+          "beats": 11.0
+        }
+      },
+      "mute": false,
+      "name": "S14",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 15,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": 1,
+        "elevationWobble": 36.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 19.0
+        },
+        "phaseOffset": 84.375,
+        "radius": 1.067,
+        "wobblePeriod": {
+          "beats": 16.0
+        }
+      },
+      "mute": false,
+      "name": "S15",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 16,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": -1,
+        "elevationWobble": 12.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 22.0
+        },
+        "phaseOffset": 90.0,
+        "radius": 1.533,
+        "wobblePeriod": {
+          "beats": 8.0
+        }
+      },
+      "mute": false,
+      "name": "S16",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 17,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": 1,
+        "elevationWobble": 32.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 8.0
+        },
+        "phaseOffset": 95.625,
+        "radius": 1.133,
+        "wobblePeriod": {
+          "beats": 13.0
+        }
+      },
+      "mute": false,
+      "name": "S17",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 18,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": -1,
+        "elevationWobble": 8.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 11.0
+        },
+        "phaseOffset": 101.25,
+        "radius": 1.6,
+        "wobblePeriod": {
+          "beats": 18.0
+        }
+      },
+      "mute": false,
+      "name": "S18",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 19,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": 1,
+        "elevationWobble": 28.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 14.0
+        },
+        "phaseOffset": 106.875,
+        "radius": 1.2,
+        "wobblePeriod": {
+          "beats": 10.0
+        }
+      },
+      "mute": false,
+      "name": "S19",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 20,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": -1,
+        "elevationWobble": 4.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 17.0
+        },
+        "phaseOffset": 112.5,
+        "radius": 1.667,
+        "wobblePeriod": {
+          "beats": 15.0
+        }
+      },
+      "mute": false,
+      "name": "S20",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 21,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": 1,
+        "elevationWobble": 24.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 20.0
+        },
+        "phaseOffset": 118.125,
+        "radius": 1.267,
+        "wobblePeriod": {
+          "beats": 7.0
+        }
+      },
+      "mute": false,
+      "name": "S21",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 22,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": -1,
+        "elevationWobble": 0.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 23.0
+        },
+        "phaseOffset": 123.75,
+        "radius": 1.733,
+        "wobblePeriod": {
+          "beats": 12.0
+        }
+      },
+      "mute": false,
+      "name": "S22",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 23,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": 1,
+        "elevationWobble": 20.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 9.0
+        },
+        "phaseOffset": 129.375,
+        "radius": 1.333,
+        "wobblePeriod": {
+          "beats": 17.0
+        }
+      },
+      "mute": false,
+      "name": "S23",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 24,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": -1,
+        "elevationWobble": 40.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 12.0
+        },
+        "phaseOffset": 135.0,
+        "radius": 1.8,
+        "wobblePeriod": {
+          "beats": 9.0
+        }
+      },
+      "mute": false,
+      "name": "S24",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 25,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": 1,
+        "elevationWobble": 16.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 15.0
+        },
+        "phaseOffset": 140.625,
+        "radius": 1.4,
+        "wobblePeriod": {
+          "beats": 14.0
+        }
+      },
+      "mute": false,
+      "name": "S25",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 26,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": -1,
+        "elevationWobble": 36.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 18.0
+        },
+        "phaseOffset": 146.25,
+        "radius": 1.0,
+        "wobblePeriod": {
+          "beats": 6.0
+        }
+      },
+      "mute": false,
+      "name": "S26",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 27,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": 1,
+        "elevationWobble": 12.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 21.0
+        },
+        "phaseOffset": 151.875,
+        "radius": 1.467,
+        "wobblePeriod": {
+          "beats": 11.0
+        }
+      },
+      "mute": false,
+      "name": "S27",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 28,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": -1,
+        "elevationWobble": 32.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 24.0
+        },
+        "phaseOffset": 157.5,
+        "radius": 1.067,
+        "wobblePeriod": {
+          "beats": 16.0
+        }
+      },
+      "mute": false,
+      "name": "S28",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 29,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": 1,
+        "elevationWobble": 8.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 10.0
+        },
+        "phaseOffset": 163.125,
+        "radius": 1.533,
+        "wobblePeriod": {
+          "beats": 8.0
+        }
+      },
+      "mute": false,
+      "name": "S29",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 30,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": -1,
+        "elevationWobble": 28.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 13.0
+        },
+        "phaseOffset": 168.75,
+        "radius": 1.133,
+        "wobblePeriod": {
+          "beats": 13.0
+        }
+      },
+      "mute": false,
+      "name": "S30",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 31,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": 1,
+        "elevationWobble": 4.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 16.0
+        },
+        "phaseOffset": 174.375,
+        "radius": 1.6,
+        "wobblePeriod": {
+          "beats": 18.0
+        }
+      },
+      "mute": false,
+      "name": "S31",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 32,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": -1,
+        "elevationWobble": 24.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 19.0
+        },
+        "phaseOffset": 180.0,
+        "radius": 1.2,
+        "wobblePeriod": {
+          "beats": 10.0
+        }
+      },
+      "mute": false,
+      "name": "S32",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 33,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": 1,
+        "elevationWobble": 0.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 22.0
+        },
+        "phaseOffset": 185.625,
+        "radius": 1.667,
+        "wobblePeriod": {
+          "beats": 15.0
+        }
+      },
+      "mute": false,
+      "name": "S33",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 34,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": -1,
+        "elevationWobble": 20.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 8.0
+        },
+        "phaseOffset": 191.25,
+        "radius": 1.267,
+        "wobblePeriod": {
+          "beats": 7.0
+        }
+      },
+      "mute": false,
+      "name": "S34",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 35,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": 1,
+        "elevationWobble": 40.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 11.0
+        },
+        "phaseOffset": 196.875,
+        "radius": 1.733,
+        "wobblePeriod": {
+          "beats": 12.0
+        }
+      },
+      "mute": false,
+      "name": "S35",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 36,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": -1,
+        "elevationWobble": 16.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 14.0
+        },
+        "phaseOffset": 202.5,
+        "radius": 1.333,
+        "wobblePeriod": {
+          "beats": 17.0
+        }
+      },
+      "mute": false,
+      "name": "S36",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 37,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": 1,
+        "elevationWobble": 36.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 17.0
+        },
+        "phaseOffset": 208.125,
+        "radius": 1.8,
+        "wobblePeriod": {
+          "beats": 9.0
+        }
+      },
+      "mute": false,
+      "name": "S37",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 38,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": -1,
+        "elevationWobble": 12.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 20.0
+        },
+        "phaseOffset": 213.75,
+        "radius": 1.4,
+        "wobblePeriod": {
+          "beats": 14.0
+        }
+      },
+      "mute": false,
+      "name": "S38",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 39,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": 1,
+        "elevationWobble": 32.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 23.0
+        },
+        "phaseOffset": 219.375,
+        "radius": 1.0,
+        "wobblePeriod": {
+          "beats": 6.0
+        }
+      },
+      "mute": false,
+      "name": "S39",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 40,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": -1,
+        "elevationWobble": 8.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 9.0
+        },
+        "phaseOffset": 225.0,
+        "radius": 1.467,
+        "wobblePeriod": {
+          "beats": 11.0
+        }
+      },
+      "mute": false,
+      "name": "S40",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 41,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": 1,
+        "elevationWobble": 28.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 12.0
+        },
+        "phaseOffset": 230.625,
+        "radius": 1.067,
+        "wobblePeriod": {
+          "beats": 16.0
+        }
+      },
+      "mute": false,
+      "name": "S41",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 42,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": -1,
+        "elevationWobble": 4.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 15.0
+        },
+        "phaseOffset": 236.25,
+        "radius": 1.533,
+        "wobblePeriod": {
+          "beats": 8.0
+        }
+      },
+      "mute": false,
+      "name": "S42",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 43,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": 1,
+        "elevationWobble": 24.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 18.0
+        },
+        "phaseOffset": 241.875,
+        "radius": 1.133,
+        "wobblePeriod": {
+          "beats": 13.0
+        }
+      },
+      "mute": false,
+      "name": "S43",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 44,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": -1,
+        "elevationWobble": 0.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 21.0
+        },
+        "phaseOffset": 247.5,
+        "radius": 1.6,
+        "wobblePeriod": {
+          "beats": 18.0
+        }
+      },
+      "mute": false,
+      "name": "S44",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 45,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": 1,
+        "elevationWobble": 20.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 24.0
+        },
+        "phaseOffset": 253.125,
+        "radius": 1.2,
+        "wobblePeriod": {
+          "beats": 10.0
+        }
+      },
+      "mute": false,
+      "name": "S45",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 46,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": -1,
+        "elevationWobble": 40.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 10.0
+        },
+        "phaseOffset": 258.75,
+        "radius": 1.667,
+        "wobblePeriod": {
+          "beats": 15.0
+        }
+      },
+      "mute": false,
+      "name": "S46",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 47,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": 1,
+        "elevationWobble": 16.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 13.0
+        },
+        "phaseOffset": 264.375,
+        "radius": 1.267,
+        "wobblePeriod": {
+          "beats": 7.0
+        }
+      },
+      "mute": false,
+      "name": "S47",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 48,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": -1,
+        "elevationWobble": 36.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 16.0
+        },
+        "phaseOffset": 270.0,
+        "radius": 1.733,
+        "wobblePeriod": {
+          "beats": 12.0
+        }
+      },
+      "mute": false,
+      "name": "S48",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 49,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": 1,
+        "elevationWobble": 12.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 19.0
+        },
+        "phaseOffset": 275.625,
+        "radius": 1.333,
+        "wobblePeriod": {
+          "beats": 17.0
+        }
+      },
+      "mute": false,
+      "name": "S49",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 50,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": -1,
+        "elevationWobble": 32.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 22.0
+        },
+        "phaseOffset": 281.25,
+        "radius": 1.8,
+        "wobblePeriod": {
+          "beats": 9.0
+        }
+      },
+      "mute": false,
+      "name": "S50",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 51,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": 1,
+        "elevationWobble": 8.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 8.0
+        },
+        "phaseOffset": 286.875,
+        "radius": 1.4,
+        "wobblePeriod": {
+          "beats": 14.0
+        }
+      },
+      "mute": false,
+      "name": "S51",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 52,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": -1,
+        "elevationWobble": 28.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 11.0
+        },
+        "phaseOffset": 292.5,
+        "radius": 1.0,
+        "wobblePeriod": {
+          "beats": 6.0
+        }
+      },
+      "mute": false,
+      "name": "S52",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 53,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": 1,
+        "elevationWobble": 4.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 14.0
+        },
+        "phaseOffset": 298.125,
+        "radius": 1.467,
+        "wobblePeriod": {
+          "beats": 11.0
+        }
+      },
+      "mute": false,
+      "name": "S53",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 54,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": -1,
+        "elevationWobble": 24.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 17.0
+        },
+        "phaseOffset": 303.75,
+        "radius": 1.067,
+        "wobblePeriod": {
+          "beats": 16.0
+        }
+      },
+      "mute": false,
+      "name": "S54",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 55,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": 1,
+        "elevationWobble": 0.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 20.0
+        },
+        "phaseOffset": 309.375,
+        "radius": 1.533,
+        "wobblePeriod": {
+          "beats": 8.0
+        }
+      },
+      "mute": false,
+      "name": "S55",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 56,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": -1,
+        "elevationWobble": 20.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 23.0
+        },
+        "phaseOffset": 315.0,
+        "radius": 1.133,
+        "wobblePeriod": {
+          "beats": 13.0
+        }
+      },
+      "mute": false,
+      "name": "S56",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 57,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": 1,
+        "elevationWobble": 40.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 9.0
+        },
+        "phaseOffset": 320.625,
+        "radius": 1.6,
+        "wobblePeriod": {
+          "beats": 18.0
+        }
+      },
+      "mute": false,
+      "name": "S57",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 58,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": -1,
+        "elevationWobble": 16.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 12.0
+        },
+        "phaseOffset": 326.25,
+        "radius": 1.2,
+        "wobblePeriod": {
+          "beats": 10.0
+        }
+      },
+      "mute": false,
+      "name": "S58",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 59,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": 1,
+        "elevationWobble": 36.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 15.0
+        },
+        "phaseOffset": 331.875,
+        "radius": 1.667,
+        "wobblePeriod": {
+          "beats": 15.0
+        }
+      },
+      "mute": false,
+      "name": "S59",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 60,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": -1,
+        "elevationWobble": 12.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 18.0
+        },
+        "phaseOffset": 337.5,
+        "radius": 1.267,
+        "wobblePeriod": {
+          "beats": 7.0
+        }
+      },
+      "mute": false,
+      "name": "S60",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 61,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": 1,
+        "elevationWobble": 32.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 21.0
+        },
+        "phaseOffset": 343.125,
+        "radius": 1.733,
+        "wobblePeriod": {
+          "beats": 12.0
+        }
+      },
+      "mute": false,
+      "name": "S61",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 62,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": -1,
+        "elevationWobble": 8.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 24.0
+        },
+        "phaseOffset": 348.75,
+        "radius": 1.333,
+        "wobblePeriod": {
+          "beats": 17.0
+        }
+      },
+      "mute": false,
+      "name": "S62",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 63,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": 1,
+        "elevationWobble": 28.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 10.0
+        },
+        "phaseOffset": 354.375,
+        "radius": 1.8,
+        "wobblePeriod": {
+          "beats": 9.0
+        }
+      },
+      "mute": false,
+      "name": "S63",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    },
+    {
+      "directSpeakers": [],
+      "distance": {
+        "k": 1.0,
+        "q": 0.0,
+        "rMin": 0.5
+      },
+      "gainDb": 0.0,
+      "id": 64,
+      "input": {
+        "type": "pink"
+      },
+      "inserts": [],
+      "kind": "Generator",
+      "linkedPoints": false,
+      "modulators": [],
+      "motion": {
+        "centre": {
+          "az": 0.0,
+          "dist": 0.0,
+          "el": 0.0
+        },
+        "direction": -1,
+        "elevationWobble": 4.0,
+        "kind": "Orbit",
+        "period": {
+          "beats": 13.0
+        },
+        "phaseOffset": 0.0,
+        "radius": 1.4,
+        "wobblePeriod": {
+          "beats": 14.0
+        }
+      },
+      "mute": false,
+      "name": "S64",
+      "spatializer": "Dbap",
+      "spread": 1.0,
+      "stereo": false,
+      "width": 60.0
+    }
+  ],
+  "speakerChains": []
+}

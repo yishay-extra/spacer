@@ -2,23 +2,22 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
+#include <array>
 #include <functional>
 #include <optional>
+#include <vector>
 
 #include "app/AppContext.h"
+#include "ui/logic/PaintStats.h"
 #include "ui/logic/StageScene.h"
 #include "ui/logic/StageTransform.h"
 
 namespace spacer {
 
-/// The stage (SPEC §16 item 1): top-down or side view of the layout and the
-/// sources. Speakers show their output meter as a ring; trajectories are
-/// faint paths. Perform mode: drag sources (Manual position or motion
-/// centre), click a speaker to solo pink noise on it. LayoutEdit mode (the
-/// layout editor's stage): drag speakers, click to select.
-///
-/// The maths (transforms, hit-testing, drag rules) is in src/ui/logic and
-/// unit-tested; this class only draws and routes mouse events.
+/// The stage (SPEC §16 item 1): an orthographic 3D orbit view with Top / Side /
+/// Front snaps; dragging empty space rotates. Perform mode drags sources and
+/// clicks speakers to solo them; LayoutEdit mode drags and selects speakers.
+/// The maths is in src/ui/logic; this class only draws and routes the mouse.
 class StageView final : public juce::Component, private AppContext::Listener {
 public:
     enum class Mode { Perform, LayoutEdit };
@@ -26,9 +25,9 @@ public:
     StageView(AppContext& context, Mode mode);
     ~StageView() override;
 
-    /// Top or side view (SPEC §16: "toggle side view").
-    void setProjection(StageProjection projection);
-    StageProjection projection() const noexcept { return transform_.view(); }
+    /// Jumps the camera to a snap; the view opens at StageSnap::ThreeD.
+    void setSnap(StageSnap snap);
+    std::optional<StageSnap> snap() const noexcept { return transform_.snap(); }
 
     /// LayoutEdit: the selected speaker (highlighted); -1 = none.
     void setSelectedSpeaker(int speakerId);
@@ -50,20 +49,35 @@ private:
     void feedbackUpdated() override;
 
     void refreshScene(bool refit);
-    void toggleView();
+    void refreshSnapButtons();
     StagePoint toStage(juce::Point<float> p) const { return {p.x, p.y}; }
     juce::Point<float> toJuce(const Cartesian& c) const;
 
-    void paintGrid(juce::Graphics& g) const;
-    void paintSpeakers(juce::Graphics& g) const;
+    void paintFloor(juce::Graphics& g) const;
+    void paintMast(juce::Graphics& g) const;
+    void paintListener(juce::Graphics& g) const;
+    void paintGizmo(juce::Graphics& g) const;
     void paintTrajectories(juce::Graphics& g) const;
-    void paintSources(juce::Graphics& g) const;
+    void paintShareLines(juce::Graphics& g) const;
+    void paintItems(juce::Graphics& g);
+    void paintSpeaker(juce::Graphics& g, std::size_t index, int glowLimit);
+    void paintSourcePoint(juce::Graphics& g, const StageSourcePoint& s, int cloudLimit);
+    void paintStem(juce::Graphics& g, const Cartesian& position, juce::Colour colour, float cue) const;
+    void paintCloud(juce::Graphics& g, const Cartesian& centre, float radiusMetres, int dots,
+                    juce::Colour colour, float cue);
 
     AppContext& context_;
     Mode mode_;
     StageTransform transform_;
     StageScene scene_;
-    juce::TextButton viewButton_;
+    struct SnapButton {
+        StageSnap snap;
+        juce::TextButton button;
+    };
+    std::array<SnapButton, 4> snapButtons_;
+    bool orbiting_{false};
+    bool orbitStarted_{false};
+    juce::Point<float> lastOrbitPosition_;
 
     struct Drag {
         StageItem item;
@@ -74,6 +88,12 @@ private:
     std::optional<Drag> drag_;
     std::optional<StageItem> hover_;
     int selectedSpeaker_{-1};
+
+    PaintStats paintStats_;
+    bool showStats_{false};
+    double animTime_{0.0};
+    juce::RectangleList<float> dots_;
+    std::vector<Cartesian> itemPositions_;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(StageView)
 };
