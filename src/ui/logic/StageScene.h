@@ -5,14 +5,19 @@
 // reported them, else the model's phase-0 positions) and trajectory previews.
 // Plain C++, unit-tested on Linux.
 
+#include <array>
 #include <string>
 #include <vector>
 
 #include "core/Project.h"
 #include "ui/logic/FeedbackState.h"
 #include "ui/logic/StageHitTest.h"
+#include "ui/logic/StagePalette.h"
+#include "ui/logic/StageShares.h"
 
 namespace spacer {
+
+inline constexpr float kMinDrawnShare = 0.03f;
 
 struct StageSpeaker {
     int id{0};
@@ -29,6 +34,10 @@ struct StageSourcePoint {
     std::string name;
     Cartesian position;
     bool mute{false};
+    StageRgb colour;
+    float level{0.0f};
+    bool hasShares{false};
+    std::array<float, kMaxSpeakers> shares{};
 };
 
 struct StageTrajectory {
@@ -48,6 +57,9 @@ public:
     const std::vector<StageSourcePoint>& sources() const { return sources_; }
     const std::vector<StageTrajectory>& trajectories() const { return trajectories_; }
 
+    /// Source points with level > 0.
+    int loudPoints() const;
+
     /// Hit-test items (sources and speakers) for StageHitTest.
     std::vector<StageItem> items() const;
 
@@ -55,6 +67,9 @@ private:
     std::vector<StageSpeaker> speakers_;
     std::vector<StageSourcePoint> sources_;
     std::vector<StageTrajectory> trajectories_;
+    StageShares shares_;
+    Layout sharesLayout_;
+    bool sharesPrepared_{false};
 };
 
 }  // namespace spacer
