@@ -21,7 +21,7 @@
 - Tests: Catch2 v3, one `TEST_CASE` per behaviour, files `tests/ui/<Thing>Tests.cpp` (picked up by glob; re-run `cmake -S . -B build` after adding a file).
 - Build is warning-free (`-Wall -Wextra -Wpedantic -Wshadow -Wconversion` on `spacer_ui_logic`); fix warnings, do not suppress them.
 - Comments: default to none. No dates, issue numbers, plan/task ids or history in comments. A header comment is 2–4 lines.
-- `clang-format` is not installed on this Mac and CI does not run it (checked 2026-11-10): match the surrounding style by hand (4 spaces, 110 columns, as in the neighbouring files). Do not install tools.
+- `clang-format` is run as `xcrun clang-format` (Apple clang-format 21; every file at origin/main is clean under it). Format the `.cpp`/`.h` files you touch before committing.
 - Commit messages: short imperative subject, body says why, ending with the line `Co-Authored-By: Claude Fable 5.2 <noreply@anthropic.com>`.
 - JUCE API facts are verified against the fetched source, `/Users/yishay/projects/spacer/build/_deps/juce-src/modules/`, not from memory.
 

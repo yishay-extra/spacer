@@ -129,11 +129,13 @@ fixed the look.
     supersedes the last two sentences of call 7 and narrows "lines to the
     speakers carrying it"). A source point draws lines to its 8 strongest
     speakers at most; the smaller cloud still appears on every speaker that
-    carries it. All speaker clouds together use at most 3000 dots per frame:
-    each gets `min(per-cloud maximum / 4, max(3, 3000 / number of
-    source-speaker pairs drawn))`. Reason: a wide DBAP source reaches all 32
-    speakers, and 64 of them would otherwise mean about 2000 lines and 47 000
-    dots per frame, far past the 8 ms paint budget.
+    carries it. All speaker clouds together aim at 3000 dots per frame: each
+    gets `min(per-cloud maximum / 4, max(3, 3000 / number of source-speaker
+    pairs drawn))`. The floor of 3 dots per pair wins past 1000 pairs, so at
+    the limits (128 points x 32 speakers) the worst case is 12 288 dots.
+    Reason: a wide DBAP source reaches all 32 speakers, and 64 of them would
+    otherwise mean about 2000 lines and 47 000 dots per frame, far past the
+    8 ms paint budget.
 
 ## Camera
 
