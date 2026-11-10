@@ -551,10 +551,11 @@ Single window, dark theme, resizable, minimum 1100×700. Panels:
    speaker and source. Drag sources (sets Manual motion value or offsets the
    motion centre); a drag moves in the screen plane. Trajectories drawn as
    faint paths. Each source has its own colour and is drawn as a cloud whose
-   density follows its level, with a line to, and a smaller cloud on, each
-   speaker that carries it (VBAP, DBAP, Direct; ambisonic sources show the
-   cloud only). Speaker meters as rings; click a speaker to solo pink noise.
-   Keyboard: space = Go, Esc = panic, ⌘Z undo.
+   density follows its level, with a smaller cloud on each speaker that
+   carries it and lines to the strongest of them, 8 at most (VBAP, DBAP,
+   Direct; ambisonic sources show the cloud only). Speaker meters as rings;
+   click a speaker to solo pink noise. Keyboard: space = Go, Esc = panic,
+   ⌘Z undo.
 2. **Sources** (left): list + strip for the selected source (input, gain,
    mute, spatializer, spread, distance, motion kind + params, modulators,
    inserts, meter). Add/remove/duplicate.

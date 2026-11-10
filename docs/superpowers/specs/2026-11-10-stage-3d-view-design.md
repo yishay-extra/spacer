@@ -125,6 +125,15 @@ fixed the look.
 17. **`StageProjection`, `setProjection()`, `projection()` are replaced**, not
     aliased. Nothing outside `StageView` and the stage tests uses them. Tests
     are respelled to the new API with their numbers untouched.
+18. **Lines and speaker clouds are bounded** (added after the Task 6 review;
+    supersedes the last two sentences of call 7 and narrows "lines to the
+    speakers carrying it"). A source point draws lines to its 8 strongest
+    speakers at most; the smaller cloud still appears on every speaker that
+    carries it. All speaker clouds together use at most 3000 dots per frame:
+    each gets `min(per-cloud maximum / 4, max(3, 3000 / number of
+    source-speaker pairs drawn))`. Reason: a wide DBAP source reaches all 32
+    speakers, and 64 of them would otherwise mean about 2000 lines and 47 000
+    dots per frame, far past the 8 ms paint budget.
 
 ## Camera
 
