@@ -1,6 +1,7 @@
 build/
 build-*/
 cmake-build-*/
+/Spacer.app
 .cache/
 compile_commands.json
 *.xcodeproj/
