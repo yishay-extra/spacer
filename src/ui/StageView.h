@@ -5,8 +5,10 @@
 #include <array>
 #include <functional>
 #include <optional>
+#include <vector>
 
 #include "app/AppContext.h"
+#include "ui/logic/PaintStats.h"
 #include "ui/logic/StageScene.h"
 #include "ui/logic/StageTransform.h"
 
@@ -59,9 +61,14 @@ private:
     void paintMast(juce::Graphics& g) const;
     void paintListener(juce::Graphics& g) const;
     void paintGizmo(juce::Graphics& g) const;
-    void paintSpeakers(juce::Graphics& g) const;
     void paintTrajectories(juce::Graphics& g) const;
-    void paintSources(juce::Graphics& g) const;
+    void paintShareLines(juce::Graphics& g) const;
+    void paintItems(juce::Graphics& g);
+    void paintSpeaker(juce::Graphics& g, std::size_t index);
+    void paintSourcePoint(juce::Graphics& g, const StageSourcePoint& s);
+    void paintStem(juce::Graphics& g, const Cartesian& position, juce::Colour colour, float cue) const;
+    void paintCloud(juce::Graphics& g, const Cartesian& centre, float radiusMetres, int dots, juce::Colour colour,
+                    float cue);
 
     AppContext& context_;
     Mode mode_;
@@ -84,6 +91,12 @@ private:
     std::optional<Drag> drag_;
     std::optional<StageItem> hover_;
     int selectedSpeaker_{-1};
+
+    PaintStats paintStats_;
+    bool showStats_{false};
+    double animTime_{0.0};
+    juce::RectangleList<float> dots_;
+    std::vector<Cartesian> itemPositions_;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(StageView)
 };
