@@ -3,9 +3,11 @@
 #include <algorithm>
 #include <cmath>
 #include <string>
+#include <vector>
 
 #include "ui/logic/LayoutEditing.h"
 #include "ui/logic/SourceGeometry.h"
+#include "ui/logic/StageDepth.h"
 #include "ui/logic/StageHitTest.h"
 
 namespace spacer {
@@ -37,11 +39,25 @@ juce::Colour meterColour(float levelDb, float gainReductionDb) {
 }  // namespace
 
 StageView::StageView(AppContext& context, Mode mode) : context_(context), mode_(mode) {
-    viewButton_.setButtonText("Side view");
-    viewButton_.setClickingTogglesState(true);
-    viewButton_.setTooltip("Toggle between the top-down and the side view");
-    viewButton_.onClick = [this] { toggleView(); };
-    addAndMakeVisible(viewButton_);
+    const struct {
+        StageSnap snap;
+        const char* text;
+        const char* tip;
+    } specs[] = {
+        {StageSnap::ThreeD, "3D", "Free 3D view"},
+        {StageSnap::Top, "Top", "From above: front is up"},
+        {StageSnap::Side, "Side", "From the right: front is right"},
+        {StageSnap::Front, "Front", "From behind the listener: right is right"},
+    };
+    for (std::size_t i = 0; i < snapButtons_.size(); ++i) {
+        auto& sb = snapButtons_[i];
+        sb.snap = specs[i].snap;
+        sb.button.setButtonText(specs[i].text);
+        sb.button.setTooltip(specs[i].tip);
+        sb.button.onClick = [this, snap = specs[i].snap] { setSnap(snap); };
+        addAndMakeVisible(sb.button);
+    }
+    setSnap(StageSnap::ThreeD);
     context_.addListener(this);
     refreshScene(true);
 }
@@ -52,12 +68,14 @@ StageView::~StageView() {
 
 void StageView::setSnap(StageSnap snap) {
     transform_.setSnap(snap);
-    viewButton_.setToggleState(snap == StageSnap::Side, juce::dontSendNotification);
+    refreshSnapButtons();
     repaint();
 }
 
-void StageView::toggleView() {
-    setSnap(viewButton_.getToggleState() ? StageSnap::Side : StageSnap::Top);
+void StageView::refreshSnapButtons() {
+    const auto current = transform_.snap();
+    for (auto& sb : snapButtons_)
+        sb.button.setToggleState(current && *current == sb.snap, juce::dontSendNotification);
 }
 
 void StageView::setSelectedSpeaker(int speakerId) {
@@ -89,7 +107,12 @@ void StageView::feedbackUpdated() {
 
 void StageView::resized() {
     transform_.setViewport({0.0f, 0.0f, static_cast<float>(getWidth()), static_cast<float>(getHeight())});
-    viewButton_.setBounds(getWidth() - 100, 8, 92, 24);
+    constexpr int w = 46, gap = 4, h = 24;
+    int x = getWidth() - 8 - static_cast<int>(snapButtons_.size()) * (w + gap) + gap;
+    for (auto& sb : snapButtons_) {
+        sb.button.setBounds(x, 8, w, h);
+        x += w + gap;
+    }
 }
 
 juce::Point<float> StageView::toJuce(const Cartesian& c) const {
@@ -101,16 +124,28 @@ juce::Point<float> StageView::toJuce(const Cartesian& c) const {
 
 void StageView::paint(juce::Graphics& g) {
     g.fillAll(kBackground);
-    paintGrid(g);
+    paintFloor(g);
+    paintMast(g);
+    paintListener(g);
     paintTrajectories(g);
     paintSpeakers(g);
     paintSources(g);
+    paintGizmo(g);
 
     g.setColour(kGridText);
     g.setFont(juce::FontOptions(12.0f));
-    const bool top = transform_.snap() == StageSnap::Top;
-    g.drawText(top ? "Top view  -  front is up" : "Side view (from the right)  -  front is right, up is up",
-               getLocalBounds().reduced(10).removeFromBottom(16), juce::Justification::bottomLeft);
+    const char* caption = "3D view  -  drag empty space to rotate";
+    if (const auto snap = transform_.snap()) {
+        switch (*snap) {
+            case StageSnap::ThreeD: break;
+            case StageSnap::Top: caption = "Top view  -  front is up"; break;
+            case StageSnap::Side: caption = "Side view (from the right)  -  front is right, up is up"; break;
+            case StageSnap::Front:
+                caption = "Front view (from behind the listener)  -  right is right, up is up";
+                break;
+        }
+    }
+    g.drawText(caption, getLocalBounds().reduced(10).removeFromBottom(16), juce::Justification::bottomLeft);
     if (const auto test = context_.speakerTestId()) {
         g.setColour(kTesting);
         g.drawText("Speaker test: " + juce::String(*test) + "  (click the speaker again to stop)",
@@ -118,67 +153,127 @@ void StageView::paint(juce::Graphics& g) {
     }
 }
 
-void StageView::paintGrid(juce::Graphics& g) const {
-    const auto origin = toJuce({});
-    const float ppm = transform_.pixelsPerMetre();
-    const float maxR = std::hypot(static_cast<float>(getWidth()), static_cast<float>(getHeight())) / ppm +
-                       std::hypot(transform_.pan().x, transform_.pan().y);
-    const int rings = std::min(50, static_cast<int>(std::ceil(maxR)));
+void StageView::paintFloor(juce::Graphics& g) const {
+    constexpr int kSegments = 72;
+    constexpr int kMaxRings = 50;
+    const float extent = transform_.extent();
+    const int rings = std::clamp(
+        static_cast<int>(std::ceil(std::max(extent * 1.5f, extent * 1.5f / transform_.zoom()))), 1, kMaxRings);
     g.setFont(juce::FontOptions(10.0f));
-    if (transform_.snap() == StageSnap::Top) {
-        for (int r = 1; r <= rings; ++r) {
-            const float rp = static_cast<float>(r) * ppm;
-            g.setColour(kGrid);
-            g.drawEllipse(origin.x - rp, origin.y - rp, rp * 2.0f, rp * 2.0f, 1.0f);
-            g.setColour(kGridText);
-            g.drawText(juce::String(r) + " m",
-                       juce::Rectangle<float>(origin.x + 3.0f, origin.y - rp, 40.0f, 12.0f),
-                       juce::Justification::topLeft);
+    for (int r = 1; r <= rings; ++r) {
+        const float radius = static_cast<float>(r);
+        juce::Path ring;
+        for (int i = 0; i <= kSegments; ++i) {
+            const float a = static_cast<float>(i) * (2.0f * kPi) / static_cast<float>(kSegments);
+            const auto p = toJuce({radius * std::cos(a), radius * std::sin(a), 0.0f});
+            if (i == 0)
+                ring.startNewSubPath(p);
+            else
+                ring.lineTo(p);
         }
         g.setColour(kGrid);
-        g.drawLine(0.0f, origin.y, static_cast<float>(getWidth()), origin.y, 1.0f);
-        g.drawLine(origin.x, 0.0f, origin.x, static_cast<float>(getHeight()), 1.0f);
-        // Listener: a head with its nose pointing front (+y = screen up).
-        g.setColour(kListener);
-        g.drawEllipse(origin.x - 8.0f, origin.y - 8.0f, 16.0f, 16.0f, 1.5f);
-        juce::Path nose;
-        nose.addTriangle(origin.x - 4.0f, origin.y - 7.0f, origin.x + 4.0f, origin.y - 7.0f, origin.x,
-                         origin.y - 14.0f);
-        g.fillPath(nose);
-    } else {
-        for (int r = -rings; r <= rings; ++r) {
-            const float y = origin.y - static_cast<float>(r) * ppm;
-            const float x = origin.x + static_cast<float>(r) * ppm;
-            g.setColour(r == 0 ? kGrid.brighter(0.4f) : kGrid);
-            g.drawLine(0.0f, y, static_cast<float>(getWidth()), y, r == 0 ? 1.5f : 1.0f);
-            g.setColour(kGrid);
-            g.drawLine(x, 0.0f, x, static_cast<float>(getHeight()), 1.0f);
-        }
-        g.setColour(kListener);
-        g.drawEllipse(origin.x - 8.0f, origin.y - 8.0f, 16.0f, 16.0f, 1.5f);
-        juce::Path nose;  // front = screen right
-        nose.addTriangle(origin.x + 7.0f, origin.y - 4.0f, origin.x + 7.0f, origin.y + 4.0f, origin.x + 14.0f,
-                         origin.y);
-        g.fillPath(nose);
+        g.strokePath(ring, juce::PathStrokeType(1.0f));
+        const auto label = toJuce({radius, 0.0f, 0.0f});
+        g.setColour(kGridText);
+        g.drawText(juce::String(r) + " m", juce::Rectangle<float>(label.x + 3.0f, label.y - 12.0f, 40.0f, 12.0f),
+                   juce::Justification::topLeft);
+    }
+    const float reach = static_cast<float>(rings);
+    g.setColour(kGrid.brighter(0.3f));
+    g.drawLine(juce::Line<float>(toJuce({-reach, 0.0f, 0.0f}), toJuce({reach, 0.0f, 0.0f})), 1.0f);
+    g.drawLine(juce::Line<float>(toJuce({0.0f, -reach, 0.0f}), toJuce({0.0f, reach, 0.0f})), 1.0f);
+    const auto front = toJuce({0.0f, reach + 0.5f, 0.0f});
+    g.setColour(kGridText);
+    g.setFont(juce::FontOptions(11.0f));
+    g.drawText("FRONT", juce::Rectangle<float>(60.0f, 14.0f).withCentre(front), juce::Justification::centred);
+}
+
+void StageView::paintMast(juce::Graphics& g) const {
+    const int height = static_cast<int>(std::ceil(transform_.extent()));
+    g.setColour(kListener.withAlpha(0.7f));
+    g.drawLine(juce::Line<float>(toJuce({}), toJuce({0.0f, 0.0f, static_cast<float>(height)})), 1.0f);
+    g.setFont(juce::FontOptions(10.0f));
+    for (int m = 1; m <= height; ++m) {
+        const auto p = toJuce({0.0f, 0.0f, static_cast<float>(m)});
+        g.setColour(kListener.withAlpha(0.7f));
+        g.drawLine(p.x - 3.0f, p.y, p.x + 3.0f, p.y, 1.0f);
+        g.setColour(kGridText);
+        g.drawText(juce::String(m), juce::Rectangle<float>(p.x + 5.0f, p.y - 6.0f, 24.0f, 12.0f),
+                   juce::Justification::centredLeft);
+    }
+}
+
+void StageView::paintListener(juce::Graphics& g) const {
+    const auto origin = toJuce({});
+    g.setColour(kListener);
+    g.drawEllipse(origin.x - 8.0f, origin.y - 8.0f, 16.0f, 16.0f, 1.5f);
+    const auto front = toJuce({0.0f, 1.0f, 0.0f}) - origin;
+    const float len = std::hypot(front.x, front.y);
+    if (len < 1.0f) return;
+    const juce::Point<float> dir{front.x / len, front.y / len};
+    const juce::Point<float> side{-dir.y, dir.x};
+    juce::Path nose;
+    nose.addTriangle(origin + dir * 7.0f + side * 4.0f, origin + dir * 7.0f - side * 4.0f,
+                     origin + dir * 14.0f);
+    g.fillPath(nose);
+}
+
+void StageView::paintGizmo(juce::Graphics& g) const {
+    const juce::Point<float> centre{static_cast<float>(getWidth()) - 50.0f,
+                                    static_cast<float>(getHeight()) - 50.0f};
+    constexpr float kLength = 26.0f;
+    const struct {
+        Cartesian axis;
+        const char* text;
+        juce::uint32 colour;
+    } axes[] = {
+        {{1.0f, 0.0f, 0.0f}, "R", 0xffe5645c},
+        {{0.0f, 1.0f, 0.0f}, "F", 0xff5cc98a},
+        {{0.0f, 0.0f, 1.0f}, "Up", 0xff5c9be5},
+    };
+    g.setFont(juce::FontOptions(11.0f));
+    for (const auto& a : axes) {
+        const juce::Point<float> tip =
+            centre + juce::Point<float>(transform_.screenRight().dot(a.axis), -transform_.screenUp().dot(a.axis)) *
+                         kLength;
+        g.setColour(juce::Colour(a.colour));
+        g.drawArrow(juce::Line<float>(centre, tip), 1.5f, 6.0f, 6.0f);
+        const auto out = tip - centre;
+        const float len = std::max(1.0f, std::hypot(out.x, out.y));
+        const auto labelAt = tip + juce::Point<float>(out.x / len, out.y / len) * 9.0f;
+        g.drawText(a.text, juce::Rectangle<float>(24.0f, 12.0f).withCentre(labelAt), juce::Justification::centred);
     }
 }
 
 void StageView::paintSpeakers(juce::Graphics& g) const {
     const auto test = context_.speakerTestId();
     g.setFont(juce::FontOptions(11.0f));
-    for (const auto& s : scene_.speakers()) {
+    const auto& speakers = scene_.speakers();
+    std::vector<Cartesian> positions;
+    positions.reserve(speakers.size());
+    for (const auto& s : speakers) positions.push_back(s.position);
+    for (const std::size_t index : farToNear(positions, transform_)) {
+        const auto& s = speakers[index];
+        const float cue = depthCue(s.position, transform_);
         const auto p = toJuce(s.position);
+        if (std::abs(s.position.z) > 0.02f) {
+            const auto foot = toJuce({s.position.x, s.position.y, 0.0f});
+            g.setColour(kSpeaker.withAlpha(0.4f * cue));
+            g.drawLine(juce::Line<float>(p, foot), 1.0f);
+            g.drawEllipse(foot.x - 2.5f, foot.y - 2.5f, 5.0f, 5.0f, 1.0f);
+        }
         // Meter ring (post-limiter peak; red while the limiter reduces gain).
+        const float size = kSpeakerSize * cue;
         const float fraction = FeedbackState::meterFraction(s.levelDb);
         if (fraction > 0.0f) {
-            const float r = kSpeakerSize * 0.6f + fraction * kMeterRingMax;
-            g.setColour(meterColour(s.levelDb, s.gainReductionDb).withAlpha(0.35f + 0.65f * fraction));
+            const float r = (kSpeakerSize * 0.6f + fraction * kMeterRingMax) * cue;
+            g.setColour(meterColour(s.levelDb, s.gainReductionDb).withAlpha((0.35f + 0.65f * fraction) * cue));
             g.drawEllipse(p.x - r, p.y - r, r * 2.0f, r * 2.0f, 2.5f);
         }
-        const auto box = juce::Rectangle<float>(kSpeakerSize, kSpeakerSize).withCentre(p);
+        const auto box = juce::Rectangle<float>(size, size).withCentre(p);
         const bool selected = s.id == selectedSpeaker_;
         const bool hovered = hover_ && hover_->kind == StageItem::Kind::Speaker && hover_->id == s.id;
-        g.setColour(s.lfe ? kSpeakerLfe : kSpeaker);
+        g.setColour((s.lfe ? kSpeakerLfe : kSpeaker).withAlpha(cue));
         if (s.lfe)
             g.fillEllipse(box);
         else
@@ -190,7 +285,7 @@ void StageView::paintSpeakers(juce::Graphics& g) const {
             g.setColour(selected ? kSelected : kSpeaker.withAlpha(0.6f));
             g.drawRoundedRectangle(box.expanded(3.0f), 3.0f, 1.5f);
         }
-        g.setColour(kSpeaker.withAlpha(0.85f));
+        g.setColour(kSpeaker.withAlpha(0.85f * cue));
         g.drawText(juce::String(s.name), juce::Rectangle<float>(p.x - 40.0f, p.y + 9.0f, 80.0f, 14.0f),
                    juce::Justification::centredTop);
     }
@@ -253,10 +348,15 @@ void StageView::mouseMove(const juce::MouseEvent& e) {
 
 void StageView::mouseDown(const juce::MouseEvent& e) {
     drag_.reset();
+    orbiting_ = false;
     StageHitOptions options;
     if (mode_ == Mode::LayoutEdit) options.only = StageItem::Kind::Speaker;
     const auto hit = spacer::hitTest(scene_.items(), transform_, toStage(e.position), options);
-    if (!hit) return;
+    if (!hit) {
+        orbiting_ = true;
+        lastOrbitPosition_ = e.position;
+        return;
+    }
     Drag d;
     d.item = *hit;
     if (hit->kind == StageItem::Kind::Source) {
@@ -277,6 +377,14 @@ void StageView::mouseDown(const juce::MouseEvent& e) {
 }
 
 void StageView::mouseDrag(const juce::MouseEvent& e) {
+    if (orbiting_) {
+        const auto movement = e.position - lastOrbitPosition_;
+        lastOrbitPosition_ = e.position;
+        transform_.orbit(movement.x, movement.y);
+        refreshSnapButtons();
+        repaint();
+        return;
+    }
     if (!drag_) return;
     if (!drag_->moved) {
         if (e.getDistanceFromDragStart() < 3) return;  // a click, not a drag (yet)
@@ -305,6 +413,7 @@ void StageView::mouseDrag(const juce::MouseEvent& e) {
 }
 
 void StageView::mouseUp(const juce::MouseEvent&) {
+    orbiting_ = false;
     if (!drag_) return;
     const Drag d = *drag_;
     drag_.reset();

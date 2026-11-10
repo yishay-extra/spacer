@@ -2,6 +2,7 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
+#include <array>
 #include <functional>
 #include <optional>
 
@@ -11,11 +12,11 @@
 
 namespace spacer {
 
-/// The stage (SPEC §16 item 1): top-down or side view of the layout and the
-/// sources. Speakers show their output meter as a ring; trajectories are
-/// faint paths. Perform mode: drag sources (Manual position or motion
-/// centre), click a speaker to solo pink noise on it. LayoutEdit mode (the
-/// layout editor's stage): drag speakers, click to select.
+/// The stage (SPEC §16 item 1): an orthographic 3D orbit view of the layout and
+/// the sources, with Top / Side / Front snaps; dragging empty space rotates.
+/// Speakers show their output meter as a ring. Perform mode: drag sources,
+/// click a speaker to solo pink noise on it. LayoutEdit mode: drag speakers,
+/// click to select.
 ///
 /// The maths (transforms, hit-testing, drag rules) is in src/ui/logic and
 /// unit-tested; this class only draws and routes mouse events.
@@ -26,7 +27,7 @@ public:
     StageView(AppContext& context, Mode mode);
     ~StageView() override;
 
-    /// Top or side view (SPEC §16: "toggle side view").
+    /// Jumps the camera to a snap; the view opens at StageSnap::ThreeD.
     void setSnap(StageSnap snap);
     std::optional<StageSnap> snap() const noexcept { return transform_.snap(); }
 
@@ -50,11 +51,14 @@ private:
     void feedbackUpdated() override;
 
     void refreshScene(bool refit);
-    void toggleView();
+    void refreshSnapButtons();
     StagePoint toStage(juce::Point<float> p) const { return {p.x, p.y}; }
     juce::Point<float> toJuce(const Cartesian& c) const;
 
-    void paintGrid(juce::Graphics& g) const;
+    void paintFloor(juce::Graphics& g) const;
+    void paintMast(juce::Graphics& g) const;
+    void paintListener(juce::Graphics& g) const;
+    void paintGizmo(juce::Graphics& g) const;
     void paintSpeakers(juce::Graphics& g) const;
     void paintTrajectories(juce::Graphics& g) const;
     void paintSources(juce::Graphics& g) const;
@@ -63,7 +67,13 @@ private:
     Mode mode_;
     StageTransform transform_;
     StageScene scene_;
-    juce::TextButton viewButton_;
+    struct SnapButton {
+        StageSnap snap;
+        juce::TextButton button;
+    };
+    std::array<SnapButton, 4> snapButtons_;
+    bool orbiting_{false};
+    juce::Point<float> lastOrbitPosition_;
 
     struct Drag {
         StageItem item;
