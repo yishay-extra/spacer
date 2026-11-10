@@ -54,6 +54,8 @@ StageView::StageView(AppContext& context, Mode mode) : context_(context), mode_(
         sb.snap = specs[i].snap;
         sb.button.setButtonText(specs[i].text);
         sb.button.setTooltip(specs[i].tip);
+        sb.button.setColour(juce::TextButton::buttonOnColourId, kSelected);
+        sb.button.setColour(juce::TextButton::textColourOnId, juce::Colours::white);
         sb.button.onClick = [this, snap = specs[i].snap] { setSnap(snap); };
         addAndMakeVisible(sb.button);
     }
@@ -182,14 +184,14 @@ void StageView::paintFloor(juce::Graphics& g) const {
     g.setColour(kGrid.brighter(0.3f));
     g.drawLine(juce::Line<float>(toJuce({-reach, 0.0f, 0.0f}), toJuce({reach, 0.0f, 0.0f})), 1.0f);
     g.drawLine(juce::Line<float>(toJuce({0.0f, -reach, 0.0f}), toJuce({0.0f, reach, 0.0f})), 1.0f);
-    const auto front = toJuce({0.0f, reach + 0.5f, 0.0f});
+    const auto front = toJuce({0.0f, extent * 1.08f, 0.0f});
     g.setColour(kGridText);
     g.setFont(juce::FontOptions(11.0f));
     g.drawText("FRONT", juce::Rectangle<float>(60.0f, 14.0f).withCentre(front), juce::Justification::centred);
 }
 
 void StageView::paintMast(juce::Graphics& g) const {
-    const int height = static_cast<int>(std::ceil(transform_.extent()));
+    const int height = std::min(50, static_cast<int>(std::ceil(transform_.extent())));
     g.setColour(kListener.withAlpha(0.7f));
     g.drawLine(juce::Line<float>(toJuce({}), toJuce({0.0f, 0.0f, static_cast<float>(height)})), 1.0f);
     g.setFont(juce::FontOptions(10.0f));
