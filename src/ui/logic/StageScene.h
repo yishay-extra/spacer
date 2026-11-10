@@ -6,6 +6,7 @@
 // Plain C++, unit-tested on Linux.
 
 #include <array>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -18,6 +19,11 @@
 namespace spacer {
 
 inline constexpr float kMinDrawnShare = 0.03f;
+inline constexpr int kMaxShareLines = 8;
+
+/// Layout speaker indices of the strongest non-zero shares, strongest first (ties: lower index first),
+/// at most out.size() of them. Returns how many were written.
+int strongestShares(std::span<const float> shares, std::span<int> out);
 
 struct StageSpeaker {
     int id{0};
@@ -58,7 +64,9 @@ public:
     const std::vector<StageTrajectory>& trajectories() const { return trajectories_; }
 
     /// Source points with level > 0.
-    int loudPoints() const;
+    int loudPoints() const { return loudPoints_; }
+    /// (Source point, speaker) pairs with a share > 0.
+    int sharePairs() const { return sharePairs_; }
 
     /// Hit-test items (sources and speakers) for StageHitTest.
     std::vector<StageItem> items() const;
@@ -70,6 +78,8 @@ private:
     StageShares shares_;
     Layout sharesLayout_;
     bool sharesPrepared_{false};
+    int loudPoints_{0};
+    int sharePairs_{0};
 };
 
 }  // namespace spacer

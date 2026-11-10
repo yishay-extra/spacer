@@ -1,7 +1,9 @@
 #include "ui/StageView.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -306,10 +308,12 @@ void StageView::paintShareLines(juce::Graphics& g) const {
         if (s.mute || s.level <= 0.0f || !s.hasShares || !isDrawable(s.position)) continue;
         const auto from = toJuce(s.position);
         const juce::Colour colour = sourceJuceColour(s);
-        for (std::size_t i = 0; i < count; ++i) {
-            const float share = s.shares[i];
-            if (share <= 0.0f || !isDrawable(speakers[i].position)) continue;
-            g.setColour(colour.withAlpha(std::min(0.8f, 0.1f + 0.7f * share)));
+        std::array<int, kMaxShareLines> strongest{};
+        const int n = strongestShares(std::span<const float>(s.shares.data(), count), strongest);
+        for (int k = 0; k < n; ++k) {
+            const auto i = static_cast<std::size_t>(strongest[static_cast<std::size_t>(k)]);
+            if (!isDrawable(speakers[i].position)) continue;
+            g.setColour(colour.withAlpha(std::min(0.8f, 0.1f + 0.7f * s.shares[i])));
             g.drawLine(juce::Line<float>(from, toJuce(speakers[i].position)), 1.0f);
         }
     }
@@ -320,6 +324,8 @@ void StageView::paintItems(juce::Graphics& g) {
     const auto& points = scene_.sources();
     const bool withSources = mode_ == Mode::Perform;
     const std::size_t speakerCount = speakers.size();
+    const int cloudLimit = cloudDotLimit(scene_.loudPoints());
+    const int glowLimit = glowDotLimit(cloudLimit, scene_.sharePairs());
 
     itemPositions_.clear();
     for (const auto& s : speakers) itemPositions_.push_back(s.position);
@@ -328,9 +334,9 @@ void StageView::paintItems(juce::Graphics& g) {
 
     for (const std::size_t index : farToNear(itemPositions_, transform_)) {
         if (index < speakerCount)
-            paintSpeaker(g, index);
+            paintSpeaker(g, index, glowLimit);
         else
-            paintSourcePoint(g, points[index - speakerCount]);
+            paintSourcePoint(g, points[index - speakerCount], cloudLimit);
     }
 }
 
@@ -344,18 +350,17 @@ void StageView::paintStem(juce::Graphics& g, const Cartesian& position, juce::Co
     g.drawEllipse(foot.x - 2.5f, foot.y - 2.5f, 5.0f, 5.0f, 1.0f);
 }
 
-void StageView::paintSpeaker(juce::Graphics& g, std::size_t index) {
+void StageView::paintSpeaker(juce::Graphics& g, std::size_t index, int glowLimit) {
     const auto& s = scene_.speakers()[index];
     const float cue = depthCue(s.position, transform_);
     const auto p = toJuce(s.position);
     paintStem(g, s.position, kSpeaker, cue);
     if (mode_ == Mode::Perform && index < static_cast<std::size_t>(kMaxSpeakers)) {
-        const int limit = cloudDotLimit(scene_.loudPoints()) / 4;
         for (const auto& point : scene_.sources()) {
             if (point.mute || !point.hasShares || point.level <= 0.0f) continue;
             const float share = point.shares[index];
             if (share <= 0.0f) continue;
-            paintCloud(g, s.position, kGlowRadius, cloudDots(share, limit), sourceJuceColour(point), cue);
+            paintCloud(g, s.position, kGlowRadius, cloudDots(share, glowLimit), sourceJuceColour(point), cue);
         }
     }
     // Meter ring (post-limiter peak; red while the limiter reduces gain).
@@ -388,13 +393,13 @@ void StageView::paintSpeaker(juce::Graphics& g, std::size_t index) {
                juce::Justification::centredTop);
 }
 
-void StageView::paintSourcePoint(juce::Graphics& g, const StageSourcePoint& s) {
+void StageView::paintSourcePoint(juce::Graphics& g, const StageSourcePoint& s, int cloudLimit) {
     const float cue = depthCue(s.position, transform_);
     const auto p = toJuce(s.position);
     const juce::Colour colour = sourceJuceColour(s);
     paintStem(g, s.position, colour, cue);
     if (!s.mute && s.level > 0.0f)
-        paintCloud(g, s.position, kCloudRadius, cloudDots(s.level, cloudDotLimit(scene_.loudPoints())), colour,
+        paintCloud(g, s.position, kCloudRadius, cloudDots(s.level, cloudLimit), colour,
                    cue);
     const bool selected = context_.selection().isSelected(s.id);
     const bool active =

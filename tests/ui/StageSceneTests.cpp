@@ -1,4 +1,6 @@
+#include <array>
 #include <cmath>
+#include <span>
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
@@ -70,6 +72,7 @@ TEST_CASE("Source points carry colour, level and shares", "[ui][scene]") {
     REQUIRE(scene.sources()[0].level == 0.0f);  // silent: a dot only
     REQUIRE_FALSE(scene.sources()[0].hasShares);
     REQUIRE(scene.loudPoints() == 0);
+    REQUIRE(scene.sharePairs() == 0);
 
     f.apply(fb::SourceMeter{1, {1.0f, 0.0f}});  // 0 dBFS
     scene.update(p, f);
@@ -77,6 +80,7 @@ TEST_CASE("Source points carry colour, level and shares", "[ui][scene]") {
     REQUIRE(s.level == 1.0f);
     REQUIRE(s.hasShares);
     REQUIRE(scene.loudPoints() == 1);
+    REQUIRE(scene.sharePairs() == 2);
     for (std::size_t i = 0; i < 4; ++i) {
         const bool front = std::abs(p.layout.speakers[i].position.azimuth) < 90.0f;
         REQUIRE_THAT(s.shares[i], WithinAbs(front ? 0.70711 : 0.0, 1e-3));
@@ -133,4 +137,17 @@ TEST_CASE("Shares follow a layout change and stereo points share one level", "[u
     for (float share : scene.sources()[0].shares) sumSq += static_cast<double>(share) * share;
     REQUIRE(sumSq > 0.99);
     REQUIRE(sumSq < 1.001);
+}
+
+TEST_CASE("Strongest shares come first and stop at the limit", "[ui][scene]") {
+    const std::array<float, 6> shares{0.1f, 0.0f, 0.5f, 0.5f, 0.2f, 0.0f};
+    std::array<int, 3> three{};
+    REQUIRE(strongestShares(shares, three) == 3);
+    REQUIRE(three == std::array<int, 3>{2, 3, 4});
+    std::array<int, 8> eight{};
+    REQUIRE(strongestShares(shares, eight) == 4);
+    REQUIRE(std::array<int, 4>{eight[0], eight[1], eight[2], eight[3]} == std::array<int, 4>{2, 3, 4, 0});
+    const std::array<float, 3> zeros{};
+    REQUIRE(strongestShares(zeros, eight) == 0);
+    REQUIRE(strongestShares(shares, std::span<int>{}) == 0);
 }

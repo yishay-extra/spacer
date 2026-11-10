@@ -46,6 +46,12 @@ int cloudDotLimit(int loudPoints) {
     return std::clamp(kCloudFrameBudget / loudPoints, kCloudMinBudgetDots, kCloudMaxDots);
 }
 
+int glowDotLimit(int cloudLimit, int sharePairs) {
+    const int base = std::max(cloudLimit, 0) / 4;
+    if (sharePairs <= 0) return base;
+    return std::min(base, std::max(kGlowMinDots, kGlowFrameBudget / sharePairs));
+}
+
 int cloudDots(float fraction, int limit) {
     if (!std::isfinite(fraction) || limit <= 0) return 0;
     const float f = std::clamp(fraction, 0.0f, 1.0f);

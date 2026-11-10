@@ -62,3 +62,16 @@ TEST_CASE("Louder clouds have more dots", "[ui][cloud]") {
         previous = n;
     }
 }
+
+TEST_CASE("Speaker glows share their own frame budget", "[ui][cloud]") {
+    REQUIRE(glowDotLimit(96, 0) == 24);
+    REQUIRE(glowDotLimit(96, 1) == 24);
+    REQUIRE(glowDotLimit(96, 125) == 24);
+    REQUIRE(glowDotLimit(96, 126) == 23);
+    REQUIRE(glowDotLimit(96, 300) == 10);
+    REQUIRE(glowDotLimit(96, 2048) == 3);
+    REQUIRE(glowDotLimit(46, 2048) == 3);
+    REQUIRE(glowDotLimit(24, 10) == 6);
+    REQUIRE(glowDotLimit(8, 4000) == 2);
+    REQUIRE(glowDotLimit(0, 5) == 0);
+}

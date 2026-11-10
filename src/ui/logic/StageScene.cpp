@@ -33,6 +33,8 @@ void StageScene::update(const Project& project, const FeedbackState& feedback) {
     }
 
     sources_.clear();
+    loudPoints_ = 0;
+    sharePairs_ = 0;
     for (const auto& s : project.sources) {
         const auto model = modelPoints(s, project.layout);
         const float level =
@@ -56,14 +58,28 @@ void StageScene::update(const Project& project, const FeedbackState& feedback) {
                     if (point.shares[i] < kMinDrawnShare) point.shares[i] = 0.0f;
                 }
             }
+            if (point.level > 0.0f) ++loudPoints_;
+            for (const float share : point.shares)
+                if (share > 0.0f) ++sharePairs_;
             sources_.push_back(std::move(point));
         }
     }
 }
 
-int StageScene::loudPoints() const {
-    return static_cast<int>(
-        std::count_if(sources_.begin(), sources_.end(), [](const auto& s) { return s.level > 0.0f; }));
+int strongestShares(std::span<const float> shares, std::span<int> out) {
+    int written = 0;
+    for (std::size_t i = 0; i < shares.size() && !out.empty(); ++i) {
+        if (!(shares[i] > 0.0f)) continue;
+        const auto size = static_cast<int>(out.size());
+        int at = written;
+        while (at > 0 && shares[static_cast<std::size_t>(out[static_cast<std::size_t>(at - 1)])] < shares[i]) --at;
+        if (at >= size) continue;
+        const int last = std::min(written, size - 1);
+        for (int k = last; k > at; --k) out[static_cast<std::size_t>(k)] = out[static_cast<std::size_t>(k - 1)];
+        out[static_cast<std::size_t>(at)] = static_cast<int>(i);
+        written = std::min(written + 1, size);
+    }
+    return written;
 }
 
 std::vector<StageItem> StageScene::items() const {
