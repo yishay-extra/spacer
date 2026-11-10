@@ -11,3 +11,4 @@ PLAN WP11 asks for a manual checklist per UI work package. Each one lives in
 | WP11d Settings + status bar | [mac-validation/WP11d.md](mac-validation/WP11d.md) |
 | WP11e Plugin UI | [mac-validation/WP11e.md](mac-validation/WP11e.md) |
 | WP14 Integration pass (layout override, settings trim, plugin dirty) | [mac-validation/WP14.md](mac-validation/WP14.md) |
+| WP15 3D stage view | [mac-validation/WP15.md](mac-validation/WP15.md) |

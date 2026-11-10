@@ -117,7 +117,7 @@ Supporting pieces:
  │  ├─ OSC server / MIDI mapping  ├─ Plugin scanner / editor windows            │
  │  └─ Project file load/save     └─ Device manager (CoreAudio, aggregates)     │
  │                                                                              │
- │  UI (JUCE): stage view (top/side), layout editor, source strips, cue list,  │
+ │  UI (JUCE): stage view (3D), layout editor, source strips, cue list,         │
  │             motion editor, meters, device/IO settings                        │
  └──────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -161,7 +161,7 @@ spread parameter that widens the source as it comes closer/inside the array.
 
 ### 5.3 Speaker layout and room compensation
 
-- Layouts are edited visually (top and side views) or numerically; presets
+- Layouts are edited visually (3D view with top, side and front snaps) or numerically; presets
   for stereo, quad, 5.1, 7.1, 7.1.4, octagon, hexadecagon, dome 22, etc.
 - **Automatic compensation** from positions: delay so all speakers' wavefronts
   arrive at the listening position together, gain so each contributes equally
@@ -251,7 +251,7 @@ it.
 
 ## 6. User interface (phase 1)
 
-- **Stage view** — top-down (and side) view of the layout with sources as
+- **Stage view** — rotatable 3D view (with top, side and front snaps) of the layout with sources as
   draggable objects, trajectories drawn, live meters on speakers. This is the
   main performance surface.
 - **Layout editor** — place speakers, see computed delays/gains, test each

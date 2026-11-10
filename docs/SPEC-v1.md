@@ -545,10 +545,16 @@ Positions serialise as `{"az","el","dist"}`. Periods as `{"beats": x}` or
 
 Single window, dark theme, resizable, minimum 1100×700. Panels:
 
-1. **Stage** (centre): top-down view of layout and sources; toggle side view;
-   drag sources (sets Manual motion value or offsets the motion centre);
-   trajectories drawn as faint paths; speaker meters as rings; click a speaker
-   to solo pink noise. Keyboard: space = Go, Esc = panic, ⌘Z undo.
+1. **Stage** (centre): 3D view of layout and sources (orthographic, the floor
+   always level). Drag empty space to rotate, wheel to zoom; snap buttons
+   3D / Top / Side / Front. A stem to the floor shows the height of every
+   speaker and source. Drag sources (sets Manual motion value or offsets the
+   motion centre); a drag moves in the screen plane. Trajectories drawn as
+   faint paths. Each source has its own colour and is drawn as a cloud whose
+   density follows its level, with a line to, and a smaller cloud on, each
+   speaker that carries it (VBAP, DBAP, Direct; ambisonic sources show the
+   cloud only). Speaker meters as rings; click a speaker to solo pink noise.
+   Keyboard: space = Go, Esc = panic, ⌘Z undo.
 2. **Sources** (left): list + strip for the selected source (input, gain,
    mute, spatializer, spread, distance, motion kind + params, modulators,
    inserts, meter). Add/remove/duplicate.
