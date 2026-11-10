@@ -34,9 +34,9 @@ cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
   -DFETCHCONTENT_SOURCE_DIR_JUCE=$D/juce-src \
   -DFETCHCONTENT_SOURCE_DIR_CATCH2=$D/catch2-src \
   -DFETCHCONTENT_SOURCE_DIR_NLOHMANN_JSON=$D/nlohmann_json-src   # reuses the downloaded deps
-cmake --build build --target spacer_tests 2>&1 | grep -E 'warning|error|FAILED' ; echo "build: ${PIPESTATUS[0]}"
+cmake --build build --target spacer_tests > build/last-build.log 2>&1; echo "build: $?"; grep -E 'warning|error|FAILED' build/last-build.log
 build/tests/spacer_tests "[ui]"            # focused run; tags per task below
-cmake --build build 2>&1 | grep -E 'warning|error|FAILED' ; echo "build: ${PIPESTATUS[0]}"   # whole tree incl. the app
+cmake --build build > build/last-build.log 2>&1; echo "build: $?"; grep -E 'warning|error|FAILED' build/last-build.log   # whole tree incl. the app
 ctest --test-dir build --output-on-failure 2>&1 | tail -5   # the gate
 ```
 
