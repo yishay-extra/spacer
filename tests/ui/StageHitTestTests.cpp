@@ -69,3 +69,16 @@ TEST_CASE("Hit radius follows the options", "[ui][hit]") {
     o.sourceRadiusPx = 10.0f;
     REQUIRE(hitTest(items, top(), {208, 200}, o));
 }
+
+TEST_CASE("Hit test follows the camera", "[ui][hit]") {
+    // Two speakers on one vertical line: one spot from above, apart from the front.
+    const std::vector<StageItem> items = {
+        {Kind::Speaker, 1, 0, {1.0f, 0.0f, 0.0f}},
+        {Kind::Speaker, 2, 0, {1.0f, 0.0f, 1.0f}},
+    };
+    auto t = top();
+    REQUIRE(hitTest(items, t, {300, 200})->id == 2);  // the higher one is nearer the viewer
+    t.setSnap(StageSnap::Front);
+    REQUIRE(hitTest(items, t, {300, 200})->id == 1);
+    REQUIRE(hitTest(items, t, {300, 100})->id == 2);
+}

@@ -50,14 +50,14 @@ StageView::~StageView() {
     context_.removeListener(this);
 }
 
-void StageView::setProjection(StageProjection projection) {
-    transform_.setView(projection);
-    viewButton_.setToggleState(projection == StageProjection::Side, juce::dontSendNotification);
+void StageView::setSnap(StageSnap snap) {
+    transform_.setSnap(snap);
+    viewButton_.setToggleState(snap == StageSnap::Side, juce::dontSendNotification);
     repaint();
 }
 
 void StageView::toggleView() {
-    setProjection(viewButton_.getToggleState() ? StageProjection::Side : StageProjection::Top);
+    setSnap(viewButton_.getToggleState() ? StageSnap::Side : StageSnap::Top);
 }
 
 void StageView::setSelectedSpeaker(int speakerId) {
@@ -108,7 +108,7 @@ void StageView::paint(juce::Graphics& g) {
 
     g.setColour(kGridText);
     g.setFont(juce::FontOptions(12.0f));
-    const bool top = transform_.view() == StageProjection::Top;
+    const bool top = transform_.snap() == StageSnap::Top;
     g.drawText(top ? "Top view  -  front is up" : "Side view (from the right)  -  front is right, up is up",
                getLocalBounds().reduced(10).removeFromBottom(16), juce::Justification::bottomLeft);
     if (const auto test = context_.speakerTestId()) {
@@ -125,7 +125,7 @@ void StageView::paintGrid(juce::Graphics& g) const {
                        std::hypot(transform_.pan().x, transform_.pan().y);
     const int rings = std::min(50, static_cast<int>(std::ceil(maxR)));
     g.setFont(juce::FontOptions(10.0f));
-    if (transform_.view() == StageProjection::Top) {
+    if (transform_.snap() == StageSnap::Top) {
         for (int r = 1; r <= rings; ++r) {
             const float rp = static_cast<float>(r) * ppm;
             g.setColour(kGrid);

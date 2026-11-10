@@ -1,3 +1,6 @@
+#include <cmath>
+#include <limits>
+
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
@@ -9,11 +12,11 @@ using Catch::Matchers::WithinAbs;
 
 namespace {
 
-StageTransform square(StageProjection view = StageProjection::Top) {
+StageTransform square(StageSnap view = StageSnap::Top) {
     StageTransform t;
     t.setViewport({0, 0, 400, 400});
     t.setExtent(2.0f);  // 2 m from centre to edge -> 100 px/m
-    t.setView(view);
+    t.setSnap(view);
     return t;
 }
 
@@ -36,7 +39,7 @@ TEST_CASE("Top view puts front up and right to the right", "[ui][stage]") {
 }
 
 TEST_CASE("Side view shows front to the right and up as up", "[ui][stage]") {
-    const auto t = square(StageProjection::Side);
+    const auto t = square(StageSnap::Side);
     const auto front = t.toScreen(Position{0, 0, 1}.toCartesian());
     REQUIRE_THAT(front.x, WithinAbs(300.0, 1e-3));
     REQUIRE_THAT(front.y, WithinAbs(200.0, 1e-3));
@@ -50,7 +53,7 @@ TEST_CASE("Side view shows front to the right and up as up", "[ui][stage]") {
 }
 
 TEST_CASE("Screen to world inverts world to screen and keeps the depth", "[ui][stage]") {
-    for (auto view : {StageProjection::Top, StageProjection::Side}) {
+    for (auto view : {StageSnap::Top, StageSnap::Side}) {
         auto t = square(view);
         t.setViewport({30, 40, 640, 380});
         t.setZoom(1.7f);
@@ -65,7 +68,7 @@ TEST_CASE("Screen to world inverts world to screen and keeps the depth", "[ui][s
     // The hidden coordinate comes from the reference point.
     const auto top = square();
     REQUIRE_THAT(top.toWorld({200, 200}, {9, 9, 1.5f}).z, WithinAbs(1.5, 1e-6));
-    const auto side = square(StageProjection::Side);
+    const auto side = square(StageSnap::Side);
     REQUIRE_THAT(side.toWorld({200, 200}, {-2.0f, 9, 9}).x, WithinAbs(-2.0, 1e-6));
 }
 
@@ -75,7 +78,7 @@ TEST_CASE("Screen deltas map to world deltas on the shown axes only", "[ui][stag
     REQUIRE_THAT(d.x, WithinAbs(0.5, 1e-5));
     REQUIRE_THAT(d.y, WithinAbs(1.0, 1e-5));
     REQUIRE_THAT(d.z, WithinAbs(0.0, 1e-6));
-    const auto side = square(StageProjection::Side);
+    const auto side = square(StageSnap::Side);
     const Cartesian s = side.screenDeltaToWorld(50.0f, -100.0f);
     REQUIRE_THAT(s.x, WithinAbs(0.0, 1e-6));
     REQUIRE_THAT(s.y, WithinAbs(0.5, 1e-5));
@@ -115,4 +118,104 @@ TEST_CASE("Fit extent covers every speaker with a margin", "[ui][stage]") {
     StageTransform t;
     t.setExtent(-3.0f);
     REQUIRE_THAT(t.extent(), WithinAbs(StageTransform::kMinExtentMetres, 1e-6));
+}
+
+TEST_CASE("Snap cameras give exact axis-aligned bases", "[ui][stage]") {
+    StageTransform t;
+    REQUIRE(t.snap() == StageSnap::Top);  // the default
+    REQUIRE(t.screenRight() == Cartesian{1, 0, 0});
+    REQUIRE(t.screenUp() == Cartesian{0, 1, 0});
+    REQUIRE(t.towardViewer() == Cartesian{0, 0, 1});
+    t.setSnap(StageSnap::Side);
+    REQUIRE(t.screenRight() == Cartesian{0, 1, 0});
+    REQUIRE(t.screenUp() == Cartesian{0, 0, 1});
+    REQUIRE(t.towardViewer() == Cartesian{1, 0, 0});
+    t.setSnap(StageSnap::Front);
+    REQUIRE(t.screenRight() == Cartesian{1, 0, 0});
+    REQUIRE(t.screenUp() == Cartesian{0, 0, 1});
+    REQUIRE(t.towardViewer() == Cartesian{0, -1, 0});
+    REQUIRE(StageTransform::cameraFor(StageSnap::ThreeD) == StageCamera{-32.0f, 24.0f});
+}
+
+TEST_CASE("Every camera has an orthonormal basis with a level floor", "[ui][stage]") {
+    StageTransform t;
+    for (float yaw : {-170.0f, -32.0f, 0.0f, 45.0f, 120.0f})
+        for (float pitch : {-90.0f, -40.0f, 0.0f, 24.0f, 90.0f}) {
+            t.setCamera({yaw, pitch});
+            const Cartesian r = t.screenRight(), u = t.screenUp(), d = t.towardViewer();
+            REQUIRE_THAT(r.length(), WithinAbs(1.0, 1e-5));
+            REQUIRE_THAT(u.length(), WithinAbs(1.0, 1e-5));
+            REQUIRE_THAT(d.length(), WithinAbs(1.0, 1e-5));
+            REQUIRE_THAT(r.dot(u), WithinAbs(0.0, 1e-5));
+            REQUIRE_THAT(r.dot(d), WithinAbs(0.0, 1e-5));
+            REQUIRE_THAT(u.dot(d), WithinAbs(0.0, 1e-5));
+            REQUIRE_THAT(r.cross(u).dot(d), WithinAbs(1.0, 1e-5));
+            REQUIRE(r.z == 0.0f);   // the view never rolls
+            REQUIRE(u.z >= 0.0f);   // world up never draws downwards
+        }
+}
+
+TEST_CASE("Screen and world round-trip at a free camera angle", "[ui][stage]") {
+    auto t = square();
+    t.setViewport({30, 40, 640, 380});
+    t.setZoom(1.7f);
+    t.setPan({0.4f, -0.3f});
+    t.setCamera({-32.0f, 24.0f});
+    const Cartesian p{1.25f, -0.75f, 0.5f};
+    const Cartesian back = t.toWorld(t.toScreen(p), p);
+    REQUIRE_THAT(back.x, WithinAbs(p.x, 1e-4));
+    REQUIRE_THAT(back.y, WithinAbs(p.y, 1e-4));
+    REQUIRE_THAT(back.z, WithinAbs(p.z, 1e-4));
+    // A drag moves the point in the screen plane and follows the mouse.
+    const Cartesian moved = p + t.screenDeltaToWorld(37.0f, -12.0f);
+    REQUIRE_THAT(t.depthOf(moved), WithinAbs(t.depthOf(p), 1e-4));
+    REQUIRE_THAT(t.toScreen(moved).x - t.toScreen(p).x, WithinAbs(37.0, 1e-2));
+    REQUIRE_THAT(t.toScreen(moved).y - t.toScreen(p).y, WithinAbs(-12.0, 1e-2));
+}
+
+TEST_CASE("Orbit turns 0.4 degrees per pixel, wraps yaw and clamps pitch", "[ui][stage]") {
+    StageTransform t;
+    t.setCamera({0.0f, 0.0f});
+    t.orbit(10.0f, 25.0f);
+    REQUIRE_THAT(t.camera().yawDeg, WithinAbs(-4.0, 1e-4));
+    REQUIRE_THAT(t.camera().pitchDeg, WithinAbs(10.0, 1e-4));
+    REQUIRE_FALSE(t.snap());
+    t.orbit(0.0f, 1000.0f);
+    REQUIRE(t.camera().pitchDeg == 90.0f);
+    t.orbit(0.0f, -1000.0f);
+    REQUIRE(t.camera().pitchDeg == -90.0f);
+    t.setCamera({170.0f, 0.0f});
+    t.orbit(-50.0f, 0.0f);  // 170 + 20 wraps to -170
+    REQUIRE_THAT(t.camera().yawDeg, WithinAbs(-170.0, 1e-3));
+    t.setSnap(StageSnap::Side);
+    t.setCamera({std::numeric_limits<float>::quiet_NaN(), 0.0f});
+    REQUIRE(t.snap() == StageSnap::Side);  // ignored
+}
+
+TEST_CASE("Rotating keeps the listener where it is on screen", "[ui][stage]") {
+    auto t = square();
+    t.zoomAbout({320, 90}, 2.5f);
+    const auto before = t.toScreen({0, 0, 0});
+    t.orbit(123.0f, -45.0f);
+    const auto after = t.toScreen({0, 0, 0});
+    REQUIRE_THAT(after.x, WithinAbs(before.x, 1e-3));
+    REQUIRE_THAT(after.y, WithinAbs(before.y, 1e-3));
+}
+
+TEST_CASE("Fit extent is the farthest speaker distance", "[ui][stage]") {
+    Layout box;
+    box.speakers = {Speaker{1, "a", Position::fromCartesian({2, 2, 2})},
+                    Speaker{2, "b", Position::fromCartesian({-2, -2, 0})}};
+    REQUIRE_THAT(StageTransform::fitExtent(box), WithinAbs(std::sqrt(12.0) * 1.15, 1e-3));
+}
+
+TEST_CASE("A zero-size viewport still gives finite results", "[ui][stage]") {
+    StageTransform t;
+    t.setViewport({0, 0, 0, 0});
+    t.setCamera({-32.0f, 24.0f});
+    const auto s = t.toScreen({1, 2, 3});
+    REQUIRE(std::isfinite(s.x));
+    REQUIRE(std::isfinite(s.y));
+    const Cartesian w = t.toWorld({5, 5}, {1, 2, 3});
+    REQUIRE((std::isfinite(w.x) && std::isfinite(w.y) && std::isfinite(w.z)));
 }

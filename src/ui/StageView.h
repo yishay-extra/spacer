@@ -27,8 +27,8 @@ public:
     ~StageView() override;
 
     /// Top or side view (SPEC §16: "toggle side view").
-    void setProjection(StageProjection projection);
-    StageProjection projection() const noexcept { return transform_.view(); }
+    void setSnap(StageSnap snap);
+    std::optional<StageSnap> snap() const noexcept { return transform_.snap(); }
 
     /// LayoutEdit: the selected speaker (highlighted); -1 = none.
     void setSelectedSpeaker(int speakerId);
