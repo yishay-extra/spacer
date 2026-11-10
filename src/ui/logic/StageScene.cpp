@@ -38,8 +38,7 @@ void StageScene::update(const Project& project, const FeedbackState& feedback) {
     sharePairs_ = 0;
     for (const auto& s : project.sources) {
         const auto model = modelPoints(s, project.layout);
-        const float level =
-            s.mute ? 0.0f : FeedbackState::meterFraction(feedback.sourceLevelDb(s.id));
+        const float level = s.mute ? 0.0f : FeedbackState::meterFraction(feedback.sourceLevelDb(s.id));
         for (int ch = 0; ch < static_cast<int>(model.size()); ++ch) {
             const auto rendered = feedback.sourcePosition(s.id, ch);
             const Position p = rendered ? *rendered : model[static_cast<std::size_t>(ch)];
@@ -52,7 +51,8 @@ void StageScene::update(const Project& project, const FeedbackState& feedback) {
             point.colour = sourceColour(s.id);
             point.level = level;
             if (level > 0.0f) {
-                const auto count = std::min(static_cast<std::size_t>(shares_.numSpeakers()), point.shares.size());
+                const auto count =
+                    std::min(static_cast<std::size_t>(shares_.numSpeakers()), point.shares.size());
                 point.hasShares = shares_.gainsFor(s, p, std::span<float>(point.shares.data(), count));
                 for (std::size_t i = 0; i < point.shares.size(); ++i) {
                     point.shares[i] = point.hasShares ? point.shares[i] * level : 0.0f;
@@ -73,10 +73,12 @@ int strongestShares(std::span<const float> shares, std::span<int> out) {
         if (!(shares[i] > 0.0f)) continue;
         const auto size = static_cast<int>(out.size());
         int at = written;
-        while (at > 0 && shares[static_cast<std::size_t>(out[static_cast<std::size_t>(at - 1)])] < shares[i]) --at;
+        while (at > 0 && shares[static_cast<std::size_t>(out[static_cast<std::size_t>(at - 1)])] < shares[i])
+            --at;
         if (at >= size) continue;
         const int last = std::min(written, size - 1);
-        for (int k = last; k > at; --k) out[static_cast<std::size_t>(k)] = out[static_cast<std::size_t>(k - 1)];
+        for (int k = last; k > at; --k)
+            out[static_cast<std::size_t>(k)] = out[static_cast<std::size_t>(k - 1)];
         out[static_cast<std::size_t>(at)] = static_cast<int>(i);
         written = std::min(written + 1, size);
     }

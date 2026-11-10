@@ -9,7 +9,9 @@ namespace {
 constexpr double kGoldenStep = 0.61803399;
 constexpr float kSaturation = 0.65f;
 
-std::uint8_t toByte(float v) { return static_cast<std::uint8_t>(std::lround(v * 255.0f)); }
+std::uint8_t toByte(float v) {
+    return static_cast<std::uint8_t>(std::lround(v * 255.0f));
+}
 
 }  // namespace
 
@@ -29,12 +31,33 @@ StageRgb sourceColour(int sourceId) {
     const float t = 1.0f - kSaturation * (1.0f - frac);
     float r = 1.0f, g = t, b = p;
     switch (sector) {
-        case 1: r = q; g = 1.0f; b = p; break;
-        case 2: r = p; g = 1.0f; b = t; break;
-        case 3: r = p; g = q; b = 1.0f; break;
-        case 4: r = t; g = p; b = 1.0f; break;
-        case 5: r = 1.0f; g = p; b = q; break;
-        default: break;
+        case 1:
+            r = q;
+            g = 1.0f;
+            b = p;
+            break;
+        case 2:
+            r = p;
+            g = 1.0f;
+            b = t;
+            break;
+        case 3:
+            r = p;
+            g = q;
+            b = 1.0f;
+            break;
+        case 4:
+            r = t;
+            g = p;
+            b = 1.0f;
+            break;
+        case 5:
+            r = 1.0f;
+            g = p;
+            b = q;
+            break;
+        default:
+            break;
     }
     return {toByte(r), toByte(g), toByte(b)};
 }

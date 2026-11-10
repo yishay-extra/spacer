@@ -1,8 +1,7 @@
-#include <cmath>
-#include <limits>
-
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
+#include <cmath>
+#include <limits>
 
 #include "core/LayoutPresets.h"
 #include "ui/logic/StageTransform.h"
@@ -150,8 +149,8 @@ TEST_CASE("Every camera has an orthonormal basis with a level floor", "[ui][stag
             REQUIRE_THAT(r.dot(d), WithinAbs(0.0, 1e-5));
             REQUIRE_THAT(u.dot(d), WithinAbs(0.0, 1e-5));
             REQUIRE_THAT(r.cross(u).dot(d), WithinAbs(1.0, 1e-5));
-            REQUIRE(r.z == 0.0f);   // the view never rolls
-            REQUIRE(u.z >= 0.0f);   // world up never draws downwards
+            REQUIRE(r.z == 0.0f);  // the view never rolls
+            REQUIRE(u.z >= 0.0f);  // world up never draws downwards
         }
 }
 

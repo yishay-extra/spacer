@@ -38,10 +38,14 @@ float StageTransform::pixelsPerMetre() const {
 
 StageCamera StageTransform::cameraFor(StageSnap snap) {
     switch (snap) {
-        case StageSnap::ThreeD: return {-32.0f, 24.0f};
-        case StageSnap::Top: return {0.0f, 90.0f};
-        case StageSnap::Side: return {90.0f, 0.0f};
-        case StageSnap::Front: return {0.0f, 0.0f};
+        case StageSnap::ThreeD:
+            return {-32.0f, 24.0f};
+        case StageSnap::Top:
+            return {0.0f, 90.0f};
+        case StageSnap::Side:
+            return {90.0f, 0.0f};
+        case StageSnap::Front:
+            return {0.0f, 0.0f};
     }
     return {0.0f, 90.0f};
 }
@@ -59,7 +63,8 @@ std::optional<StageSnap> StageTransform::snap() const {
 }
 
 void StageTransform::orbit(float dxPixels, float dyPixels) {
-    setCamera({camera_.yawDeg - kOrbitDegPerPixel * dxPixels, camera_.pitchDeg + kOrbitDegPerPixel * dyPixels});
+    setCamera(
+        {camera_.yawDeg - kOrbitDegPerPixel * dxPixels, camera_.pitchDeg + kOrbitDegPerPixel * dyPixels});
 }
 
 void StageTransform::updateBasis() {

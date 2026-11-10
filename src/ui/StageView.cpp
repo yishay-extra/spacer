@@ -8,8 +8,8 @@
 #include <vector>
 
 #include "ui/logic/LayoutEditing.h"
-#include "ui/logic/StageCloud.h"
 #include "ui/logic/SourceGeometry.h"
+#include "ui/logic/StageCloud.h"
 #include "ui/logic/StageDepth.h"
 #include "ui/logic/StageHitTest.h"
 
@@ -158,9 +158,14 @@ void StageView::paint(juce::Graphics& g) {
     juce::String caption = "3D view  -  drag empty space to rotate";
     if (const auto snap = transform_.snap()) {
         switch (*snap) {
-            case StageSnap::ThreeD: break;
-            case StageSnap::Top: caption = "Top view  -  front is up"; break;
-            case StageSnap::Side: caption = "Side view (from the right)  -  front is right, up is up"; break;
+            case StageSnap::ThreeD:
+                break;
+            case StageSnap::Top:
+                caption = "Top view  -  front is up";
+                break;
+            case StageSnap::Side:
+                caption = "Side view (from the right)  -  front is right, up is up";
+                break;
             case StageSnap::Front:
                 caption = "Front view (from behind the listener)  -  right is right, up is up";
                 break;
@@ -182,8 +187,9 @@ void StageView::paintFloor(juce::Graphics& g) const {
     constexpr int kSegments = 72;
     constexpr int kMaxRings = 50;
     const float extent = transform_.extent();
-    const int rings = std::clamp(
-        static_cast<int>(std::ceil(std::max(extent * 1.5f, extent * 1.5f / transform_.zoom()))), 1, kMaxRings);
+    const int rings =
+        std::clamp(static_cast<int>(std::ceil(std::max(extent * 1.5f, extent * 1.5f / transform_.zoom()))), 1,
+                   kMaxRings);
     g.setFont(juce::FontOptions(10.0f));
     for (int r = 1; r <= rings; ++r) {
         const float radius = static_cast<float>(r);
@@ -200,7 +206,8 @@ void StageView::paintFloor(juce::Graphics& g) const {
         g.strokePath(ring, juce::PathStrokeType(1.0f));
         const auto label = toJuce({radius, 0.0f, 0.0f});
         g.setColour(kGridText);
-        g.drawText(juce::String(r) + " m", juce::Rectangle<float>(label.x + 3.0f, label.y - 12.0f, 40.0f, 12.0f),
+        g.drawText(juce::String(r) + " m",
+                   juce::Rectangle<float>(label.x + 3.0f, label.y - 12.0f, 40.0f, 12.0f),
                    juce::Justification::topLeft);
     }
     const float reach = static_cast<float>(rings);
@@ -265,15 +272,16 @@ void StageView::paintGizmo(juce::Graphics& g) const {
     };
     g.setFont(juce::FontOptions(11.0f));
     for (const auto& a : axes) {
-        const juce::Point<float> tip =
-            centre + juce::Point<float>(transform_.screenRight().dot(a.axis), -transform_.screenUp().dot(a.axis)) *
-                         kLength;
+        const juce::Point<float> tip = centre + juce::Point<float>(transform_.screenRight().dot(a.axis),
+                                                                   -transform_.screenUp().dot(a.axis)) *
+                                                    kLength;
         g.setColour(juce::Colour(a.colour));
         g.drawArrow(juce::Line<float>(centre, tip), 1.5f, 6.0f, 6.0f);
         const auto out = tip - centre;
         const float len = std::max(1.0f, std::hypot(out.x, out.y));
         const auto labelAt = tip + juce::Point<float>(out.x / len, out.y / len) * 9.0f;
-        g.drawText(a.text, juce::Rectangle<float>(24.0f, 12.0f).withCentre(labelAt), juce::Justification::centred);
+        g.drawText(a.text, juce::Rectangle<float>(24.0f, 12.0f).withCentre(labelAt),
+                   juce::Justification::centred);
     }
 }
 
@@ -349,7 +357,8 @@ void StageView::paintItems(juce::Graphics& g) {
     }
 }
 
-void StageView::paintStem(juce::Graphics& g, const Cartesian& position, juce::Colour colour, float cue) const {
+void StageView::paintStem(juce::Graphics& g, const Cartesian& position, juce::Colour colour,
+                          float cue) const {
     if (std::abs(position.z) <= 0.02f) return;
     const auto p = toJuce(position);
     const auto foot = toJuce({position.x, position.y, 0.0f});
@@ -408,18 +417,17 @@ void StageView::paintSourcePoint(juce::Graphics& g, const StageSourcePoint& s, i
     const juce::Colour colour = sourceJuceColour(s);
     paintStem(g, s.position, colour, cue);
     if (!s.mute && s.level > 0.0f)
-        paintCloud(g, s.position, kCloudRadius, cloudDots(s.level, cloudLimit), colour,
-                   cue);
+        paintCloud(g, s.position, kCloudRadius, cloudDots(s.level, cloudLimit), colour, cue);
     const bool selected = context_.selection().isSelected(s.id);
-    const bool active =
-        (drag_ && drag_->item.kind == StageItem::Kind::Source && drag_->item.id == s.id) ||
-        (hover_ && hover_->kind == StageItem::Kind::Source && hover_->id == s.id);
+    const bool active = (drag_ && drag_->item.kind == StageItem::Kind::Source && drag_->item.id == s.id) ||
+                        (hover_ && hover_->kind == StageItem::Kind::Source && hover_->id == s.id);
     const float radius = kSourceRadius * cue;
     g.setColour(colour.withAlpha(cue));
     g.fillEllipse(p.x - radius, p.y - radius, radius * 2.0f, radius * 2.0f);
     if (active || selected) {
         g.setColour(active ? juce::Colours::white : kSelected);
-        g.drawEllipse(p.x - radius - 3.0f, p.y - radius - 3.0f, radius * 2.0f + 6.0f, radius * 2.0f + 6.0f, 1.5f);
+        g.drawEllipse(p.x - radius - 3.0f, p.y - radius - 3.0f, radius * 2.0f + 6.0f, radius * 2.0f + 6.0f,
+                      1.5f);
     }
     juce::String label(s.name);
     if (s.channel == 1) label << " R";

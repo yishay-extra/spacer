@@ -63,8 +63,8 @@ private:
     void paintSpeaker(juce::Graphics& g, std::size_t index, int glowLimit);
     void paintSourcePoint(juce::Graphics& g, const StageSourcePoint& s, int cloudLimit);
     void paintStem(juce::Graphics& g, const Cartesian& position, juce::Colour colour, float cue) const;
-    void paintCloud(juce::Graphics& g, const Cartesian& centre, float radiusMetres, int dots, juce::Colour colour,
-                    float cue);
+    void paintCloud(juce::Graphics& g, const Cartesian& centre, float radiusMetres, int dots,
+                    juce::Colour colour, float cue);
 
     AppContext& context_;
     Mode mode_;

@@ -1,6 +1,5 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
-
 #include <cmath>
 #include <limits>
 
@@ -21,7 +20,9 @@ TEST_CASE("Cloud offsets are one fixed, centred, unit-sized table", "[ui][cloud]
     REQUIRE_THAT(o[95].phase, WithinAbs(3.399481, 1e-4));
     double mx = 0, my = 0, mz = 0, sq = 0;
     for (const auto& p : o) {
-        mx += p.x; my += p.y; mz += p.z;
+        mx += p.x;
+        my += p.y;
+        mz += p.z;
         sq += p.x * p.x + p.y * p.y + p.z * p.z;
         REQUIRE(std::abs(p.x) <= 3.47f);
         REQUIRE(std::abs(p.y) <= 3.47f);

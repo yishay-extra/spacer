@@ -22,7 +22,8 @@ inline constexpr int kGlowMinDots = 3;
 /// The one fixed table of kCloudMaxDots unit-variance offsets; identical on every platform.
 std::span<const CloudOffset> cloudOffsets();
 /// Most dots one cloud may use when `loudPoints` clouds are drawn:
-/// clamp(kCloudFrameBudget / loudPoints, kCloudMinBudgetDots, kCloudMaxDots); kCloudMaxDots when loudPoints <= 0.
+/// clamp(kCloudFrameBudget / loudPoints, kCloudMinBudgetDots, kCloudMaxDots); kCloudMaxDots when loudPoints
+/// <= 0.
 int cloudDotLimit(int loudPoints);
 /// Most dots one speaker glow may use: min(cloudLimit / 4, max(kGlowMinDots, kGlowFrameBudget / sharePairs));
 /// cloudLimit / 4 when sharePairs <= 0; never below 0.

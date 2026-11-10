@@ -1,6 +1,5 @@
-#include <catch2/catch_test_macros.hpp>
-
 #include <algorithm>
+#include <catch2/catch_test_macros.hpp>
 #include <cmath>
 
 #include "ui/logic/StagePalette.h"
@@ -24,7 +23,8 @@ TEST_CASE("Every source id has its own stable colour", "[ui][palette]") {
             REQUIRE_FALSE(sourceColour(a) == sourceColour(b));
         }
     }
-    for (int a = 1; a < 64; ++a) REQUIRE(hueGap(sourceHue(a), sourceHue(a + 1)) > 0.3f);  // neighbours contrast
+    for (int a = 1; a < 64; ++a)
+        REQUIRE(hueGap(sourceHue(a), sourceHue(a + 1)) > 0.3f);  // neighbours contrast
     for (int id : {0, -5}) {
         REQUIRE(sourceHue(id) >= 0.0f);
         REQUIRE(sourceHue(id) < 1.0f);
@@ -34,7 +34,7 @@ TEST_CASE("Every source id has its own stable colour", "[ui][palette]") {
 TEST_CASE("Source colours are bright and saturated", "[ui][palette]") {
     for (int id = 1; id <= 64; ++id) {
         const StageRgb c = sourceColour(id);
-        REQUIRE(std::max({c.r, c.g, c.b}) == 255);                  // value 1.0
-        REQUIRE(std::min({c.r, c.g, c.b}) == 89);                   // 255 × (1 − 0.65), rounded
+        REQUIRE(std::max({c.r, c.g, c.b}) == 255);  // value 1.0
+        REQUIRE(std::min({c.r, c.g, c.b}) == 89);   // 255 × (1 − 0.65), rounded
     }
 }
