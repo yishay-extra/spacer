@@ -34,6 +34,8 @@ constexpr float kMeterRingMax = 16.0f;  // extra ring radius at 0 dBFS
 constexpr float kCloudRadius = 0.20f;   // metres, per unit of the cloud table
 constexpr float kGlowRadius = 0.13f;    // metres
 constexpr float kShimmer = 0.12f;       // dot wobble, in cloud-table units
+// Whole shimmer cycles for 1.7, 1.3 and 1.1 rad/s (their common period is 20 pi s).
+constexpr double kAnimPeriodSeconds = 20.0 * 3.14159265358979323846;
 
 juce::Colour sourceJuceColour(const StageSourcePoint& s) {
     return s.mute ? kSourceMuted : juce::Colour(s.colour.r, s.colour.g, s.colour.b);
@@ -118,7 +120,7 @@ void StageView::projectChanged(AppContext::Change change) {
 }
 
 void StageView::feedbackUpdated() {
-    animTime_ += 1.0 / AppContext::kTickHz;
+    animTime_ = std::fmod(animTime_ + 1.0 / AppContext::kTickHz, kAnimPeriodSeconds);
     scene_.update(context_.project(), context_.feedback());
     repaint();
 }
@@ -205,10 +207,17 @@ void StageView::paintFloor(juce::Graphics& g) const {
     g.setColour(kGrid.brighter(0.3f));
     g.drawLine(juce::Line<float>(toJuce({-reach, 0.0f, 0.0f}), toJuce({reach, 0.0f, 0.0f})), 1.0f);
     g.drawLine(juce::Line<float>(toJuce({0.0f, -reach, 0.0f}), toJuce({0.0f, reach, 0.0f})), 1.0f);
-    const auto front = toJuce({0.0f, extent * 1.08f, 0.0f});
+    constexpr float kLabelW = 60.0f, kLabelH = 14.0f;
+    const auto from = toJuce({});
+    const auto to = toJuce({0.0f, extent * 1.08f, 0.0f});
+    const auto bounds = getLocalBounds().toFloat().reduced(kLabelW * 0.5f + 6.0f, kLabelH * 0.5f + 6.0f);
+    const StageRect limit{bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight()};
+    if (!bounds.contains(from) || std::hypot(to.x - from.x, to.y - from.y) < 12.0f) return;
+    const auto at = pullInside({from.x, from.y}, {to.x, to.y}, limit);
     g.setColour(kGridText);
     g.setFont(juce::FontOptions(11.0f));
-    g.drawText("FRONT", juce::Rectangle<float>(60.0f, 14.0f).withCentre(front), juce::Justification::centred);
+    g.drawText("FRONT", juce::Rectangle<float>(kLabelW, kLabelH).withCentre({at.x, at.y}),
+               juce::Justification::centred);
 }
 
 void StageView::paintMast(juce::Graphics& g) const {
@@ -278,7 +287,7 @@ void StageView::paintCloud(juce::Graphics& g, const Cartesian& centre, float rad
     const Cartesian right = transform_.screenRight();
     const Cartesian up = transform_.screenUp();
     const float size = cue > 0.88f ? 3.0f : 2.0f;
-    const float t = static_cast<float>(animTime_);
+    const float t = static_cast<float>(animTime_);  // wrapped, so float keeps its precision
     dots_.clear();
     for (int k = 0; k < dots; ++k) {
         const CloudOffset& o = offsets[static_cast<std::size_t>(k)];
@@ -458,7 +467,7 @@ void StageView::mouseDown(const juce::MouseEvent& e) {
     const auto hit = spacer::hitTest(scene_.items(), transform_, toStage(e.position), options);
     if (!hit) {
         orbiting_ = true;
-        lastOrbitPosition_ = e.position;
+        orbitStarted_ = false;
         return;
     }
     Drag d;
@@ -482,6 +491,14 @@ void StageView::mouseDown(const juce::MouseEvent& e) {
 
 void StageView::mouseDrag(const juce::MouseEvent& e) {
     if (orbiting_) {
+        if (!orbitStarted_) {
+            if (e.getDistanceFromDragStart() < 3) return;  // a click, not an orbit (yet)
+            orbitStarted_ = true;
+            lastOrbitPosition_ = e.position;
+            hover_.reset();
+            setMouseCursor(juce::MouseCursor::NormalCursor);
+            return;
+        }
         const auto movement = e.position - lastOrbitPosition_;
         lastOrbitPosition_ = e.position;
         transform_.orbit(movement.x, movement.y);
@@ -518,6 +535,7 @@ void StageView::mouseDrag(const juce::MouseEvent& e) {
 
 void StageView::mouseUp(const juce::MouseEvent&) {
     orbiting_ = false;
+    orbitStarted_ = false;
     if (!drag_) return;
     const Drag d = *drag_;
     drag_.reset();

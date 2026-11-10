@@ -29,8 +29,7 @@ struct StageHitOptions {
 /// The item under `screen`. Sources are on top of speakers, so a source in
 /// range wins over any speaker. Among items of one kind the one closest on
 /// screen wins; at equal screen distance, the one nearer the viewer (larger
-/// `StageTransform::depthOf`) wins, then the
-/// one listed first.
+/// `StageTransform::depthOf`) wins, then the one listed first.
 std::optional<StageItem> hitTest(const std::vector<StageItem>& items, const StageTransform& transform,
                                  const StagePoint& screen, const StageHitOptions& options = {});
 

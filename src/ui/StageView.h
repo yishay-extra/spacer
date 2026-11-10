@@ -14,14 +14,10 @@
 
 namespace spacer {
 
-/// The stage (SPEC §16 item 1): an orthographic 3D orbit view of the layout and
-/// the sources, with Top / Side / Front snaps; dragging empty space rotates.
-/// Speakers show their output meter as a ring. Perform mode: drag sources,
-/// click a speaker to solo pink noise on it. LayoutEdit mode: drag speakers,
-/// click to select.
-///
-/// The maths (transforms, hit-testing, drag rules) is in src/ui/logic and
-/// unit-tested; this class only draws and routes mouse events.
+/// The stage (SPEC §16 item 1): an orthographic 3D orbit view with Top / Side /
+/// Front snaps; dragging empty space rotates. Perform mode drags sources and
+/// clicks speakers to solo them; LayoutEdit mode drags and selects speakers.
+/// The maths is in src/ui/logic; this class only draws and routes the mouse.
 class StageView final : public juce::Component, private AppContext::Listener {
 public:
     enum class Mode { Perform, LayoutEdit };
@@ -80,6 +76,7 @@ private:
     };
     std::array<SnapButton, 4> snapButtons_;
     bool orbiting_{false};
+    bool orbitStarted_{false};
     juce::Point<float> lastOrbitPosition_;
 
     struct Drag {

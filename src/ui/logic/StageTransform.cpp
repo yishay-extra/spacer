@@ -5,6 +5,24 @@
 
 namespace spacer {
 
+StagePoint pullInside(const StagePoint& from, const StagePoint& to, const StageRect& bounds) {
+    const float right = bounds.x + bounds.width;
+    const float bottom = bounds.y + bounds.height;
+    const auto inside = [&](const StagePoint& p) {
+        return p.x >= bounds.x && p.x <= right && p.y >= bounds.y && p.y <= bottom;
+    };
+    if (!inside(from)) return from;
+    if (inside(to)) return to;
+    const float dx = to.x - from.x;
+    const float dy = to.y - from.y;
+    float t = 1.0f;
+    if (dx > 0.0f) t = std::min(t, (right - from.x) / dx);
+    if (dx < 0.0f) t = std::min(t, (bounds.x - from.x) / dx);
+    if (dy > 0.0f) t = std::min(t, (bottom - from.y) / dy);
+    if (dy < 0.0f) t = std::min(t, (bounds.y - from.y) / dy);
+    return {from.x + dx * t, from.y + dy * t};
+}
+
 void StageTransform::setExtent(float metres) {
     extent_ = std::isfinite(metres) ? std::max(metres, kMinExtentMetres) : kMinExtentMetres;
 }

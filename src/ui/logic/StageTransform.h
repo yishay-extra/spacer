@@ -37,6 +37,10 @@ struct StageRect {
     float height{0.0f};
 };
 
+/// The point of the segment from → to that is farthest from `from` and still inside `bounds`:
+/// `to` when it is inside; `from` when `from` itself is outside.
+StagePoint pullInside(const StagePoint& from, const StagePoint& to, const StageRect& bounds);
+
 class StageTransform {
 public:
     static constexpr float kMinExtentMetres = 1.0f;

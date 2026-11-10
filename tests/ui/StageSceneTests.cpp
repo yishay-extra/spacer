@@ -151,3 +151,22 @@ TEST_CASE("Strongest shares come first and stop at the limit", "[ui][scene]") {
     REQUIRE(strongestShares(zeros, eight) == 0);
     REQUIRE(strongestShares(shares, std::span<int>{}) == 0);
 }
+
+TEST_CASE("Shares follow a layout that shrinks", "[ui][scene]") {
+    Project p = makeProject();
+    p.layout = *layoutpresets::load("dome22");
+    FeedbackState f;
+    f.apply(fb::SourceMeter{1, {1.0f, 0.0f}});  // 0 dBFS
+    StageScene scene;
+    scene.setProject(p);
+    scene.update(p, f);
+    p.layout = *layoutpresets::load("quad");
+    scene.update(p, f);
+    const auto& s = scene.sources()[0];
+    for (std::size_t i = 4; i < s.shares.size(); ++i) REQUIRE(s.shares[i] == 0.0f);
+    for (std::size_t i = 0; i < 4; ++i) {
+        const bool front = std::abs(p.layout.speakers[i].position.azimuth) < 90.0f;
+        REQUIRE_THAT(s.shares[i], WithinAbs(front ? 0.70711 : 0.0, 1e-3));
+    }
+    REQUIRE(scene.sharePairs() == 2);
+}

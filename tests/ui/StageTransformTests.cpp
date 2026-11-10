@@ -219,3 +219,26 @@ TEST_CASE("A zero-size viewport still gives finite results", "[ui][stage]") {
     const Cartesian w = t.toWorld({5, 5}, {1, 2, 3});
     REQUIRE((std::isfinite(w.x) && std::isfinite(w.y) && std::isfinite(w.z)));
 }
+
+TEST_CASE("A point is pulled back along its ray until it is inside", "[ui][stage]") {
+    const StageRect bounds{0, 0, 400, 300};
+    const StagePoint centre{200, 150};
+    auto p = pullInside(centre, {250, 100}, bounds);  // already inside
+    REQUIRE_THAT(p.x, WithinAbs(250.0, 1e-4));
+    REQUIRE_THAT(p.y, WithinAbs(100.0, 1e-4));
+    p = pullInside(centre, {200, -50}, bounds);  // above the top edge
+    REQUIRE_THAT(p.x, WithinAbs(200.0, 1e-4));
+    REQUIRE_THAT(p.y, WithinAbs(0.0, 1e-4));
+    p = pullInside(centre, {500, 150}, bounds);  // beyond the right edge
+    REQUIRE_THAT(p.x, WithinAbs(400.0, 1e-4));
+    REQUIRE_THAT(p.y, WithinAbs(150.0, 1e-4));
+    p = pullInside(centre, {600, 450}, bounds);  // through the corner
+    REQUIRE_THAT(p.x, WithinAbs(400.0, 1e-4));
+    REQUIRE_THAT(p.y, WithinAbs(300.0, 1e-4));
+    p = pullInside({-10, -10}, {200, 150}, bounds);  // the start is outside
+    REQUIRE_THAT(p.x, WithinAbs(-10.0, 1e-4));
+    REQUIRE_THAT(p.y, WithinAbs(-10.0, 1e-4));
+    const StageRect offset{50, 40, 100, 100};  // a rectangle not at the origin
+    p = pullInside({100, 90}, {100, 500}, offset);
+    REQUIRE_THAT(p.y, WithinAbs(140.0, 1e-4));
+}

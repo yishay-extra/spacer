@@ -1,6 +1,7 @@
 #include "ui/logic/StageScene.h"
 
 #include <algorithm>
+#include <utility>
 
 #include "ui/logic/SourceGeometry.h"
 #include "ui/logic/TrajectoryPreview.h"
@@ -51,7 +52,7 @@ void StageScene::update(const Project& project, const FeedbackState& feedback) {
             point.colour = sourceColour(s.id);
             point.level = level;
             if (level > 0.0f) {
-                const auto count = static_cast<std::size_t>(shares_.numSpeakers());
+                const auto count = std::min(static_cast<std::size_t>(shares_.numSpeakers()), point.shares.size());
                 point.hasShares = shares_.gainsFor(s, p, std::span<float>(point.shares.data(), count));
                 for (std::size_t i = 0; i < point.shares.size(); ++i) {
                     point.shares[i] = point.hasShares ? point.shares[i] * level : 0.0f;
